@@ -1,20 +1,21 @@
+import { Rating } from '@mantine/core'
 import { ACCENT, colors } from '../theme'
-import { stars } from '../lib/format'
 
 interface StarsProps {
   rating: number
-  /** Letter-spacing varies between the card (2px) and table (1px) layouts. */
-  letterSpacing?: number
+  /** Tweaks the glyph size between the card (15px) and table (13px) layouts. */
   fontSize?: number
 }
 
 /** Read-only star rating: filled stars in the accent color, rest in faint. */
-export function Stars({ rating, letterSpacing = 2, fontSize = 15 }: StarsProps) {
-  const { filled, empty } = stars(rating)
+export function Stars({ rating, fontSize = 15 }: StarsProps) {
   return (
-    <div style={{ fontSize, letterSpacing: `${letterSpacing}px`, whiteSpace: 'nowrap' }}>
-      <span style={{ color: ACCENT }}>{filled}</span>
-      <span style={{ color: colors.starEmpty }}>{empty}</span>
-    </div>
+    <Rating
+      value={rating}
+      count={5}
+      readOnly
+      fullSymbol={<span style={{ color: ACCENT, fontSize }}>★</span>}
+      emptySymbol={<span style={{ color: colors.starEmpty, fontSize }}>★</span>}
+    />
   )
 }

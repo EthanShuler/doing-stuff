@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { Box, Button, Center } from '@mantine/core'
 import type { EntryDraft, SortKey, ViewMode } from './types'
 import { useActivityStore } from './data/useActivityStore'
 import { useSession } from './data/useSession'
@@ -25,21 +26,9 @@ function emptyDraft(): EntryDraft {
 /** Full-screen centered message — used for loading and fatal errors. */
 function Splash({ text }: { text: string }) {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: colors.pageBg,
-        fontFamily: fonts.sans,
-        color: colors.muted,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        textAlign: 'center',
-      }}
-    >
+    <Center mih="100vh" bg={colors.pageBg} c={colors.muted} p={24} ta="center" style={{ fontFamily: fonts.sans }}>
       {text}
-    </div>
+    </Center>
   )
 }
 
@@ -147,31 +136,26 @@ function AppShell({ session, configured }: { session: Session | null; configured
   return (
     <>
       {supabase && (
-        <button
-          type="button"
+        <Button
+          variant="white"
           onClick={() => supabase!.auth.signOut()}
-          style={{
-            position: 'fixed',
-            top: 16,
-            right: 16,
-            zIndex: 50,
-            padding: '7px 12px',
-            border: `1px solid ${colors.cardBorder}`,
-            borderRadius: 9,
-            background: '#fff',
-            color: colors.muted,
-            fontSize: 12,
-            fontWeight: 600,
-            fontFamily: fonts.sans,
-            cursor: 'pointer',
-          }}
+          fz={12}
+          fw={600}
+          radius={9}
+          px={12}
+          py={7}
+          c={colors.muted}
+          style={{ position: 'fixed', top: 16, right: 16, zIndex: 50, border: `1px solid ${colors.cardBorder}` }}
         >
           Sign out
-        </button>
+        </Button>
       )}
 
       {store.error && (
-        <div
+        <Box
+          c="oklch(0.45 0.14 25)"
+          px={14}
+          py={9}
           style={{
             position: 'fixed',
             top: 16,
@@ -179,11 +163,9 @@ function AppShell({ session, configured }: { session: Session | null; configured
             transform: 'translateX(-50%)',
             zIndex: 60,
             maxWidth: 'min(92vw, 520px)',
-            padding: '9px 14px',
             border: `1px solid ${colors.cardBorder}`,
             borderRadius: 9,
             background: 'oklch(0.96 0.04 25)',
-            color: 'oklch(0.45 0.14 25)',
             fontSize: 13,
             fontWeight: 500,
             fontFamily: fonts.sans,
@@ -191,7 +173,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
           }}
         >
           {store.error}
-        </div>
+        </Box>
       )}
 
       <Dashboard
@@ -212,30 +194,28 @@ function AppShell({ session, configured }: { session: Session | null; configured
         onDelete={store.deleteEntry}
       />
 
-      {modal === 'entry' && (
-        <EntryModal
-          draft={draft}
-          isEditing={editingId !== null}
-          categories={store.categories}
-          activities={store.activities}
-          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          onSave={saveEntry}
-          onDelete={deleteEditingEntry}
-          onClose={closeModal}
-        />
-      )}
+      <EntryModal
+        opened={modal === 'entry'}
+        draft={draft}
+        isEditing={editingId !== null}
+        categories={store.categories}
+        activities={store.activities}
+        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+        onSave={saveEntry}
+        onDelete={deleteEditingEntry}
+        onClose={closeModal}
+      />
 
-      {modal === 'manage' && (
-        <ManageModal
-          categories={store.categories}
-          activities={store.activities}
-          onAddActivity={store.addActivity}
-          onDeleteActivity={store.deleteActivity}
-          onAddCategory={store.addCategory}
-          onDeleteCategory={store.deleteCategory}
-          onClose={closeModal}
-        />
-      )}
+      <ManageModal
+        opened={modal === 'manage'}
+        categories={store.categories}
+        activities={store.activities}
+        onAddActivity={store.addActivity}
+        onDeleteActivity={store.deleteActivity}
+        onAddCategory={store.addCategory}
+        onDeleteCategory={store.deleteCategory}
+        onClose={closeModal}
+      />
     </>
   )
 }

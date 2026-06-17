@@ -1,9 +1,11 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
+import { Box, Button, Group, Paper, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import type { Activity, Category } from '../types'
-import { ACCENT, colors, fonts, palette, swatchFor } from '../theme'
-import { Overlay } from './EntryModal'
+import { colors, fonts, palette, swatchFor } from '../theme'
+import { ModalShell } from './ModalShell'
 
 interface ManageModalProps {
+  opened: boolean
   categories: Category[]
   activities: Activity[]
   onAddActivity: (categoryId: string, name: string) => void
@@ -14,6 +16,7 @@ interface ManageModalProps {
 }
 
 export function ManageModal({
+  opened,
   categories,
   activities,
   onAddActivity,
@@ -40,78 +43,45 @@ export function ManageModal({
   }
 
   return (
-    <Overlay onClose={onClose} width={520}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-        <h3 style={{ fontFamily: fonts.serif, fontWeight: 500, fontSize: 28, margin: 0 }}>
+    <ModalShell opened={opened} onClose={onClose} width={520}>
+      <Group justify="space-between" align="center" mb={22}>
+        <Title order={3} fz={28}>
           Categories &amp; activities
-        </h3>
-        <button
-          onClick={onClose}
-          style={{
-            fontFamily: fonts.sans,
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#fff',
-            background: ACCENT,
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: 9,
-            cursor: 'pointer',
-          }}
-        >
+        </Title>
+        <Button onClick={onClose} radius={9} size="sm">
           Done
-        </button>
-      </div>
+        </Button>
+      </Group>
 
       {categories.map((category) => {
         const swatch = swatchFor(category.colorIndex)
         const catActivities = activities.filter((a) => a.categoryId === category.id)
         return (
-          <div
+          <Paper
             key={category.id}
-            style={{
-              background: '#fff',
-              border: `1px solid ${colors.cardBorder}`,
-              borderRadius: 14,
-              padding: '16px 18px',
-              marginBottom: 14,
-            }}
+            bg="#fff"
+            withBorder
+            p="16px 18px"
+            mb={14}
+            style={{ borderColor: colors.cardBorder, borderRadius: 14 }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
-              <span
-                style={{ width: 11, height: 11, borderRadius: '50%', background: swatch.color, flexShrink: 0 }}
-              />
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.07em',
-                  color: swatch.ink,
-                }}
-              >
+            <Group gap={9} align="center" mb={12}>
+              <Box w={11} h={11} style={{ borderRadius: '50%', background: swatch.color, flexShrink: 0 }} />
+              <Text fz={12} fw={700} tt="uppercase" c={swatch.ink} style={{ letterSpacing: '0.07em' }}>
                 {category.name}
-              </span>
-              <button
+              </Text>
+              <UnstyledButton
                 onClick={() => onDeleteCategory(category.id)}
-                style={{
-                  marginLeft: 'auto',
-                  fontFamily: fonts.sans,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: colors.faint,
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
+                ml="auto"
+                style={{ fontFamily: fonts.sans, fontSize: 11, fontWeight: 600, color: colors.faint }}
               >
                 Remove category
-              </button>
-            </div>
+              </UnstyledButton>
+            </Group>
 
-            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 12 }}>
+            <Group gap={7} wrap="wrap" mb={12}>
               {catActivities.map((activity) => (
-                <span
+                <Box
                   key={activity.id}
                   style={{
                     display: 'inline-flex',
@@ -126,151 +96,95 @@ export function ManageModal({
                   }}
                 >
                   {activity.name}
-                  <button
+                  <UnstyledButton
                     onClick={() => onDeleteActivity(activity.id)}
-                    style={{
-                      fontFamily: fonts.sans,
-                      fontSize: 14,
-                      lineHeight: 1,
-                      color: '#b3ada3',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                    }}
                     aria-label={`Remove ${activity.name}`}
+                    style={{ fontFamily: fonts.sans, fontSize: 14, lineHeight: 1, color: '#b3ada3', padding: '0 2px' }}
                   >
                     ×
-                  </button>
-                </span>
+                  </UnstyledButton>
+                </Box>
               ))}
-            </div>
+            </Group>
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
+            <Group gap={8} align="flex-end" wrap="nowrap">
+              <TextInput
+                flex={1}
                 value={activityDrafts[category.id] ?? ''}
                 onChange={(e) =>
-                  setActivityDrafts((prev) => ({ ...prev, [category.id]: e.target.value }))
+                  setActivityDrafts((prev) => ({ ...prev, [category.id]: e.currentTarget.value }))
                 }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') submitActivity(category.id)
                 }}
                 placeholder="Add an activity…"
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  border: '1px solid rgba(120,100,80,0.25)',
-                  borderRadius: 9,
-                  fontSize: 13,
-                  fontFamily: fonts.sans,
-                  color: colors.ink,
-                  background: '#fff',
-                }}
+                styles={{ input: { fontSize: 13 } }}
               />
-              <button
+              <Button
+                variant="default"
                 onClick={() => submitActivity(category.id)}
-                style={{
-                  fontFamily: fonts.sans,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#5c574e',
-                  background: colors.chip,
-                  border: '1px solid rgba(120,100,80,0.18)',
-                  padding: '9px 16px',
-                  borderRadius: 9,
-                  cursor: 'pointer',
-                }}
+                radius={9}
+                styles={addButtonStyles}
               >
                 Add
-              </button>
-            </div>
-          </div>
+              </Button>
+            </Group>
+          </Paper>
         )
       })}
 
-      <div
-        style={{
-          background: 'oklch(0.96 0.018 78)',
-          border: '1px dashed rgba(120,100,80,0.3)',
-          borderRadius: 14,
-          padding: '16px 18px',
-          marginTop: 18,
-        }}
+      <Box
+        bg="oklch(0.96 0.018 78)"
+        p="16px 18px"
+        mt={18}
+        style={{ border: '1px dashed rgba(120,100,80,0.3)', borderRadius: 14 }}
       >
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            color: colors.muted,
-            marginBottom: 11,
-          }}
-        >
+        <Text fz={12} fw={600} tt="uppercase" c={colors.muted} mb={11} style={{ letterSpacing: '0.06em' }}>
           New category
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 13 }}>
-          <input
+        </Text>
+        <Group gap={8} mb={13} align="flex-end" wrap="nowrap">
+          <TextInput
+            flex={1}
             value={newCatName}
-            onChange={(e) => setNewCatName(e.target.value)}
+            onChange={(e) => setNewCatName(e.currentTarget.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') submitCategory()
             }}
             placeholder="e.g. Date nights"
-            style={{
-              flex: 1,
-              padding: '9px 12px',
-              border: '1px solid rgba(120,100,80,0.25)',
-              borderRadius: 9,
-              fontSize: 13,
-              fontFamily: fonts.sans,
-              color: colors.ink,
-              background: '#fff',
-            }}
+            styles={{ input: { fontSize: 13 } }}
           />
-          <button onClick={submitCategory} style={createButton}>
+          <Button onClick={submitCategory} radius={9}>
             Create
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span
-            style={{
-              fontSize: 11,
-              color: colors.muted,
-              fontFamily: fonts.mono,
-              letterSpacing: '0.06em',
-            }}
-          >
+          </Button>
+        </Group>
+        <Group gap={10} align="center">
+          <Text fz={11} c={colors.muted} style={{ fontFamily: fonts.mono, letterSpacing: '0.06em' }}>
             COLOR
-          </span>
+          </Text>
           {palette.map((swatch, index) => (
-            <span
+            <UnstyledButton
               key={index}
               onClick={() => setNewCatColor(index)}
               style={{
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
-                cursor: 'pointer',
                 background: swatch.color,
                 border: `3px solid ${newCatColor === index ? colors.ink : 'transparent'}`,
               }}
             />
           ))}
-        </div>
-      </div>
-    </Overlay>
+        </Group>
+      </Box>
+    </ModalShell>
   )
 }
 
-const createButton: CSSProperties = {
-  fontFamily: fonts.sans,
-  fontSize: 13,
-  fontWeight: 600,
-  color: '#fff',
-  background: ACCENT,
-  border: 'none',
-  padding: '9px 18px',
-  borderRadius: 9,
-  cursor: 'pointer',
+const addButtonStyles = {
+  root: {
+    background: colors.chip,
+    border: '1px solid rgba(120,100,80,0.18)',
+    color: '#5c574e',
+    fontSize: 13,
+  },
 }

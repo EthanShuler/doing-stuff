@@ -1,4 +1,16 @@
-import type { CSSProperties } from 'react'
+import {
+  Anchor,
+  Box,
+  Button,
+  Group,
+  Paper,
+  SegmentedControl,
+  Select,
+  SimpleGrid,
+  Text,
+  Title,
+  UnstyledButton,
+} from '@mantine/core'
 import type { Category, SortKey, ViewMode } from '../types'
 import type { DisplayRow, Stats } from '../data/derive'
 import { ACCENT, colors, fonts, swatchFor } from '../theme'
@@ -23,6 +35,20 @@ interface DashboardProps {
   onDelete: (id: string) => void
 }
 
+const eyebrowStyle = {
+  fontFamily: fonts.mono,
+  fontSize: 11,
+  letterSpacing: '0.2em',
+  textTransform: 'uppercase' as const,
+}
+
+const monoLabelStyle = {
+  fontFamily: fonts.mono,
+  fontSize: 11,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+}
+
 export function Dashboard({
   title,
   subtitle,
@@ -43,67 +69,40 @@ export function Dashboard({
   const isEmpty = rows.length === 0
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: colors.pageBg,
-        fontFamily: fonts.sans,
-        color: colors.ink,
-        padding: '48px 24px 80px',
-      }}
-    >
-      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <Box mih="100vh" bg={colors.pageBg} c={colors.ink} pt={48} pb={80} px={24} style={{ fontFamily: fonts.sans }}>
+      <Box maw={960} mx="auto">
         {/* HEADER */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            gap: 24,
-            flexWrap: 'wrap',
-            paddingBottom: 22,
-            borderBottom: '1px dotted rgba(120,100,80,0.4)',
-          }}
+        <Group
+          justify="space-between"
+          align="flex-end"
+          gap={24}
+          wrap="wrap"
+          pb={22}
+          style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
         >
-          <div>
-            <div
-              style={{
-                fontFamily: fonts.mono,
-                fontSize: 11,
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                color: ACCENT,
-                marginBottom: 9,
-              }}
-            >
+          <Box>
+            <Text c="clay.6" mb={9} style={eyebrowStyle}>
               Our city, together
-            </div>
-            <h1
-              style={{
-                fontFamily: fonts.serif,
-                fontWeight: 500,
-                fontSize: 42,
-                lineHeight: 1,
-                margin: 0,
-                letterSpacing: '-0.01em',
-              }}
-            >
+            </Text>
+            <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
               {title}
-            </h1>
-            <div style={{ fontSize: 14, color: colors.muted, marginTop: 6 }}>{subtitle}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onManage} style={secondaryButton}>
+            </Title>
+            <Text fz={14} c={colors.muted} mt={6}>
+              {subtitle}
+            </Text>
+          </Box>
+          <Group gap={10}>
+            <Button variant="default" onClick={onManage} radius={10} styles={secondaryButtonStyles}>
               Manage
-            </button>
-            <button onClick={onAdd} style={primaryButton}>
+            </Button>
+            <Button onClick={onAdd} radius={10}>
               + New entry
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Group>
+        </Group>
 
         {/* STATS */}
-        <div style={{ display: 'flex', gap: 14, marginTop: 26, flexWrap: 'wrap' }}>
+        <Group gap={14} mt={26} wrap="wrap" align="stretch">
           <StatCard value={stats.total} label="Total entries" bg="oklch(0.96 0.018 78)" />
           <StatCard
             value={stats.thisMonth}
@@ -119,20 +118,11 @@ export function Dashboard({
             valueColor="oklch(0.55 0.12 45)"
             labelColor="oklch(0.55 0.1 45)"
           />
-        </div>
+        </Group>
 
         {/* CONTROLS */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            marginTop: 28,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
+          <Group gap={8} wrap="wrap">
             <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
             {categories.map((category) => {
               const swatch = swatchFor(category.colorIndex)
@@ -148,54 +138,40 @@ export function Dashboard({
                 />
               )
             })}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div
-              style={{
-                display: 'flex',
-                background: colors.chip,
-                border: '1px solid rgba(120,100,80,0.12)',
-                borderRadius: 9,
-                padding: 3,
+          </Group>
+          <Group align="center" gap={14} wrap="wrap">
+            <SegmentedControl
+              value={view}
+              onChange={(value) => onView(value as ViewMode)}
+              data={[
+                { label: 'Cards', value: 'cards' },
+                { label: 'Table', value: 'table' },
+              ]}
+              radius={9}
+              styles={{
+                root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
+                label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
               }}
-            >
-              <ViewButton label="Cards" active={view === 'cards'} onClick={() => onView('cards')} />
-              <ViewButton label="Table" active={view === 'table'} onClick={() => onView('table')} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <span
-                style={{
-                  fontFamily: fonts.mono,
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: colors.muted,
-                }}
-              >
+            />
+            <Group align="center" gap={9}>
+              <Text c={colors.muted} style={monoLabelStyle}>
                 Sort
-              </span>
-              <select
+              </Text>
+              <Select
                 value={sort}
-                onChange={(e) => onSort(e.target.value as SortKey)}
-                style={{
-                  fontFamily: fonts.sans,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: colors.ink,
-                  background: '#fff',
-                  border: '1px solid rgba(120,100,80,0.25)',
-                  borderRadius: 9,
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="recent">Most recent</option>
-                <option value="rating">Highest rated</option>
-                <option value="category">By category</option>
-              </select>
-            </div>
-          </div>
-        </div>
+                onChange={(value) => value && onSort(value as SortKey)}
+                allowDeselect={false}
+                data={[
+                  { value: 'recent', label: 'Most recent' },
+                  { value: 'rating', label: 'Highest rated' },
+                  { value: 'category', label: 'By category' },
+                ]}
+                w={160}
+                styles={{ input: { fontWeight: 600 } }}
+              />
+            </Group>
+          </Group>
+        </Group>
 
         {/* ENTRIES */}
         {isEmpty ? (
@@ -205,9 +181,17 @@ export function Dashboard({
         ) : (
           <Table rows={rows} onEdit={onEdit} onDelete={onDelete} />
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   )
+}
+
+const secondaryButtonStyles = {
+  root: {
+    background: 'transparent',
+    border: '1px solid rgba(120,100,80,0.3)',
+    color: '#5c574e',
+  },
 }
 
 function StatCard({
@@ -224,21 +208,14 @@ function StatCard({
   labelColor?: string
 }) {
   return (
-    <div style={{ flex: 1, minWidth: 160, background: bg, borderRadius: 14, padding: '18px 20px' }}>
-      <div style={{ fontFamily: fonts.serif, fontSize: 34, lineHeight: 1, color: valueColor }}>{value}</div>
-      <div
-        style={{
-          fontSize: 12,
-          color: labelColor ?? colors.muted,
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          marginTop: 7,
-        }}
-      >
+    <Box flex={1} miw={160} bg={bg} p="18px 20px" style={{ borderRadius: 14 }}>
+      <Text fz={34} lh={1} c={valueColor} style={{ fontFamily: fonts.serif }}>
+        {value}
+      </Text>
+      <Text fz={12} fw={600} mt={7} c={labelColor ?? colors.muted} tt="uppercase" style={{ letterSpacing: '0.05em' }}>
         {label}
-      </div>
-    </div>
+      </Text>
+    </Box>
   )
 }
 
@@ -255,53 +232,26 @@ function Pill({
   dotColor?: string
   onClick: () => void
 }) {
-  const base: CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    fontSize: 13,
-    padding: '8px 16px',
-    borderRadius: 30,
-    cursor: 'pointer',
-  }
-  const style: CSSProperties = active
-    ? { ...base, fontWeight: 600, background: activeBg, color: '#fff', border: `1px solid ${activeBg}` }
-    : {
-        ...base,
-        fontWeight: 500,
-        background: colors.chip,
-        color: '#6b665e',
-        border: '1px solid rgba(120,100,80,0.12)',
-      }
   return (
-    <div style={style} onClick={onClick}>
-      {dotColor && (
-        <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor }} />
-      )}
-      {label}
-    </div>
-  )
-}
-
-function ViewButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
+    <UnstyledButton
       onClick={onClick}
       style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
         fontFamily: fonts.sans,
         fontSize: 13,
-        fontWeight: 600,
-        padding: '6px 14px',
-        border: 'none',
-        borderRadius: 7,
-        cursor: 'pointer',
-        background: active ? '#fff' : 'transparent',
-        color: active ? colors.ink : colors.muted,
-        boxShadow: active ? '0 1px 2px rgba(60,50,40,0.12)' : 'none',
+        padding: '8px 16px',
+        borderRadius: 30,
+        fontWeight: active ? 600 : 500,
+        background: active ? activeBg : colors.chip,
+        color: active ? '#fff' : '#6b665e',
+        border: active ? `1px solid ${activeBg}` : '1px solid rgba(120,100,80,0.12)',
       }}
     >
+      {dotColor && <Box w={7} h={7} style={{ borderRadius: '50%', background: dotColor }} />}
       {label}
-    </button>
+    </UnstyledButton>
   )
 }
 
@@ -315,48 +265,39 @@ function CardGrid({
   onDelete: (id: string) => void
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 20 }}>
+    <SimpleGrid cols={2} spacing={14} mt={20}>
       {rows.map((row) => (
-        <div
+        <Paper
           key={row.id}
-          style={{
-            background: '#fff',
-            border: `1px solid ${colors.cardBorder}`,
-            borderRadius: 14,
-            padding: '18px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
+          bg="#fff"
+          withBorder
+          p="18px 20px"
+          style={{ borderColor: colors.cardBorder, borderRadius: 14, display: 'flex', flexDirection: 'column' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: row.categoryColor }} />
-              <span style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.1em', color: colors.muted }}>
+          <Group justify="space-between" align="center" mb={11}>
+            <Group gap={7} align="center">
+              <Box w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor }} />
+              <Text c={colors.muted} style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.1em' }}>
                 {`${row.categoryName} · ${row.activityName}`.toUpperCase()}
-              </span>
-            </div>
-            <span style={{ fontFamily: fonts.mono, fontSize: 11, color: colors.faint }}>{formatDate(row.date)}</span>
-          </div>
-          <div style={{ fontFamily: fonts.serif, fontSize: 22, lineHeight: 1.12, marginBottom: 8 }}>{row.title}</div>
-          <div style={{ marginBottom: 10 }}>
+              </Text>
+            </Group>
+            <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 11 }}>
+              {formatDate(row.date)}
+            </Text>
+          </Group>
+          <Text fz={22} lh={1.12} mb={8} style={{ fontFamily: fonts.serif }}>
+            {row.title}
+          </Text>
+          <Box mb={10}>
             <Stars rating={row.rating} />
-          </div>
-          <div
-            style={{
-              fontFamily: fonts.serif,
-              fontStyle: 'italic',
-              fontSize: 14,
-              lineHeight: 1.5,
-              color: '#6b665e',
-              flex: 1,
-            }}
-          >
+          </Box>
+          <Text fz={14} lh={1.5} c="#6b665e" flex={1} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
             {row.description}
-          </div>
+          </Text>
           <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} bordered />
-        </div>
+        </Paper>
       ))}
-    </div>
+    </SimpleGrid>
   )
 }
 
@@ -372,27 +313,25 @@ function Table({
   onDelete: (id: string) => void
 }) {
   return (
-    <div
-      style={{
-        marginTop: 20,
-        background: '#fff',
-        border: `1px solid ${colors.cardBorder}`,
-        borderRadius: 14,
-        overflow: 'hidden',
-      }}
+    <Paper
+      mt={20}
+      bg="#fff"
+      withBorder
+      style={{ borderColor: colors.cardBorder, borderRadius: 14, overflow: 'hidden' }}
     >
-      <div
+      <Box
+        display="grid"
+        px={20}
+        py={13}
+        c={colors.muted}
         style={{
-          display: 'grid',
           gridTemplateColumns: TABLE_COLUMNS,
           gap: 12,
-          padding: '13px 20px',
           borderBottom: '1px dotted rgba(120,100,80,0.3)',
           fontFamily: fonts.mono,
           fontSize: 10,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: colors.muted,
         }}
       >
         <span>Title</span>
@@ -401,33 +340,40 @@ function Table({
         <span>Date</span>
         <span>Rating</span>
         <span />
-      </div>
+      </Box>
       {rows.map((row) => (
-        <div
+        <Box
           key={row.id}
+          display="grid"
+          px={20}
+          py={14}
           style={{
-            display: 'grid',
             gridTemplateColumns: TABLE_COLUMNS,
             gap: 12,
-            padding: '14px 20px',
             borderTop: '1px dotted rgba(120,100,80,0.16)',
             alignItems: 'center',
           }}
         >
-          <span style={{ fontFamily: fonts.serif, fontSize: 17, lineHeight: 1.2 }}>{row.title}</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#5c574e' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: row.categoryColor, flexShrink: 0 }} />
+          <Text fz={17} lh={1.2} style={{ fontFamily: fonts.serif }}>
+            {row.title}
+          </Text>
+          <Group component="span" gap={7} align="center" fz={13} c="#5c574e">
+            <Box component="span" display="block" w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor, flexShrink: 0 }} />
             {row.categoryName}
-          </span>
-          <span style={{ fontSize: 13, color: '#6b665e' }}>{row.activityName}</span>
-          <span style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.faint }}>{formatDate(row.date)}</span>
-          <span style={{ fontSize: 13 }}>
-            <Stars rating={row.rating} letterSpacing={1} fontSize={13} />
-          </span>
+          </Group>
+          <Text fz={13} c="#6b665e">
+            {row.activityName}
+          </Text>
+          <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 12 }}>
+            {formatDate(row.date)}
+          </Text>
+          <Box fz={13}>
+            <Stars rating={row.rating} fontSize={13} />
+          </Box>
           <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} align="flex-end" />
-        </div>
+        </Box>
       ))}
-    </div>
+    </Paper>
   )
 }
 
@@ -442,82 +388,44 @@ function RowActions({
   onEdit: (id: string) => void
   onDelete: (id: string) => void
   bordered?: boolean
-  align?: CSSProperties['justifyContent']
+  align?: 'flex-start' | 'flex-end'
 }) {
-  const linkButton: CSSProperties = {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    fontWeight: 600,
-    color: colors.muted,
-    background: 'none',
-    border: 'none',
-    padding: 0,
-    cursor: 'pointer',
-  }
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: bordered ? 14 : 10,
-        justifyContent: align,
-        ...(bordered
-          ? { marginTop: 14, paddingTop: 12, borderTop: '1px dotted rgba(120,100,80,0.3)' }
-          : {}),
-      }}
+    <Group
+      gap={bordered ? 14 : 10}
+      justify={align}
+      mt={bordered ? 14 : 0}
+      pt={bordered ? 12 : 0}
+      style={bordered ? { borderTop: '1px dotted rgba(120,100,80,0.3)' } : undefined}
     >
-      <button style={linkButton} onClick={() => onEdit(id)}>
+      <Anchor component="button" onClick={() => onEdit(id)} fz={12} fw={600} c={colors.muted} underline="never">
         Edit
-      </button>
-      <button style={linkButton} onClick={() => onDelete(id)}>
+      </Anchor>
+      <Anchor component="button" onClick={() => onDelete(id)} fz={12} fw={600} c={colors.muted} underline="never">
         Delete
-      </button>
-    </div>
+      </Anchor>
+    </Group>
   )
 }
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div
-      style={{
-        marginTop: 20,
-        textAlign: 'center',
-        padding: '64px 24px',
-        background: '#fff',
-        border: '1px dashed rgba(120,100,80,0.28)',
-        borderRadius: 16,
-      }}
+    <Box
+      mt={20}
+      ta="center"
+      bg="#fff"
+      p="64px 24px"
+      style={{ border: '1px dashed rgba(120,100,80,0.28)', borderRadius: 16 }}
     >
-      <div style={{ fontFamily: fonts.serif, fontSize: 24, marginBottom: 8 }}>Nothing here yet</div>
-      <div style={{ fontSize: 14, color: colors.muted, marginBottom: 20 }}>
+      <Text fz={24} mb={8} style={{ fontFamily: fonts.serif }}>
+        Nothing here yet
+      </Text>
+      <Text fz={14} c={colors.muted} mb={20}>
         No entries in this view. Log your next outing together.
-      </div>
-      <button onClick={onAdd} style={{ ...primaryButton, padding: '11px 20px' }}>
+      </Text>
+      <Button onClick={onAdd} radius={10} px={20} py={11} style={{ background: ACCENT }}>
         + New entry
-      </button>
-    </div>
+      </Button>
+    </Box>
   )
-}
-
-const primaryButton: CSSProperties = {
-  fontFamily: fonts.sans,
-  fontSize: 14,
-  fontWeight: 600,
-  color: '#fff',
-  background: ACCENT,
-  border: 'none',
-  padding: '10px 18px',
-  borderRadius: 10,
-  cursor: 'pointer',
-}
-
-const secondaryButton: CSSProperties = {
-  fontFamily: fonts.sans,
-  fontSize: 14,
-  fontWeight: 600,
-  color: '#5c574e',
-  background: 'transparent',
-  border: '1px solid rgba(120,100,80,0.3)',
-  padding: '10px 16px',
-  borderRadius: 10,
-  cursor: 'pointer',
 }

@@ -1,8 +1,21 @@
-import type { CSSProperties } from 'react'
+import {
+  Box,
+  Button,
+  Group,
+  Rating,
+  Select,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+  UnstyledButton,
+} from '@mantine/core'
 import type { Activity, Category, EntryDraft } from '../types'
 import { ACCENT, colors, DANGER, fonts } from '../theme'
+import { ModalShell } from './ModalShell'
 
 interface EntryModalProps {
+  opened: boolean
   draft: EntryDraft
   isEditing: boolean
   categories: Category[]
@@ -13,28 +26,20 @@ interface EntryModalProps {
   onClose: () => void
 }
 
-const labelStyle: CSSProperties = {
+// Matches the Mantine InputWrapper label styling (see mantineTheme.ts) for the
+// rating field, which isn't a Mantine input and so doesn't inherit it.
+const labelStyle = {
   display: 'block',
   fontSize: 12,
   fontWeight: 600,
-  textTransform: 'uppercase',
+  textTransform: 'uppercase' as const,
   letterSpacing: '0.06em',
   color: colors.muted,
-  margin: '0 0 7px',
-}
-
-const fieldStyle: CSSProperties = {
-  width: '100%',
-  padding: '11px 12px',
-  border: '1px solid rgba(120,100,80,0.25)',
-  borderRadius: 9,
-  fontSize: 14,
-  fontFamily: fonts.sans,
-  color: colors.ink,
-  background: '#fff',
+  marginBottom: 7,
 }
 
 export function EntryModal({
+  opened,
   draft,
   isEditing,
   categories,
@@ -46,7 +51,6 @@ export function EntryModal({
 }: EntryModalProps) {
   const activityChoices = activities.filter((a) => a.categoryId === draft.categoryId)
   const hasCategory = Boolean(draft.categoryId)
-  const activityDisabled = !hasCategory
   const showNoActivityMsg = hasCategory && activityChoices.length === 0
   const activityPlaceholder = !hasCategory
     ? 'Pick a category first'
@@ -57,210 +61,101 @@ export function EntryModal({
   const canSave = Boolean(draft.activityId) && draft.rating > 0
 
   return (
-    <Overlay onClose={onClose}>
-      <h3 style={{ fontFamily: fonts.serif, fontWeight: 500, fontSize: 28, margin: '0 0 22px' }}>
+    <ModalShell opened={opened} onClose={onClose}>
+      <Title order={3} fz={28} mb={22}>
         {isEditing ? 'Edit entry' : 'New entry'}
-      </h3>
+      </Title>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
-          <label style={labelStyle}>Category</label>
-          <select
-            value={draft.categoryId}
-            onChange={(e) => onChange({ categoryId: e.target.value, activityId: '' })}
-            style={{ ...fieldStyle, cursor: 'pointer' }}
-          >
-            <option value="">Choose…</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={labelStyle}>Activity</label>
-          <select
-            value={draft.activityId}
-            onChange={(e) => onChange({ activityId: e.target.value })}
-            disabled={activityDisabled}
-            style={{
-              ...fieldStyle,
-              cursor: activityDisabled ? 'not-allowed' : 'pointer',
-              background: activityDisabled ? colors.chip : '#fff',
-              color: activityDisabled ? '#b3ada3' : colors.ink,
-            }}
-          >
-            <option value="">{activityPlaceholder}</option>
-            {activityChoices.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <Group gap={12} mb={18} grow align="flex-start">
+        <Select
+          label="Category"
+          placeholder="Choose…"
+          value={draft.categoryId || null}
+          onChange={(value) => onChange({ categoryId: value ?? '', activityId: '' })}
+          data={categories.map((c) => ({ value: c.id, label: c.name }))}
+        />
+        <Select
+          label="Activity"
+          placeholder={activityPlaceholder}
+          value={draft.activityId || null}
+          onChange={(value) => onChange({ activityId: value ?? '' })}
+          disabled={!hasCategory}
+          data={activityChoices.map((a) => ({ value: a.id, label: a.name }))}
+        />
+      </Group>
 
       {showNoActivityMsg && (
-        <div
-          style={{
-            fontSize: 13,
-            color: colors.muted,
-            fontStyle: 'italic',
-            fontFamily: fonts.serif,
-            margin: '-8px 0 18px',
-          }}
-        >
+        <Text c={colors.muted} fz={13} mt={-8} mb={18} style={{ fontStyle: 'italic', fontFamily: fonts.serif }}>
           No activities in this category yet — add some under <strong>Manage</strong>.
-        </div>
+        </Text>
       )}
 
-      <div style={{ marginBottom: 18 }}>
-        <label style={labelStyle}>Title</label>
-        <input
-          value={draft.title}
-          onChange={(e) => onChange({ title: e.target.value })}
-          placeholder="Give this outing a name…"
-          style={fieldStyle}
+      <TextInput
+        label="Title"
+        value={draft.title}
+        onChange={(e) => onChange({ title: e.currentTarget.value })}
+        placeholder="Give this outing a name…"
+        mb={18}
+      />
+
+      <TextInput
+        label="Date"
+        type="date"
+        value={draft.date}
+        onChange={(e) => onChange({ date: e.currentTarget.value })}
+        mb={18}
+      />
+
+      <Box mb={18}>
+        <Text component="label" style={labelStyle}>
+          How was it?
+        </Text>
+        <Rating
+          value={draft.rating}
+          onChange={(value) => onChange({ rating: value })}
+          count={5}
+          fullSymbol={<span style={{ color: ACCENT, fontSize: 32 }}>★</span>}
+          emptySymbol={<span style={{ color: colors.starEmpty, fontSize: 32 }}>★</span>}
         />
-      </div>
+      </Box>
 
-      <div style={{ marginBottom: 18 }}>
-        <label style={labelStyle}>Date</label>
-        <input
-          type="date"
-          value={draft.date}
-          onChange={(e) => onChange({ date: e.target.value })}
-          style={fieldStyle}
-        />
-      </div>
+      <Textarea
+        label="Notes"
+        value={draft.description}
+        onChange={(e) => onChange({ description: e.currentTarget.value })}
+        placeholder="What did you two do? How did it go?"
+        autosize
+        minRows={3}
+        mb={24}
+        styles={{ input: { fontFamily: fonts.serif, lineHeight: 1.5 } }}
+      />
 
-      <div style={{ marginBottom: 18 }}>
-        <label style={labelStyle}>How was it?</label>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[1, 2, 3, 4, 5].map((value) => (
-            <span
-              key={value}
-              onClick={() => onChange({ rating: value })}
-              style={{
-                fontSize: 32,
-                lineHeight: 1,
-                cursor: 'pointer',
-                color: value <= draft.rating ? ACCENT : colors.starEmpty,
-              }}
-            >
-              ★
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 24 }}>
-        <label style={labelStyle}>Notes</label>
-        <textarea
-          value={draft.description}
-          onChange={(e) => onChange({ description: e.target.value })}
-          placeholder="What did you two do? How did it go?"
-          style={{
-            ...fieldStyle,
-            minHeight: 80,
-            fontFamily: fonts.serif,
-            resize: 'vertical',
-            lineHeight: 1.5,
-          }}
-        />
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <Group justify="space-between" align="center" gap={10}>
         {isEditing && (
-          <button
+          <UnstyledButton
             onClick={onDelete}
-            style={{
-              fontFamily: fonts.sans,
-              fontSize: 13,
-              fontWeight: 600,
-              color: DANGER,
-              background: 'none',
-              border: 'none',
-              padding: '8px 0',
-              cursor: 'pointer',
-            }}
+            style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
           >
             Delete entry
-          </button>
+          </UnstyledButton>
         )}
-        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-          <button onClick={onClose} style={secondaryButton}>
+        <Group gap={10} ml="auto">
+          <Button variant="default" onClick={onClose} radius={10} styles={secondaryButtonStyles}>
             Cancel
-          </button>
-          <button
-            onClick={onSave}
-            disabled={!canSave}
-            style={{ ...primaryButton, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
-          >
+          </Button>
+          <Button onClick={onSave} disabled={!canSave} radius={10}>
             {isEditing ? 'Save changes' : 'Add entry'}
-          </button>
-        </div>
-      </div>
-    </Overlay>
+          </Button>
+        </Group>
+      </Group>
+    </ModalShell>
   )
 }
 
-const primaryButton: CSSProperties = {
-  fontFamily: fonts.sans,
-  fontSize: 14,
-  fontWeight: 600,
-  color: '#fff',
-  background: ACCENT,
-  border: 'none',
-  padding: '10px 20px',
-  borderRadius: 10,
-  cursor: 'pointer',
-}
-
-const secondaryButton: CSSProperties = {
-  fontFamily: fonts.sans,
-  fontSize: 14,
-  fontWeight: 600,
-  color: '#5c574e',
-  background: 'transparent',
-  border: '1px solid rgba(120,100,80,0.3)',
-  padding: '10px 18px',
-  borderRadius: 10,
-  cursor: 'pointer',
-}
-
-/** Shared modal shell: dim backdrop + centered card, click-outside to close. */
-export function Overlay({ children, onClose, width = 460 }: { children: React.ReactNode; onClose: () => void; width?: number }) {
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(45,38,30,0.42)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 50,
-        padding: 24,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width,
-          maxWidth: '100%',
-          maxHeight: '88vh',
-          overflow: 'auto',
-          background: 'oklch(0.985 0.01 78)',
-          borderRadius: 18,
-          padding: 30,
-          boxShadow: '0 24px 60px rgba(40,30,20,0.3)',
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  )
+const secondaryButtonStyles = {
+  root: {
+    background: 'transparent',
+    border: '1px solid rgba(120,100,80,0.3)',
+    color: '#5c574e',
+  },
 }
