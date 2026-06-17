@@ -82,7 +82,6 @@ export function Dashboard({
         >
           <Box>
             <Text c="clay.6" mb={9} style={eyebrowStyle}>
-              Our city, together
             </Text>
             <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
               {title}

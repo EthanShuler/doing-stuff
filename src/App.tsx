@@ -15,7 +15,7 @@ import { EntryModal } from './components/EntryModal'
 import { ManageModal } from './components/ManageModal'
 
 const APP_TITLE = 'Doing Stuff'
-const APP_SUBTITLE = "Things we've done together"
+const APP_SUBTITLE = ""
 
 type Modal = 'entry' | 'manage' | null
 

@@ -68,7 +68,6 @@ export function AuthScreen() {
     <Center mih="100vh" bg={colors.pageBg} p={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
       <Box w="100%" maw={380}>
         <Text ta="center" mb={9} c="clay.6" style={eyebrowStyle}>
-          Our city, together
         </Text>
         <Title order={1} ta="center" fz={36} lh={1.05} mb={6} style={{ letterSpacing: '-0.01em' }}>
           Doing Stuff
