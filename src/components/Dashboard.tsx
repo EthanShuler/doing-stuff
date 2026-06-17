@@ -110,13 +110,6 @@ export function Dashboard({
             valueColor="oklch(0.42 0.06 150)"
             labelColor="oklch(0.45 0.05 150)"
           />
-          <StatCard
-            value={stats.avg}
-            label="Avg rating"
-            bg="oklch(0.95 0.045 55)"
-            valueColor="oklch(0.55 0.12 45)"
-            labelColor="oklch(0.55 0.1 45)"
-          />
         </Group>
 
         {/* CONTROLS */}

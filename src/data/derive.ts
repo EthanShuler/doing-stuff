@@ -18,8 +18,6 @@ export interface DisplayRow {
 export interface Stats {
   total: number
   thisMonth: number
-  /** Average rating to one decimal, or "—" when there are no entries. */
-  avg: string
 }
 
 export function joinRows(
@@ -72,8 +70,5 @@ export function filterAndSort(
 export function computeStats(entries: Entry[]): Stats {
   const prefix = currentMonthPrefix()
   const thisMonth = entries.filter((entry) => entry.date.startsWith(prefix)).length
-  const avg = entries.length
-    ? (entries.reduce((sum, entry) => sum + entry.rating, 0) / entries.length).toFixed(1)
-    : '—'
-  return { total: entries.length, thisMonth, avg }
+  return { total: entries.length, thisMonth }
 }

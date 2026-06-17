@@ -4,6 +4,46 @@ import { supabase } from '../lib/supabase'
 
 const DEFAULT_SPACE_NAME = 'Our city, together'
 
+// Dedupe concurrent space creation for the same user. React 18 StrictMode mounts
+// effects twice in dev; without this guard both runs see an empty membership and
+// each insert a space, producing duplicate spaces. The map memoizes the in-flight
+// creation so the second run reuses the first's promise instead of inserting again.
+const creatingSpace = new Map<string, Promise<string>>()
+
+async function resolveSpace(userId: string): Promise<string> {
+  const client = supabase
+  if (!client) throw new Error('Supabase not configured.')
+
+  // RLS scopes this to spaces the user already belongs to.
+  const { data: members, error: mErr } = await client
+    .from('space_members')
+    .select('space_id')
+    .limit(1)
+  if (mErr) throw mErr
+  if (members && members.length > 0) return members[0].space_id
+
+  // No space yet → create one, but only once per user. The get/set below has no
+  // `await` between them, so the second StrictMode run reliably observes the
+  // in-flight promise rather than starting its own insert.
+  const existing = creatingSpace.get(userId)
+  if (existing) return existing
+
+  // We generate the id client-side and do NOT read the row back: the
+  // `on_space_created` AFTER trigger that adds us as a member fires at statement
+  // end, *after* a RETURNING select's RLS check would run — so `.select()` here
+  // would spuriously return 0 rows. By the time this insert resolves the
+  // membership is committed, so later space-scoped fetches pass RLS fine.
+  const pending = (async () => {
+    const id = crypto.randomUUID()
+    const { error } = await client.from('spaces').insert({ id, name: DEFAULT_SPACE_NAME })
+    if (error) throw error
+    return id
+  })()
+  creatingSpace.set(userId, pending)
+  pending.finally(() => creatingSpace.delete(userId))
+  return pending
+}
+
 /**
  * Resolves the active space for the logged-in user.
  *
@@ -33,29 +73,7 @@ export function useSpace(session: Session | null) {
       setLoading(true)
       setError(null)
       try {
-        // RLS scopes this to spaces the user already belongs to.
-        const { data: members, error: mErr } = await supabase
-          .from('space_members')
-          .select('space_id')
-          .limit(1)
-        if (mErr) throw mErr
-
-        if (members && members.length > 0) {
-          if (!cancelled) setSpaceId(members[0].space_id)
-          return
-        }
-
-        // No space yet → create one. We generate the id client-side and do NOT
-        // read the row back: the `on_space_created` AFTER trigger that adds us as
-        // a member fires at statement end, *after* a RETURNING select's RLS check
-        // would run — so `.select()` here would spuriously return 0 rows. By the
-        // time this insert resolves the membership is committed, so the later
-        // data fetches (scoped to this id) pass RLS fine.
-        const id = crypto.randomUUID()
-        const { error: cErr } = await supabase
-          .from('spaces')
-          .insert({ id, name: DEFAULT_SPACE_NAME })
-        if (cErr) throw cErr
+        const id = await resolveSpace(userId)
         if (!cancelled) setSpaceId(id)
       } catch (err) {
         if (!cancelled) {

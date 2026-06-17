@@ -111,9 +111,10 @@ export function ManageModal({
               <TextInput
                 flex={1}
                 value={activityDrafts[category.id] ?? ''}
-                onChange={(e) =>
-                  setActivityDrafts((prev) => ({ ...prev, [category.id]: e.currentTarget.value }))
-                }
+                onChange={(e) => {
+                  const value = e.currentTarget.value
+                  setActivityDrafts((prev) => ({ ...prev, [category.id]: value }))
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') submitActivity(category.id)
                 }}
