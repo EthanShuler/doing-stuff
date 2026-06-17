@@ -9,21 +9,25 @@ export interface Database {
         Row: { id: string; name: string; created_at: string }
         Insert: { id?: string; name: string; created_at?: string }
         Update: { id?: string; name?: string; created_at?: string }
+        Relationships: []
       }
       space_members: {
         Row: { space_id: string; user_id: string; created_at: string }
         Insert: { space_id: string; user_id: string; created_at?: string }
         Update: { space_id?: string; user_id?: string; created_at?: string }
+        Relationships: []
       }
       categories: {
         Row: { id: string; space_id: string; name: string; color_index: number; created_at: string }
         Insert: { id?: string; space_id: string; name: string; color_index?: number; created_at?: string }
         Update: { id?: string; space_id?: string; name?: string; color_index?: number; created_at?: string }
+        Relationships: []
       }
       activities: {
         Row: { id: string; space_id: string; category_id: string; name: string; created_at: string }
         Insert: { id?: string; space_id: string; category_id: string; name: string; created_at?: string }
         Update: { id?: string; space_id?: string; category_id?: string; name?: string; created_at?: string }
+        Relationships: []
       }
       entries: {
         Row: {
@@ -56,6 +60,7 @@ export interface Database {
           rating?: number
           created_at?: string
         }
+        Relationships: []
       }
     }
     Views: Record<string, never>

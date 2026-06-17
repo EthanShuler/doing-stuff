@@ -43,25 +43,47 @@ npm run preview    # serve the production build
 There is **no test runner and no linter configured.** After code changes, run
 `npm run build` (or `npm run typecheck`) to confirm the project still compiles.
 
-## ⚠️ Current state: backend is half-wired
+## Current state: backend is live
 
-This is the single most important thing to know before editing.
+Both auth **and** data run on Supabase. The two modes to know:
 
-- **Auth is live.** `src/lib/supabase.ts`, `src/data/useSession.ts`, and
-  `src/components/AuthScreen.tsx` are real. When `VITE_SUPABASE_URL` /
-  `VITE_SUPABASE_ANON_KEY` are set, the app gates on a Supabase login.
-- **Data is NOT live.** All categories/activities/entries come from an **in-memory
-  store with seed data** in `src/data/useActivityStore.ts`. Edits live only in
-  React state and vanish on reload. The seed data is the user's example data
-  (Outdoor/City/Brain + sample entries).
-- When `VITE_SUPABASE_*` are **absent**, `supabase` is `null`, the auth screen is
-  skipped, and the app runs straight on the in-memory store — useful for UI work.
+- **Keys present (the real app).** With `VITE_SUPABASE_URL` /
+  `VITE_SUPABASE_ANON_KEY` set, the app gates on a Supabase login
+  (`useSession` + `AuthScreen`), resolves a **space** (`useSpace`), and
+  `useActivityStore` reads/writes the `categories` / `activities` / `entries`
+  tables scoped to that `space_id`. Changes persist; RLS enforces access.
+- **Keys absent (UI dev fallback).** When `VITE_SUPABASE_*` are missing,
+  `supabase` is `null`, the auth screen is skipped, and `useActivityStore` falls
+  back to an **in-memory seed** (Outdoor/City/Brain + sample entries) so the UI
+  can be worked on with no backend. Edits vanish on reload in this mode.
 
-`useActivityStore` is the **designed seam** for the database. Its action
-signatures (`addEntry`, `updateEntry`, `deleteEntry`, `addActivity`,
-`deleteActivity`, `addCategory`, `deleteCategory`) already match what the DB layer
-needs. To go live, replace their bodies with `supabase.from(...)` calls (plus
-loading/error state and a `space_id`) — components should not need to change.
+`useActivityStore(spaceId)` is still the single data seam — both modes live behind
+its identical action signatures, so components never branch on which mode is
+active. Actions are `async`; entry actions throw on failure (the entry modal stays
+open and `store.error` surfaces the reason), while category/activity actions record
+the error without throwing.
+
+### Space bootstrap & the sharing model
+
+Sharing model is **"manual / SQL for now"** (chosen deliberately). On first login a
+user has no space, so `useSpace` auto-creates one ("Our city, together"); the
+`on_space_created` trigger makes them its first member. To share one space across
+two logins, add the second user to the first's space **by hand** in the Supabase
+SQL Editor:
+
+```sql
+insert into public.space_members (space_id, user_id) values ('<space-id>', '<user-id>');
+```
+
+After that, both logins resolve to the same `space_id`. If you later want
+self-service sharing, the natural upgrade is an invite-code RPC (`join_space`) or
+add-by-email — neither is built yet.
+
+### I can't apply SQL for you
+
+Only the anon key is in `.env.local` (no service-role key / DB password), so schema
+or RLS changes must be **run by the user** in the Supabase SQL Editor. The base
+schema in `supabase/schema.sql` is already applied to the current project.
 
 ## Data model & RLS
 
@@ -92,8 +114,9 @@ src/
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
     database.types.ts      typed schema (regenerate with supabase gen types)
   data/
-    useActivityStore.ts    in-memory store + actions   ← swap to Supabase here
+    useActivityStore.ts    data seam: Supabase CRUD (or in-memory seed fallback)
     useSession.ts          Supabase auth session hook
+    useSpace.ts            resolves/creates the active space after login
     derive.ts              pure join / filter / sort / stats (no React)
   components/
     AuthScreen.tsx         login / sign-up (no-op without keys)
