@@ -52,7 +52,8 @@ export default function App() {
 
 function AppShell({ session, configured }: { session: Session | null; configured: boolean }) {
   const { spaceId, loading: spaceLoading, error: spaceError } = useSpace(session)
-  const store = useActivityStore(spaceId)
+  const userId = session?.user.id ?? null
+  const store = useActivityStore(spaceId, userId)
 
   // View state (not persisted).
   const [filterCategoryId, setFilterCategoryId] = useState('all')
@@ -65,9 +66,9 @@ function AppShell({ session, configured }: { session: Session | null; configured
   const [draft, setDraft] = useState<EntryDraft>(emptyDraft)
 
   const rows = useMemo(() => {
-    const joined = joinRows(store.entries, store.activities, store.categories)
+    const joined = joinRows(store.entries, store.activities, store.categories, store.profiles, userId)
     return filterAndSort(joined, filterCategoryId, sort)
-  }, [store.entries, store.activities, store.categories, filterCategoryId, sort])
+  }, [store.entries, store.activities, store.categories, store.profiles, filterCategoryId, sort, userId])
 
   const stats = useMemo(() => computeStats(store.entries), [store.entries])
 

@@ -14,6 +14,13 @@ export interface Activity {
   name: string
 }
 
+/** A space member's readable identity (mirrors the `profiles` table). */
+export interface Profile {
+  id: string
+  email: string | null
+  displayName: string | null
+}
+
 /** A logged outing — one row in the `entries` table. */
 export interface Entry {
   id: string
@@ -24,6 +31,8 @@ export interface Entry {
   description: string
   /** 1–5 stars. */
   rating: number
+  /** auth.users id of the member who logged this entry (null for legacy rows). */
+  createdBy: string | null
 }
 
 export type SortKey = 'recent' | 'rating' | 'category'

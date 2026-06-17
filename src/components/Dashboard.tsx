@@ -270,7 +270,10 @@ function CardGrid({
             <Group gap={7} align="center">
               <Box w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor }} />
               <Text c={colors.muted} style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.1em' }}>
-                {`${row.categoryName} · ${row.activityName}`.toUpperCase()}
+                {[row.categoryName, row.activityName, row.createdBy && `by ${row.createdBy}`]
+                  .filter(Boolean)
+                  .join(' · ')
+                  .toUpperCase()}
               </Text>
             </Group>
             <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 11 }}>
@@ -293,7 +296,7 @@ function CardGrid({
   )
 }
 
-const TABLE_COLUMNS = '2.4fr 1.3fr 1.3fr 0.9fr 1fr 0.9fr'
+const TABLE_COLUMNS = '2.2fr 1.2fr 1.1fr 0.9fr 0.9fr 0.8fr 0.8fr'
 
 function Table({
   rows,
@@ -331,6 +334,7 @@ function Table({
         <span>Activity</span>
         <span>Date</span>
         <span>Rating</span>
+        <span>By</span>
         <span />
       </Box>
       {rows.map((row) => (
@@ -362,6 +366,9 @@ function Table({
           <Box fz={13}>
             <Stars rating={row.rating} fontSize={13} />
           </Box>
+          <Text fz={13} c="#6b665e">
+            {row.createdBy || '—'}
+          </Text>
           <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} align="flex-end" />
         </Box>
       ))}

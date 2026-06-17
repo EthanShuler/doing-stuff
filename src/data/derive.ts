@@ -1,4 +1,4 @@
-import type { Activity, Category, Entry, SortKey } from '../types'
+import type { Activity, Category, Entry, Profile, SortKey } from '../types'
 import { FALLBACK_COLOR, swatchFor } from '../theme'
 import { currentMonthPrefix } from '../lib/format'
 
@@ -13,6 +13,21 @@ export interface DisplayRow {
   date: string
   description: string
   rating: number
+  /** Display label for who logged the entry: "You", a name, or "" if unknown. */
+  createdBy: string
+}
+
+/** Resolve a creator id to a short display label, marking the current user. */
+function creatorLabel(
+  createdBy: string | null,
+  profilesById: Map<string, Profile>,
+  currentUserId: string | null,
+): string {
+  if (!createdBy) return ''
+  if (currentUserId && createdBy === currentUserId) return 'You'
+  const profile = profilesById.get(createdBy)
+  if (!profile) return ''
+  return profile.displayName || (profile.email ? profile.email.split('@')[0] : '')
 }
 
 export interface Stats {
@@ -24,9 +39,12 @@ export function joinRows(
   entries: Entry[],
   activities: Activity[],
   categories: Category[],
+  profiles: Profile[] = [],
+  currentUserId: string | null = null,
 ): DisplayRow[] {
   const activityById = new Map(activities.map((a) => [a.id, a]))
   const categoryById = new Map(categories.map((c) => [c.id, c]))
+  const profilesById = new Map(profiles.map((p) => [p.id, p]))
 
   return entries.map((entry) => {
     const activity = activityById.get(entry.activityId)
@@ -41,6 +59,7 @@ export function joinRows(
       date: entry.date,
       description: entry.description,
       rating: entry.rating,
+      createdBy: creatorLabel(entry.createdBy, profilesById, currentUserId),
     }
   })
 }

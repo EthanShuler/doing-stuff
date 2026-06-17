@@ -89,7 +89,14 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 `supabase/schema.sql` is the source of truth for the database. Key points:
 
-- Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`.
+- Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
+  `profiles`.
+- **`profiles` mirrors `auth.users`** (which the browser can't read). An
+  `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
+  `display_name`); RLS lets you read your own profile plus any co-member's (via
+  the `shares_space_with()` SECURITY DEFINER function). `entries.created_by`
+  defaults to `auth.uid()`; the UI joins it to `profiles` to show who logged
+  each entry.
 - **Auth model: shared data, separate logins.** Each person logs in separately but
   both belong to one **space**. Every data row carries `space_id`; RLS grants
   access only to members of that space (via the `is_space_member()`

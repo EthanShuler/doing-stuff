@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Activity, Category, Entry, EntryDraft } from '../types'
+import type { Activity, Category, Entry, EntryDraft, Profile } from '../types'
 import { supabase } from '../lib/supabase'
 import { today } from '../lib/format'
 
@@ -17,10 +17,15 @@ interface SeedData {
   categories: Category[]
   activities: Activity[]
   entries: Entry[]
+  profiles: Profile[]
 }
 
 function seed(): SeedData {
   return {
+    profiles: [
+      { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
+      { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
+    ],
     categories: [
       { id: 'c1', name: 'Outdoor', colorIndex: 0 },
       { id: 'c2', name: 'City', colorIndex: 1 },
@@ -37,14 +42,14 @@ function seed(): SeedData {
       { id: 'a8', categoryId: 'c3', name: 'Piano lesson' },
     ],
     entries: [
-      { id: 'i1', activityId: 'a1', title: 'Riverside picnic', date: '2026-06-12', description: 'Golden hour picnic and a long walk by the water.', rating: 5 },
-      { id: 'i2', activityId: 'a5', title: 'Dinner at Tabella', date: '2026-06-08', description: 'Shared the cacio e pepe. Cozy corner table.', rating: 4 },
-      { id: 'i3', activityId: 'a7', title: 'ASL — Lesson 4', date: '2026-06-03', description: 'Finally got the alphabet down. Practiced over coffee.', rating: 4 },
-      { id: 'i4', activityId: 'a3', title: 'Pine Ridge overnight', date: '2026-05-30', description: 'Overnight on the trail. Tough climb, worth it.', rating: 5 },
-      { id: 'i5', activityId: 'a4', title: 'Sci-fi at the Roxy', date: '2026-06-10', description: 'Saw the new release. Split a popcorn.', rating: 3 },
-      { id: 'i6', activityId: 'a2', title: 'Morning laps', date: '2026-06-14', description: 'Early swim at the community pool.', rating: 4 },
-      { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4 },
-      { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5 },
+      { id: 'i1', activityId: 'a1', title: 'Riverside picnic', date: '2026-06-12', description: 'Golden hour picnic and a long walk by the water.', rating: 5, createdBy: 'u1' },
+      { id: 'i2', activityId: 'a5', title: 'Dinner at Tabella', date: '2026-06-08', description: 'Shared the cacio e pepe. Cozy corner table.', rating: 4, createdBy: 'u2' },
+      { id: 'i3', activityId: 'a7', title: 'ASL — Lesson 4', date: '2026-06-03', description: 'Finally got the alphabet down. Practiced over coffee.', rating: 4, createdBy: 'u1' },
+      { id: 'i4', activityId: 'a3', title: 'Pine Ridge overnight', date: '2026-05-30', description: 'Overnight on the trail. Tough climb, worth it.', rating: 5, createdBy: 'u2' },
+      { id: 'i5', activityId: 'a4', title: 'Sci-fi at the Roxy', date: '2026-06-10', description: 'Saw the new release. Split a popcorn.', rating: 3, createdBy: 'u1' },
+      { id: 'i6', activityId: 'a2', title: 'Morning laps', date: '2026-06-14', description: 'Early swim at the community pool.', rating: 4, createdBy: 'u2' },
+      { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4, createdBy: 'u1' },
+      { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5, createdBy: 'u2' },
     ],
   }
 }
@@ -60,7 +65,9 @@ type EntryRow = {
   entry_date: string
   description: string
   rating: number
+  created_by: string | null
 }
+type ProfileRow = { id: string; email: string | null; display_name: string | null }
 
 const toCategory = (r: CategoryRow): Category => ({ id: r.id, name: r.name, colorIndex: r.color_index })
 const toActivity = (r: ActivityRow): Activity => ({ id: r.id, categoryId: r.category_id, name: r.name })
@@ -71,7 +78,11 @@ const toEntry = (r: EntryRow): Entry => ({
   date: r.entry_date,
   description: r.description,
   rating: r.rating,
+  createdBy: r.created_by,
 })
+const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
+
+const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by'
 
 const message = (err: unknown): string =>
   err instanceof Error ? err.message : 'Something went wrong.'
@@ -87,6 +98,7 @@ export interface ActivityStore {
   categories: Category[]
   activities: Activity[]
   entries: Entry[]
+  profiles: Profile[]
   loading: boolean
   error: string | null
 
@@ -101,11 +113,12 @@ export interface ActivityStore {
   deleteCategory: (id: string) => Promise<void>
 }
 
-export function useActivityStore(spaceId: string | null): ActivityStore {
+export function useActivityStore(spaceId: string | null, userId: string | null = null): ActivityStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
   const [categories, setCategories] = useState<Category[]>(() => (supabase ? [] : seed().categories))
   const [activities, setActivities] = useState<Activity[]>(() => (supabase ? [] : seed().activities))
   const [entries, setEntries] = useState<Entry[]>(() => (supabase ? [] : seed().entries))
+  const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
 
@@ -118,18 +131,22 @@ export function useActivityStore(spaceId: string | null): ActivityStore {
       setLoading(true)
       setError(null)
       try {
-        const [cats, acts, ents] = await Promise.all([
+        const [cats, acts, ents, profs] = await Promise.all([
           supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
           supabase.from('activities').select('id,category_id,name').eq('space_id', spaceId).order('created_at'),
-          supabase.from('entries').select('id,activity_id,title,entry_date,description,rating').eq('space_id', spaceId).order('entry_date', { ascending: false }),
+          supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
+          // RLS scopes this to the current user + anyone they share a space with.
+          supabase.from('profiles').select('id,email,display_name'),
         ])
         if (cats.error) throw cats.error
         if (acts.error) throw acts.error
         if (ents.error) throw ents.error
+        if (profs.error) throw profs.error
         if (cancelled) return
         setCategories((cats.data as CategoryRow[]).map(toCategory))
         setActivities((acts.data as ActivityRow[]).map(toActivity))
         setEntries((ents.data as EntryRow[]).map(toEntry))
+        setProfiles((profs.data as ProfileRow[]).map(toProfile))
       } catch (err) {
         if (!cancelled) setError(message(err))
       } finally {
@@ -156,8 +173,10 @@ export function useActivityStore(spaceId: string | null): ActivityStore {
             entry_date: draft.date || today(),
             description: draft.description,
             rating: draft.rating,
+            // created_by defaults to auth.uid() server-side; the inserted row is
+            // read back below, so the UI gets the resolved creator id.
           })
-          .select('id,activity_id,title,entry_date,description,rating')
+          .select(ENTRY_COLUMNS)
           .single()
         if (err) {
           setError(err.message)
@@ -175,10 +194,11 @@ export function useActivityStore(spaceId: string | null): ActivityStore {
           date: draft.date || today(),
           description: draft.description,
           rating: draft.rating,
+          createdBy: userId,
         },
       ])
     },
-    [spaceId],
+    [spaceId, userId],
   )
 
   const updateEntry = useCallback(
@@ -194,7 +214,7 @@ export function useActivityStore(spaceId: string | null): ActivityStore {
             rating: draft.rating,
           })
           .eq('id', id)
-          .select('id,activity_id,title,entry_date,description,rating')
+          .select(ENTRY_COLUMNS)
           .single()
         if (err) {
           setError(err.message)
@@ -327,6 +347,7 @@ export function useActivityStore(spaceId: string | null): ActivityStore {
     categories,
     activities,
     entries,
+    profiles,
     loading,
     error,
     addEntry,

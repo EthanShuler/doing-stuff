@@ -38,6 +38,7 @@ export interface Database {
           entry_date: string
           description: string
           rating: number
+          created_by: string | null
           created_at: string
         }
         Insert: {
@@ -48,6 +49,7 @@ export interface Database {
           entry_date: string
           description?: string
           rating: number
+          created_by?: string | null
           created_at?: string
         }
         Update: {
@@ -58,8 +60,15 @@ export interface Database {
           entry_date?: string
           description?: string
           rating?: number
+          created_by?: string | null
           created_at?: string
         }
+        Relationships: []
+      }
+      profiles: {
+        Row: { id: string; email: string | null; display_name: string | null; created_at: string }
+        Insert: { id: string; email?: string | null; display_name?: string | null; created_at?: string }
+        Update: { id?: string; email?: string | null; display_name?: string | null; created_at?: string }
         Relationships: []
       }
     }

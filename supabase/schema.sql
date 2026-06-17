@@ -55,7 +55,26 @@ create table if not exists public.entries (
   entry_date  date not null,
   description text not null default '',
   rating      int  not null check (rating between 1 and 5),
+  -- Who logged this outing. Defaults to the inserting user; the UI resolves the
+  -- name via the `profiles` table (the browser can't read auth.users directly).
+  created_by  uuid references auth.users (id) default auth.uid(),
   created_at  timestamptz not null default now()
+);
+
+-- If the entries table already exists from an earlier schema, add the column:
+alter table public.entries add column if not exists created_by uuid references auth.users (id) default auth.uid();
+
+-- ---------------------------------------------------------------------------
+-- Profiles: a readable mirror of each auth.users row (which the client can't
+-- query). One row per user, kept in sync by a trigger on sign-up. Lets the UI
+-- show "who logged this" by joining entries.created_by → profiles.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.profiles (
+  id           uuid primary key references auth.users (id) on delete cascade,
+  email        text,
+  display_name text,
+  created_at   timestamptz not null default now()
 );
 
 -- Helpful indexes for the space-scoped queries the app runs.
@@ -111,6 +130,56 @@ create trigger on_space_created
   for each row execute function public.add_creator_as_member();
 
 -- ---------------------------------------------------------------------------
+-- Bootstrap: mirror every new auth.users row into public.profiles so the app
+-- can resolve a display name for it. SECURITY DEFINER to write across schemas.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, display_name)
+  values (new.id, new.email, split_part(coalesce(new.email, ''), '@', 1))
+  on conflict (id) do update set email = excluded.email;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- Backfill profiles for any users that signed up before this trigger existed.
+insert into public.profiles (id, email, display_name)
+select id, email, split_part(coalesce(email, ''), '@', 1) from auth.users
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Profiles read helper: true when the current user shares any space with
+-- `other`. SECURITY DEFINER so it can read space_members without tripping RLS.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.shares_space_with(other uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.space_members me
+    join public.space_members them on them.space_id = me.space_id
+    where me.user_id = auth.uid()
+      and them.user_id = other
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 
@@ -119,6 +188,7 @@ alter table public.space_members enable row level security;
 alter table public.categories    enable row level security;
 alter table public.activities    enable row level security;
 alter table public.entries       enable row level security;
+alter table public.profiles      enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -153,6 +223,18 @@ drop policy if exists "leave space" on public.space_members;
 create policy "leave space" on public.space_members
   for delete using (user_id = auth.uid() or public.is_space_member(space_id));
 
+-- profiles -------------------------------------------------------------------
+-- You can read your own profile and the profiles of anyone you share a space
+-- with (so the dashboard can name who logged each entry). You can edit only
+-- your own (e.g. to set a display name).
+drop policy if exists "read self or co-members" on public.profiles;
+create policy "read self or co-members" on public.profiles
+  for select using (id = auth.uid() or public.shares_space_with(id));
+
+drop policy if exists "update own profile" on public.profiles;
+create policy "update own profile" on public.profiles
+  for update using (id = auth.uid()) with check (id = auth.uid());
+
 -- categories / activities / entries ------------------------------------------
 -- Same rule for all three: full access iff you belong to the row's space.
 drop policy if exists "space members all" on public.categories;
@@ -177,7 +259,9 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries
   to authenticated;
+grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
+grant execute on function public.shares_space_with(uuid) to authenticated;
 
 -- ============================================================================
 -- Optional: seed your own space with the design's starter data. Run this AFTER
