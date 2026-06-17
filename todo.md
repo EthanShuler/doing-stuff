@@ -1,0 +1,1 @@
+- Map feature (sort by wishlist vs activity). When viewing by activity, specify further filtering.

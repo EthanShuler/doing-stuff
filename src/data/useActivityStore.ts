@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Activity, Category, Entry, EntryDraft, Profile } from '../types'
+import type { Activity, Category, Entry, EntryDraft, Profile, WishlistItem } from '../types'
 import { supabase } from '../lib/supabase'
 import { today } from '../lib/format'
 
@@ -18,6 +18,7 @@ interface SeedData {
   activities: Activity[]
   entries: Entry[]
   profiles: Profile[]
+  wishlist: WishlistItem[]
 }
 
 function seed(): SeedData {
@@ -25,6 +26,11 @@ function seed(): SeedData {
     profiles: [
       { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
       { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
+    ],
+    wishlist: [
+      { id: 'w1', text: 'Sunrise hike up Eagle Ridge', entryId: null, createdBy: 'u1', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'w2', text: 'Try the new ramen place downtown', entryId: null, createdBy: 'u2', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'w3', text: 'Visit the botanical garden', entryId: null, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
     ],
     categories: [
       { id: 'c1', name: 'Outdoor', colorIndex: 0 },
@@ -68,6 +74,13 @@ type EntryRow = {
   created_by: string | null
 }
 type ProfileRow = { id: string; email: string | null; display_name: string | null }
+type WishlistRow = {
+  id: string
+  text: string
+  entry_id: string | null
+  created_by: string | null
+  created_at: string
+}
 
 const toCategory = (r: CategoryRow): Category => ({ id: r.id, name: r.name, colorIndex: r.color_index })
 const toActivity = (r: ActivityRow): Activity => ({ id: r.id, categoryId: r.category_id, name: r.name })
@@ -81,8 +94,16 @@ const toEntry = (r: EntryRow): Entry => ({
   createdBy: r.created_by,
 })
 const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
+const toWishlistItem = (r: WishlistRow): WishlistItem => ({
+  id: r.id,
+  text: r.text,
+  entryId: r.entry_id,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+})
 
 const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by'
+const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at'
 
 const message = (err: unknown): string =>
   err instanceof Error ? err.message : 'Something went wrong.'
@@ -99,10 +120,12 @@ export interface ActivityStore {
   activities: Activity[]
   entries: Entry[]
   profiles: Profile[]
+  wishlist: WishlistItem[]
   loading: boolean
   error: string | null
 
-  addEntry: (draft: EntryDraft) => Promise<void>
+  /** Resolves to the new entry's id, so a wishlist check-off can link to it. */
+  addEntry: (draft: EntryDraft) => Promise<string>
   updateEntry: (id: string, draft: EntryDraft) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
 
@@ -111,6 +134,14 @@ export interface ActivityStore {
 
   addCategory: (name: string, colorIndex: number) => Promise<void>
   deleteCategory: (id: string) => Promise<void>
+
+  addWishlistItem: (text: string) => Promise<void>
+  updateWishlistItem: (id: string, text: string) => Promise<void>
+  deleteWishlistItem: (id: string) => Promise<void>
+  /** Mark an item done by linking it to the entry it produced. */
+  linkWishlistItem: (id: string, entryId: string) => Promise<void>
+  /** Reopen a done item (clear its entry link); the entry itself is kept. */
+  unlinkWishlistItem: (id: string) => Promise<void>
 }
 
 export function useActivityStore(spaceId: string | null, userId: string | null = null): ActivityStore {
@@ -119,6 +150,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   const [activities, setActivities] = useState<Activity[]>(() => (supabase ? [] : seed().activities))
   const [entries, setEntries] = useState<Entry[]>(() => (supabase ? [] : seed().entries))
   const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
+  const [wishlist, setWishlist] = useState<WishlistItem[]>(() => (supabase ? [] : seed().wishlist))
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
 
@@ -131,22 +163,25 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       setLoading(true)
       setError(null)
       try {
-        const [cats, acts, ents, profs] = await Promise.all([
+        const [cats, acts, ents, profs, wishes] = await Promise.all([
           supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
           supabase.from('activities').select('id,category_id,name').eq('space_id', spaceId).order('created_at'),
           supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
           // RLS scopes this to the current user + anyone they share a space with.
           supabase.from('profiles').select('id,email,display_name'),
+          supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
         ])
         if (cats.error) throw cats.error
         if (acts.error) throw acts.error
         if (ents.error) throw ents.error
         if (profs.error) throw profs.error
+        if (wishes.error) throw wishes.error
         if (cancelled) return
         setCategories((cats.data as CategoryRow[]).map(toCategory))
         setActivities((acts.data as ActivityRow[]).map(toActivity))
         setEntries((ents.data as EntryRow[]).map(toEntry))
         setProfiles((profs.data as ProfileRow[]).map(toProfile))
+        setWishlist((wishes.data as WishlistRow[]).map(toWishlistItem))
       } catch (err) {
         if (!cancelled) setError(message(err))
       } finally {
@@ -182,13 +217,15 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           setError(err.message)
           throw err
         }
-        setEntries((prev) => [...prev, toEntry(data as EntryRow)])
-        return
+        const entry = toEntry(data as EntryRow)
+        setEntries((prev) => [...prev, entry])
+        return entry.id
       }
+      const id = nextId()
       setEntries((prev) => [
         ...prev,
         {
-          id: nextId(),
+          id,
           activityId: draft.activityId,
           title: draft.title,
           date: draft.date || today(),
@@ -197,6 +234,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           createdBy: userId,
         },
       ])
+      return id
     },
     [spaceId, userId],
   )
@@ -251,6 +289,11 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         }
       }
       setEntries((prev) => prev.filter((entry) => entry.id !== id))
+      // The DB's ON DELETE SET NULL reopens any wishlist item linked to this
+      // entry; mirror that locally so a checked-off wish un-checks itself.
+      setWishlist((prev) =>
+        prev.map((item) => (item.entryId === id ? { ...item, entryId: null } : item)),
+      )
     },
     [spaceId],
   )
@@ -343,11 +386,98 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     [spaceId],
   )
 
+  // --- Wishlist actions. Like category/activity actions, these record errors
+  //     but don't throw, since they're wired straight to UI handlers. ---
+
+  const addWishlistItem = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      if (supabase && spaceId) {
+        const { data, error: err } = await supabase
+          .from('wishlist_items')
+          .insert({ space_id: spaceId, text: trimmed })
+          .select(WISHLIST_COLUMNS)
+          .single()
+        if (err) {
+          setError(err.message)
+          return
+        }
+        setWishlist((prev) => [...prev, toWishlistItem(data as WishlistRow)])
+        return
+      }
+      setWishlist((prev) => [
+        ...prev,
+        { id: nextId(), text: trimmed, entryId: null, createdBy: userId, createdAt: today() },
+      ])
+    },
+    [spaceId, userId],
+  )
+
+  const updateWishlistItem = useCallback(
+    async (id: string, text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('wishlist_items').update({ text: trimmed }).eq('id', id)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setWishlist((prev) => prev.map((item) => (item.id === id ? { ...item, text: trimmed } : item)))
+    },
+    [spaceId],
+  )
+
+  const deleteWishlistItem = useCallback(
+    async (id: string) => {
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('wishlist_items').delete().eq('id', id)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setWishlist((prev) => prev.filter((item) => item.id !== id))
+    },
+    [spaceId],
+  )
+
+  const linkWishlistItem = useCallback(
+    async (id: string, entryId: string) => {
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('wishlist_items').update({ entry_id: entryId }).eq('id', id)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setWishlist((prev) => prev.map((item) => (item.id === id ? { ...item, entryId } : item)))
+    },
+    [spaceId],
+  )
+
+  const unlinkWishlistItem = useCallback(
+    async (id: string) => {
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('wishlist_items').update({ entry_id: null }).eq('id', id)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setWishlist((prev) => prev.map((item) => (item.id === id ? { ...item, entryId: null } : item)))
+    },
+    [spaceId],
+  )
+
   return {
     categories,
     activities,
     entries,
     profiles,
+    wishlist,
     loading,
     error,
     addEntry,
@@ -357,5 +487,10 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     deleteActivity,
     addCategory,
     deleteCategory,
+    addWishlistItem,
+    updateWishlistItem,
+    deleteWishlistItem,
+    linkWishlistItem,
+    unlinkWishlistItem,
   }
 }

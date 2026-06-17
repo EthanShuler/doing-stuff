@@ -35,8 +35,21 @@ export interface Entry {
   createdBy: string | null
 }
 
+/** A free-text "thing we want to try" — one row in `wishlist_items`. */
+export interface WishlistItem {
+  id: string
+  text: string
+  /** The entry this item produced when checked off; null while still open. */
+  entryId: string | null
+  /** auth.users id of the member who added the wish (not shown in the UI). */
+  createdBy: string | null
+  /** ISO timestamp; used to order the list. */
+  createdAt: string
+}
+
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
+export type Screen = 'log' | 'wishlist'
 
 /** The draft backing the new/edit entry modal. */
 export interface EntryDraft {

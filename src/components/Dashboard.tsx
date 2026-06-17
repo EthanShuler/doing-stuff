@@ -11,11 +11,12 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core'
-import type { Category, SortKey, ViewMode } from '../types'
+import type { Category, Screen, SortKey, ViewMode } from '../types'
 import type { DisplayRow, Stats } from '../data/derive'
 import { ACCENT, colors, fonts, swatchFor } from '../theme'
 import { formatDate } from '../lib/format'
 import { Stars } from './Stars'
+import { HeaderActions } from './HeaderActions'
 
 interface DashboardProps {
   title: string
@@ -23,6 +24,8 @@ interface DashboardProps {
   stats: Stats
   categories: Category[]
   rows: DisplayRow[]
+  screen: Screen
+  onScreenChange: (screen: Screen) => void
   filterCategoryId: string
   sort: SortKey
   view: ViewMode
@@ -55,6 +58,8 @@ export function Dashboard({
   stats,
   categories,
   rows,
+  screen,
+  onScreenChange,
   filterCategoryId,
   sort,
   view,
@@ -90,14 +95,7 @@ export function Dashboard({
               {subtitle}
             </Text>
           </Box>
-          <Group gap={10}>
-            <Button variant="default" onClick={onManage} radius={10} styles={secondaryButtonStyles}>
-              Manage
-            </Button>
-            <Button onClick={onAdd} radius={10}>
-              + New entry
-            </Button>
-          </Group>
+          <HeaderActions screen={screen} onScreenChange={onScreenChange} onManage={onManage} onAdd={onAdd} />
         </Group>
 
         {/* STATS */}
@@ -176,14 +174,6 @@ export function Dashboard({
       </Box>
     </Box>
   )
-}
-
-const secondaryButtonStyles = {
-  root: {
-    background: 'transparent',
-    border: '1px solid rgba(120,100,80,0.3)',
-    color: '#5c574e',
-  },
 }
 
 function StatCard({

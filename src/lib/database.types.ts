@@ -71,6 +71,33 @@ export interface Database {
         Update: { id?: string; email?: string | null; display_name?: string | null; created_at?: string }
         Relationships: []
       }
+      wishlist_items: {
+        Row: {
+          id: string
+          space_id: string
+          text: string
+          entry_id: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          text?: string
+          entry_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          text?: string
+          entry_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {

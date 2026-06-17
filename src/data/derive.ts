@@ -1,4 +1,4 @@
-import type { Activity, Category, Entry, Profile, SortKey } from '../types'
+import type { Activity, Category, Entry, Profile, SortKey, WishlistItem } from '../types'
 import { FALLBACK_COLOR, swatchFor } from '../theme'
 import { currentMonthPrefix } from '../lib/format'
 
@@ -84,6 +84,21 @@ export function filterAndSort(
     sorted.sort((a, b) => a.categoryName.localeCompare(b.categoryName) || byDateDesc(a, b))
   }
   return sorted
+}
+
+/**
+ * Order the wishlist for display: open items first, done items sink to the
+ * bottom; within each group, oldest first (so newly added wishes appear at the
+ * end of the open list, next to the add input). Pure — does not mutate input.
+ */
+export function sortWishlist(items: WishlistItem[]): WishlistItem[] {
+  const byCreatedAsc = (a: WishlistItem, b: WishlistItem) => a.createdAt.localeCompare(b.createdAt)
+  return [...items].sort((a, b) => {
+    const aDone = a.entryId !== null
+    const bDone = b.entryId !== null
+    if (aDone !== bDone) return aDone ? 1 : -1
+    return byCreatedAsc(a, b)
+  })
 }
 
 export function computeStats(entries: Entry[]): Stats {
