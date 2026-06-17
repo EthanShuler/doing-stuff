@@ -1,0 +1,193 @@
+-- ============================================================================
+--  Doing Stuff — database schema + Row Level Security
+-- ----------------------------------------------------------------------------
+--  Auth model: SHARED DATA, SEPARATE LOGINS.
+--  Each person has their own auth account. Data belongs to a "space" (a shared
+--  log). Both partners are members of the same space and see/edit the same
+--  categories, activities, and entries.
+--
+--  Run this in the Supabase SQL Editor (or via `supabase db push`). It is
+--  idempotent enough to re-run during development.
+--
+--  NOTE: This project was created with "Automatically expose new tables" OFF,
+--  so each table is granted to the `authenticated` role explicitly below. The
+--  `anon` role gets nothing — you must be logged in to touch any data.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Tables
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.spaces (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.space_members (
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (space_id, user_id)
+);
+
+create table if not exists public.categories (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  name        text not null,
+  color_index int not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.activities (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  category_id uuid not null references public.categories (id) on delete cascade,
+  name        text not null,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.entries (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  activity_id uuid not null references public.activities (id) on delete cascade,
+  title       text not null default '',
+  entry_date  date not null,
+  description text not null default '',
+  rating      int  not null check (rating between 1 and 5),
+  created_at  timestamptz not null default now()
+);
+
+-- Helpful indexes for the space-scoped queries the app runs.
+create index if not exists categories_space_idx on public.categories (space_id);
+create index if not exists activities_space_idx on public.activities (space_id);
+create index if not exists entries_space_idx     on public.entries (space_id);
+create index if not exists entries_activity_idx  on public.entries (activity_id);
+
+-- ---------------------------------------------------------------------------
+-- Membership helper
+-- ---------------------------------------------------------------------------
+-- SECURITY DEFINER so it can read space_members without tripping RLS — this
+-- avoids the infinite-recursion trap where a space_members policy queries
+-- space_members. All data-table policies call this single function.
+
+create or replace function public.is_space_member(target_space uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.space_members m
+    where m.space_id = target_space
+      and m.user_id = auth.uid()
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Bootstrap: when a user creates a space, make them its first member.
+-- SECURITY DEFINER so the insert bypasses the space_members RLS policy.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.add_creator_as_member()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.space_members (space_id, user_id)
+  values (new.id, auth.uid())
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_space_created on public.spaces;
+create trigger on_space_created
+  after insert on public.spaces
+  for each row execute function public.add_creator_as_member();
+
+-- ---------------------------------------------------------------------------
+-- Row Level Security
+-- ---------------------------------------------------------------------------
+
+alter table public.spaces        enable row level security;
+alter table public.space_members enable row level security;
+alter table public.categories    enable row level security;
+alter table public.activities    enable row level security;
+alter table public.entries       enable row level security;
+
+-- spaces ---------------------------------------------------------------------
+drop policy if exists "members read space" on public.spaces;
+create policy "members read space" on public.spaces
+  for select using (public.is_space_member(id));
+
+-- Any logged-in user may create a space; the trigger adds them as a member.
+drop policy if exists "authenticated create space" on public.spaces;
+create policy "authenticated create space" on public.spaces
+  for insert with check (auth.uid() is not null);
+
+drop policy if exists "members update space" on public.spaces;
+create policy "members update space" on public.spaces
+  for update using (public.is_space_member(id)) with check (public.is_space_member(id));
+
+drop policy if exists "members delete space" on public.spaces;
+create policy "members delete space" on public.spaces
+  for delete using (public.is_space_member(id));
+
+-- space_members --------------------------------------------------------------
+-- Members can see co-members and invite others into a space they belong to.
+drop policy if exists "members read membership" on public.space_members;
+create policy "members read membership" on public.space_members
+  for select using (public.is_space_member(space_id));
+
+drop policy if exists "members add members" on public.space_members;
+create policy "members add members" on public.space_members
+  for insert with check (public.is_space_member(space_id));
+
+-- A user can always remove their own membership (leave a space).
+drop policy if exists "leave space" on public.space_members;
+create policy "leave space" on public.space_members
+  for delete using (user_id = auth.uid() or public.is_space_member(space_id));
+
+-- categories / activities / entries ------------------------------------------
+-- Same rule for all three: full access iff you belong to the row's space.
+drop policy if exists "space members all" on public.categories;
+create policy "space members all" on public.categories
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.activities;
+create policy "space members all" on public.activities
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.entries;
+create policy "space members all" on public.entries
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+-- ---------------------------------------------------------------------------
+-- Grants (needed because "Automatically expose new tables" is OFF).
+-- RLS still governs *which rows* — these grants just expose the tables to the
+-- logged-in role through the Data API.
+-- ---------------------------------------------------------------------------
+
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  public.spaces, public.space_members, public.categories, public.activities, public.entries
+  to authenticated;
+grant execute on function public.is_space_member(uuid) to authenticated;
+
+-- ============================================================================
+-- Optional: seed your own space with the design's starter data. Run this AFTER
+-- you've signed up once, replacing nothing — it uses your current auth.uid().
+-- ----------------------------------------------------------------------------
+-- with new_space as (
+--   insert into public.spaces (name) values ('Our city, together') returning id
+-- )
+-- -- the trigger adds you as a member automatically.
+-- insert into public.categories (space_id, name, color_index)
+-- select id, c.name, c.ci from new_space,
+--   (values ('Outdoor',0),('City',1),('Brain',2)) as c(name, ci);
+-- ============================================================================

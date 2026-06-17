@@ -1,0 +1,49 @@
+// Visual theme ported verbatim from the Claude Design "Compass" direction.
+// Earthy palette: terracotta clay, sage green, warm paper.
+
+export interface PaletteSwatch {
+  /** Solid accent — dots, active pills, primary buttons. */
+  color: string
+  /** Pale background tint for stat cards. */
+  tint: string
+  /** Darker ink for text on a tint. */
+  ink: string
+}
+
+export const palette: PaletteSwatch[] = [
+  { color: 'oklch(0.6 0.09 150)', tint: 'oklch(0.95 0.03 150)', ink: 'oklch(0.42 0.06 150)' },
+  { color: 'oklch(0.62 0.13 45)', tint: 'oklch(0.95 0.045 50)', ink: 'oklch(0.5 0.1 45)' },
+  { color: 'oklch(0.56 0.1 290)', tint: 'oklch(0.94 0.035 290)', ink: 'oklch(0.46 0.07 288)' },
+  { color: 'oklch(0.66 0.11 75)', tint: 'oklch(0.95 0.04 80)', ink: 'oklch(0.5 0.08 72)' },
+  { color: 'oklch(0.6 0.07 240)', tint: 'oklch(0.94 0.028 240)', ink: 'oklch(0.45 0.05 240)' },
+  { color: 'oklch(0.62 0.1 15)', tint: 'oklch(0.95 0.035 15)', ink: 'oklch(0.5 0.08 12)' },
+]
+
+/** Primary brand accent (terracotta) — used across buttons and highlights. */
+export const ACCENT = 'oklch(0.62 0.13 45)'
+export const ACCENT_HOVER = 'oklch(0.56 0.13 45)'
+export const DANGER = 'oklch(0.55 0.14 25)'
+
+export const fonts = {
+  sans: "'Plus Jakarta Sans', sans-serif",
+  serif: "'Newsreader', serif",
+  mono: "'Spline Sans Mono', monospace",
+}
+
+export const colors = {
+  pageBg: 'oklch(0.972 0.013 78)',
+  ink: '#3a352e',
+  muted: '#8a857c',
+  faint: '#a8a298',
+  cardBorder: 'rgba(120,100,80,0.13)',
+  dotted: 'rgba(120,100,80,0.3)',
+  chip: '#f3f0ea',
+  starEmpty: '#ddd6c9',
+}
+
+/** Safe fallback color for entries whose category was deleted. */
+export const FALLBACK_COLOR = '#ccc'
+
+export function swatchFor(colorIndex: number): PaletteSwatch {
+  return palette[colorIndex] ?? palette[0]
+}
