@@ -60,6 +60,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
   // View state (not persisted).
   const [screen, setScreen] = useState<Screen>('log')
   const [filterCategoryId, setFilterCategoryId] = useState('all')
+  const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
   const [view, setView] = useState<ViewMode>('cards')
 
@@ -73,8 +74,8 @@ function AppShell({ session, configured }: { session: Session | null; configured
 
   const rows = useMemo(() => {
     const joined = joinRows(store.entries, store.activities, store.categories, store.profiles, userId)
-    return filterAndSort(joined, filterCategoryId, sort)
-  }, [store.entries, store.activities, store.categories, store.profiles, filterCategoryId, sort, userId])
+    return filterAndSort(joined, filterCategoryId, sort, search)
+  }, [store.entries, store.activities, store.categories, store.profiles, filterCategoryId, sort, search, userId])
 
   const wishlistItems = useMemo(() => sortWishlist(store.wishlist), [store.wishlist])
 
@@ -267,9 +268,11 @@ function AppShell({ session, configured }: { session: Session | null; configured
           screen={screen}
           onScreenChange={setScreen}
           filterCategoryId={filterCategoryId}
+          search={search}
           sort={sort}
           view={view}
           onFilter={setFilterCategoryId}
+          onSearch={setSearch}
           onSort={setSort}
           onView={setView}
           onAdd={openAdd}

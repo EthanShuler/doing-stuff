@@ -8,6 +8,7 @@ import {
   Select,
   SimpleGrid,
   Text,
+  TextInput,
   Title,
   UnstyledButton,
 } from '@mantine/core'
@@ -27,9 +28,11 @@ interface DashboardProps {
   screen: Screen
   onScreenChange: (screen: Screen) => void
   filterCategoryId: string
+  search: string
   sort: SortKey
   view: ViewMode
   onFilter: (categoryId: string) => void
+  onSearch: (search: string) => void
   onSort: (sort: SortKey) => void
   onView: (view: ViewMode) => void
   onAdd: () => void
@@ -61,9 +64,11 @@ export function Dashboard({
   screen,
   onScreenChange,
   filterCategoryId,
+  search,
   sort,
   view,
   onFilter,
+  onSearch,
   onSort,
   onView,
   onAdd,
@@ -130,6 +135,25 @@ export function Dashboard({
             })}
           </Group>
           <Group align="center" gap={14} wrap="wrap">
+            <TextInput
+              value={search}
+              onChange={(event) => onSearch(event.currentTarget.value)}
+              placeholder="Search titles…"
+              aria-label="Search entries by title"
+              rightSection={
+                search ? (
+                  <UnstyledButton
+                    onClick={() => onSearch('')}
+                    aria-label="Clear search"
+                    style={{ color: colors.faint, fontSize: 14, lineHeight: 1 }}
+                  >
+                    ✕
+                  </UnstyledButton>
+                ) : null
+              }
+              w={200}
+              styles={{ input: { fontFamily: fonts.sans } }}
+            />
             <SegmentedControl
               value={view}
               onChange={(value) => onView(value as ViewMode)}

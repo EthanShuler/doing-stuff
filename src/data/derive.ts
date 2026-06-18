@@ -108,14 +108,38 @@ export function mapMarkers(entries: Entry[], activities: Activity[], categories:
   return markers
 }
 
+/**
+ * Fuzzy subsequence match: every character of `query` appears in `text` in
+ * order (case-insensitive, whitespace in the query ignored). Empty query
+ * matches everything. So "prk" matches "Park" and "botgar" matches
+ * "Botanical Garden".
+ */
+export function fuzzyMatch(text: string, query: string): boolean {
+  const needle = query.toLowerCase().replace(/\s+/g, '')
+  if (!needle) return true
+  const haystack = text.toLowerCase()
+  let i = 0
+  for (const char of haystack) {
+    if (char === needle[i]) {
+      i += 1
+      if (i === needle.length) return true
+    }
+  }
+  return false
+}
+
 export function filterAndSort(
   rows: DisplayRow[],
   filterCategoryId: string,
   sort: SortKey,
+  search = '',
 ): DisplayRow[] {
   let result = rows
   if (filterCategoryId !== 'all') {
     result = result.filter((row) => row.categoryId === filterCategoryId)
+  }
+  if (search.trim()) {
+    result = result.filter((row) => fuzzyMatch(row.title, search))
   }
 
   const byDateDesc = (a: DisplayRow, b: DisplayRow) => b.date.localeCompare(a.date)
