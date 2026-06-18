@@ -11,6 +11,7 @@ export function ScreenToggle({ screen, onChange }: { screen: Screen; onChange: (
       data={[
         { label: 'Log', value: 'log' },
         { label: 'Wishlist', value: 'wishlist' },
+        { label: 'Map', value: 'map' },
       ]}
       radius={9}
       styles={{

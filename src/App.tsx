@@ -5,7 +5,7 @@ import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from './type
 import { useActivityStore } from './data/useActivityStore'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
-import { computeStats, filterAndSort, joinRows, sortWishlist } from './data/derive'
+import { computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist } from './data/derive'
 import { today } from './lib/format'
 import { supabase } from './lib/supabase'
 import { colors, fonts } from './theme'
@@ -13,6 +13,7 @@ import { AuthScreen } from './components/AuthScreen'
 import { Dashboard } from './components/Dashboard'
 import { EntryModal } from './components/EntryModal'
 import { ManageModal } from './components/ManageModal'
+import { MapView } from './components/MapView'
 import { Wishlist } from './components/Wishlist'
 
 const APP_TITLE = 'Doing Stuff'
@@ -21,7 +22,7 @@ const APP_SUBTITLE = ""
 type Modal = 'entry' | 'manage' | null
 
 function emptyDraft(): EntryDraft {
-  return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0 }
+  return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0, address: '' }
 }
 
 /** Full-screen centered message — used for loading and fatal errors. */
@@ -79,6 +80,11 @@ function AppShell({ session, configured }: { session: Session | null; configured
 
   const stats = useMemo(() => computeStats(store.entries), [store.entries])
 
+  const markers = useMemo(
+    () => mapMarkers(store.entries, store.activities, store.categories),
+    [store.entries, store.activities, store.categories],
+  )
+
   const openAdd = () => {
     setEditingId(null)
     setPendingWishId(null)
@@ -99,6 +105,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
       date: entry.date,
       description: entry.description,
       rating: entry.rating,
+      address: entry.address,
     })
     setModal('entry')
   }
@@ -197,6 +204,34 @@ function AppShell({ session, configured }: { session: Session | null; configured
         </Box>
       )}
 
+      {store.notice && (
+        <Box
+          c="oklch(0.42 0.07 75)"
+          px={14}
+          py={9}
+          onClick={store.clearNotice}
+          style={{
+            position: 'fixed',
+            top: store.error ? 64 : 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            maxWidth: 'min(92vw, 520px)',
+            border: '1px solid rgba(160,120,40,0.35)',
+            borderRadius: 9,
+            background: 'oklch(0.96 0.05 85)',
+            fontSize: 13,
+            fontWeight: 500,
+            fontFamily: fonts.sans,
+            boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
+            cursor: 'pointer',
+          }}
+        >
+          {store.notice}
+          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
+        </Box>
+      )}
+
       {screen === 'wishlist' ? (
         <Wishlist
           title={APP_TITLE}
@@ -210,6 +245,17 @@ function AppShell({ session, configured }: { session: Session | null; configured
           onAdd={store.addWishlistItem}
           onEdit={store.updateWishlistItem}
           onDelete={store.deleteWishlistItem}
+        />
+      ) : screen === 'map' ? (
+        <MapView
+          title={APP_TITLE}
+          home={store.home}
+          markers={markers}
+          screen={screen}
+          onScreenChange={setScreen}
+          onNewEntry={openAdd}
+          onManage={() => setModal('manage')}
+          onEditEntry={openEdit}
         />
       ) : (
         <Dashboard
@@ -249,10 +295,13 @@ function AppShell({ session, configured }: { session: Session | null; configured
         opened={modal === 'manage'}
         categories={store.categories}
         activities={store.activities}
+        home={store.home}
         onAddActivity={store.addActivity}
         onDeleteActivity={store.deleteActivity}
+        onSetActivityEmoji={store.setActivityEmoji}
         onAddCategory={store.addCategory}
         onDeleteCategory={store.deleteCategory}
+        onSetHome={store.setHome}
         onClose={closeModal}
       />
     </>

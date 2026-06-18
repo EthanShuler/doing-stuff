@@ -106,6 +106,14 @@ export function EntryModal({
         mb={18}
       />
 
+      <TextInput
+        label="Address"
+        value={draft.address}
+        onChange={(e) => onChange({ address: e.currentTarget.value })}
+        placeholder="Where was it? (optional — drops a pin on the map)"
+        mb={18}
+      />
+
       <Box mb={18}>
         <Text component="label" style={labelStyle}>
           How was it?

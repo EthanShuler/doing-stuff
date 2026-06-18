@@ -12,6 +12,8 @@ export interface Activity {
   id: string
   categoryId: string
   name: string
+  /** Single emoji used as this activity's map-pin icon. '' = none (pin falls back to 📍). */
+  emoji: string
 }
 
 /** A space member's readable identity (mirrors the `profiles` table). */
@@ -33,6 +35,18 @@ export interface Entry {
   rating: number
   /** auth.users id of the member who logged this entry (null for legacy rows). */
   createdBy: string | null
+  /** Free-text place this outing happened. '' = none. */
+  address: string
+  /** Geocoded from `address` on save (Nominatim). null when absent or unlocatable. */
+  lat: number | null
+  lng: number | null
+}
+
+/** The space's shared map center, geocoded from a typed address. */
+export interface Home {
+  address: string
+  lat: number | null
+  lng: number | null
 }
 
 /** A free-text "thing we want to try" — one row in `wishlist_items`. */
@@ -49,7 +63,7 @@ export interface WishlistItem {
 
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
-export type Screen = 'log' | 'wishlist'
+export type Screen = 'log' | 'wishlist' | 'map'
 
 /** The draft backing the new/edit entry modal. */
 export interface EntryDraft {
@@ -59,4 +73,5 @@ export interface EntryDraft {
   date: string
   description: string
   rating: number
+  address: string
 }

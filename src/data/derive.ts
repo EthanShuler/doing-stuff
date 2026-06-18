@@ -64,6 +64,50 @@ export function joinRows(
   })
 }
 
+/** An entry that has coordinates, ready to draw as a map pin. */
+export interface MapMarker {
+  id: string
+  lat: number
+  lng: number
+  /** Parent activity's emoji, or 📍 when none is set. */
+  emoji: string
+  title: string
+  activityName: string
+  categoryColor: string
+  date: string
+  rating: number
+}
+
+const DEFAULT_PIN = '📍'
+
+/**
+ * Entries that have been geocoded, joined to their activity's emoji + category
+ * color. Pure; ignores the category filter — the map always shows everything.
+ */
+export function mapMarkers(entries: Entry[], activities: Activity[], categories: Category[]): MapMarker[] {
+  const activityById = new Map(activities.map((a) => [a.id, a]))
+  const categoryById = new Map(categories.map((c) => [c.id, c]))
+
+  const markers: MapMarker[] = []
+  for (const entry of entries) {
+    if (entry.lat === null || entry.lng === null) continue
+    const activity = activityById.get(entry.activityId)
+    const category = activity ? categoryById.get(activity.categoryId) : undefined
+    markers.push({
+      id: entry.id,
+      lat: entry.lat,
+      lng: entry.lng,
+      emoji: activity && activity.emoji ? activity.emoji : DEFAULT_PIN,
+      title: entry.title || (activity ? activity.name : '(deleted)'),
+      activityName: activity ? activity.name : '(deleted)',
+      categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
+      date: entry.date,
+      rating: entry.rating,
+    })
+  }
+  return markers
+}
+
 export function filterAndSort(
   rows: DisplayRow[],
   filterCategoryId: string,

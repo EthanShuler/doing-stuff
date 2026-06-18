@@ -6,9 +6,30 @@ export interface Database {
   public: {
     Tables: {
       spaces: {
-        Row: { id: string; name: string; created_at: string }
-        Insert: { id?: string; name: string; created_at?: string }
-        Update: { id?: string; name?: string; created_at?: string }
+        Row: {
+          id: string
+          name: string
+          created_at: string
+          home_address: string | null
+          home_lat: number | null
+          home_lng: number | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+          home_address?: string | null
+          home_lat?: number | null
+          home_lng?: number | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+          home_address?: string | null
+          home_lat?: number | null
+          home_lng?: number | null
+        }
         Relationships: []
       }
       space_members: {
@@ -24,9 +45,9 @@ export interface Database {
         Relationships: []
       }
       activities: {
-        Row: { id: string; space_id: string; category_id: string; name: string; created_at: string }
-        Insert: { id?: string; space_id: string; category_id: string; name: string; created_at?: string }
-        Update: { id?: string; space_id?: string; category_id?: string; name?: string; created_at?: string }
+        Row: { id: string; space_id: string; category_id: string; name: string; emoji: string | null; created_at: string }
+        Insert: { id?: string; space_id: string; category_id: string; name: string; emoji?: string | null; created_at?: string }
+        Update: { id?: string; space_id?: string; category_id?: string; name?: string; emoji?: string | null; created_at?: string }
         Relationships: []
       }
       entries: {
@@ -40,6 +61,9 @@ export interface Database {
           rating: number
           created_by: string | null
           created_at: string
+          address: string | null
+          lat: number | null
+          lng: number | null
         }
         Insert: {
           id?: string
@@ -51,6 +75,9 @@ export interface Database {
           rating: number
           created_by?: string | null
           created_at?: string
+          address?: string | null
+          lat?: number | null
+          lng?: number | null
         }
         Update: {
           id?: string
@@ -62,6 +89,9 @@ export interface Database {
           rating?: number
           created_by?: string | null
           created_at?: string
+          address?: string | null
+          lat?: number | null
+          lng?: number | null
         }
         Relationships: []
       }

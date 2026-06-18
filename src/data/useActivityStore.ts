@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { Activity, Category, Entry, EntryDraft, Profile, WishlistItem } from '../types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Activity, Category, Entry, EntryDraft, Home, Profile, WishlistItem } from '../types'
 import { supabase } from '../lib/supabase'
 import { today } from '../lib/format'
+import { geocode } from '../lib/geocode'
 
 // The app's single source of domain data (categories / activities / entries).
 //
@@ -19,10 +20,15 @@ interface SeedData {
   entries: Entry[]
   profiles: Profile[]
   wishlist: WishlistItem[]
+  home: Home
 }
+
+const EMPTY_HOME: Home = { address: '', lat: null, lng: null }
 
 function seed(): SeedData {
   return {
+    // A demo center + a few pre-geocoded pins so the map works in keyless mode.
+    home: { address: 'Portland, OR', lat: 45.5152, lng: -122.6784 },
     profiles: [
       { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
       { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
@@ -38,24 +44,24 @@ function seed(): SeedData {
       { id: 'c3', name: 'Brain', colorIndex: 2 },
     ],
     activities: [
-      { id: 'a1', categoryId: 'c1', name: 'Park' },
-      { id: 'a2', categoryId: 'c1', name: 'Swimming' },
-      { id: 'a3', categoryId: 'c1', name: 'Backpacking' },
-      { id: 'a4', categoryId: 'c2', name: 'Movie' },
-      { id: 'a5', categoryId: 'c2', name: 'Restaurant' },
-      { id: 'a6', categoryId: 'c2', name: 'Book store' },
-      { id: 'a7', categoryId: 'c3', name: 'ASL learning' },
-      { id: 'a8', categoryId: 'c3', name: 'Piano lesson' },
+      { id: 'a1', categoryId: 'c1', name: 'Park', emoji: '🌳' },
+      { id: 'a2', categoryId: 'c1', name: 'Swimming', emoji: '🏊' },
+      { id: 'a3', categoryId: 'c1', name: 'Backpacking', emoji: '🎒' },
+      { id: 'a4', categoryId: 'c2', name: 'Movie', emoji: '🎬' },
+      { id: 'a5', categoryId: 'c2', name: 'Restaurant', emoji: '🍝' },
+      { id: 'a6', categoryId: 'c2', name: 'Book store', emoji: '📚' },
+      { id: 'a7', categoryId: 'c3', name: 'ASL learning', emoji: '🤟' },
+      { id: 'a8', categoryId: 'c3', name: 'Piano lesson', emoji: '🎹' },
     ],
     entries: [
-      { id: 'i1', activityId: 'a1', title: 'Riverside picnic', date: '2026-06-12', description: 'Golden hour picnic and a long walk by the water.', rating: 5, createdBy: 'u1' },
-      { id: 'i2', activityId: 'a5', title: 'Dinner at Tabella', date: '2026-06-08', description: 'Shared the cacio e pepe. Cozy corner table.', rating: 4, createdBy: 'u2' },
-      { id: 'i3', activityId: 'a7', title: 'ASL — Lesson 4', date: '2026-06-03', description: 'Finally got the alphabet down. Practiced over coffee.', rating: 4, createdBy: 'u1' },
-      { id: 'i4', activityId: 'a3', title: 'Pine Ridge overnight', date: '2026-05-30', description: 'Overnight on the trail. Tough climb, worth it.', rating: 5, createdBy: 'u2' },
-      { id: 'i5', activityId: 'a4', title: 'Sci-fi at the Roxy', date: '2026-06-10', description: 'Saw the new release. Split a popcorn.', rating: 3, createdBy: 'u1' },
-      { id: 'i6', activityId: 'a2', title: 'Morning laps', date: '2026-06-14', description: 'Early swim at the community pool.', rating: 4, createdBy: 'u2' },
-      { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4, createdBy: 'u1' },
-      { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5, createdBy: 'u2' },
+      { id: 'i1', activityId: 'a1', title: 'Riverside picnic', date: '2026-06-12', description: 'Golden hour picnic and a long walk by the water.', rating: 5, createdBy: 'u1', address: 'Tom McCall Waterfront Park, Portland, OR', lat: 45.5176, lng: -122.6708 },
+      { id: 'i2', activityId: 'a5', title: 'Dinner at Tabella', date: '2026-06-08', description: 'Shared the cacio e pepe. Cozy corner table.', rating: 4, createdBy: 'u2', address: '', lat: null, lng: null },
+      { id: 'i3', activityId: 'a7', title: 'ASL — Lesson 4', date: '2026-06-03', description: 'Finally got the alphabet down. Practiced over coffee.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null },
+      { id: 'i4', activityId: 'a3', title: 'Pine Ridge overnight', date: '2026-05-30', description: 'Overnight on the trail. Tough climb, worth it.', rating: 5, createdBy: 'u2', address: 'Forest Park, Portland, OR', lat: 45.5786, lng: -122.7565 },
+      { id: 'i5', activityId: 'a4', title: 'Sci-fi at the Roxy', date: '2026-06-10', description: 'Saw the new release. Split a popcorn.', rating: 3, createdBy: 'u1', address: '', lat: null, lng: null },
+      { id: 'i6', activityId: 'a2', title: 'Morning laps', date: '2026-06-14', description: 'Early swim at the community pool.', rating: 4, createdBy: 'u2', address: '', lat: null, lng: null },
+      { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null },
+      { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5, createdBy: 'u2', address: 'Powell\'s City of Books, Portland, OR', lat: 45.5232, lng: -122.6819 },
     ],
   }
 }
@@ -63,7 +69,7 @@ function seed(): SeedData {
 // --- Row → app-type mappers (DB is snake_case; entry_date/color_index differ) ---
 
 type CategoryRow = { id: string; name: string; color_index: number }
-type ActivityRow = { id: string; category_id: string; name: string }
+type ActivityRow = { id: string; category_id: string; name: string; emoji: string | null }
 type EntryRow = {
   id: string
   activity_id: string
@@ -72,7 +78,11 @@ type EntryRow = {
   description: string
   rating: number
   created_by: string | null
+  address: string | null
+  lat: number | null
+  lng: number | null
 }
+type SpaceHomeRow = { home_address: string | null; home_lat: number | null; home_lng: number | null }
 type ProfileRow = { id: string; email: string | null; display_name: string | null }
 type WishlistRow = {
   id: string
@@ -83,7 +93,12 @@ type WishlistRow = {
 }
 
 const toCategory = (r: CategoryRow): Category => ({ id: r.id, name: r.name, colorIndex: r.color_index })
-const toActivity = (r: ActivityRow): Activity => ({ id: r.id, categoryId: r.category_id, name: r.name })
+const toActivity = (r: ActivityRow): Activity => ({
+  id: r.id,
+  categoryId: r.category_id,
+  name: r.name,
+  emoji: r.emoji ?? '',
+})
 const toEntry = (r: EntryRow): Entry => ({
   id: r.id,
   activityId: r.activity_id,
@@ -92,7 +107,12 @@ const toEntry = (r: EntryRow): Entry => ({
   description: r.description,
   rating: r.rating,
   createdBy: r.created_by,
+  address: r.address ?? '',
+  lat: r.lat,
+  lng: r.lng,
 })
+const toHome = (r: SpaceHomeRow | null): Home =>
+  r ? { address: r.home_address ?? '', lat: r.home_lat, lng: r.home_lng } : EMPTY_HOME
 const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
 const toWishlistItem = (r: WishlistRow): WishlistItem => ({
   id: r.id,
@@ -102,8 +122,10 @@ const toWishlistItem = (r: WishlistRow): WishlistItem => ({
   createdAt: r.created_at,
 })
 
-const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by'
+const ACTIVITY_COLUMNS = 'id,category_id,name,emoji'
+const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by,address,lat,lng'
 const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at'
+const SPACE_HOME_COLUMNS = 'home_address,home_lat,home_lng'
 
 const message = (err: unknown): string =>
   err instanceof Error ? err.message : 'Something went wrong.'
@@ -115,14 +137,31 @@ function nextId(): string {
   return `x${idCounter}`
 }
 
+// Keep just the first grapheme so a pin shows one icon — grapheme-aware so it
+// doesn't split emoji ZWJ sequences (e.g. 👨‍👩‍👧) or surrogate pairs.
+function firstGrapheme(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    const first = new Intl.Segmenter().segment(trimmed)[Symbol.iterator]().next().value
+    return first ? first.segment : trimmed
+  }
+  return [...trimmed][0] ?? trimmed
+}
+
 export interface ActivityStore {
   categories: Category[]
   activities: Activity[]
   entries: Entry[]
   profiles: Profile[]
   wishlist: WishlistItem[]
+  /** The space's shared map center. */
+  home: Home
   loading: boolean
   error: string | null
+  /** Non-fatal warning (e.g. an address that couldn't be geocoded). Dismiss with clearNotice. */
+  notice: string | null
+  clearNotice: () => void
 
   /** Resolves to the new entry's id, so a wishlist check-off can link to it. */
   addEntry: (draft: EntryDraft) => Promise<string>
@@ -131,9 +170,14 @@ export interface ActivityStore {
 
   addActivity: (categoryId: string, name: string) => Promise<void>
   deleteActivity: (id: string) => Promise<void>
+  /** Set (or clear) an activity's map-pin emoji. */
+  setActivityEmoji: (id: string, emoji: string) => Promise<void>
 
   addCategory: (name: string, colorIndex: number) => Promise<void>
   deleteCategory: (id: string) => Promise<void>
+
+  /** Set the shared home address; geocodes it for the map center. */
+  setHome: (address: string) => Promise<void>
 
   addWishlistItem: (text: string) => Promise<void>
   updateWishlistItem: (id: string, text: string) => Promise<void>
@@ -151,8 +195,30 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   const [entries, setEntries] = useState<Entry[]>(() => (supabase ? [] : seed().entries))
   const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
   const [wishlist, setWishlist] = useState<WishlistItem[]>(() => (supabase ? [] : seed().wishlist))
+  const [home, setHomeState] = useState<Home>(() => (supabase ? EMPTY_HOME : seed().home))
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const clearNotice = useCallback(() => setNotice(null), [])
+
+  // Latest entries, read by updateEntry to compare the prior address without
+  // re-creating the callback on every entries change.
+  const entriesRef = useRef(entries)
+  entriesRef.current = entries
+
+  // Geocode an address for a save: returns coords (or null) and posts a
+  // non-blocking notice when a non-empty address can't be located.
+  const resolveCoords = useCallback(async (address: string) => {
+    const trimmed = address.trim()
+    if (!trimmed) return null
+    const point = await geocode(trimmed)
+    if (!point) {
+      setNotice(`Couldn't locate "${trimmed}" — saved, but it won't appear on the map.`)
+    }
+    return point
+  }, [])
+
+  const NO_COORDS = { lat: null as number | null, lng: null as number | null }
 
   // Initial load (live mode only; waits for the space to resolve).
   useEffect(() => {
@@ -163,25 +229,28 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       setLoading(true)
       setError(null)
       try {
-        const [cats, acts, ents, profs, wishes] = await Promise.all([
+        const [cats, acts, ents, profs, wishes, space] = await Promise.all([
           supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
-          supabase.from('activities').select('id,category_id,name').eq('space_id', spaceId).order('created_at'),
+          supabase.from('activities').select(ACTIVITY_COLUMNS).eq('space_id', spaceId).order('created_at'),
           supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
           // RLS scopes this to the current user + anyone they share a space with.
           supabase.from('profiles').select('id,email,display_name'),
           supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
+          supabase.from('spaces').select(SPACE_HOME_COLUMNS).eq('id', spaceId).single(),
         ])
         if (cats.error) throw cats.error
         if (acts.error) throw acts.error
         if (ents.error) throw ents.error
         if (profs.error) throw profs.error
         if (wishes.error) throw wishes.error
+        if (space.error) throw space.error
         if (cancelled) return
         setCategories((cats.data as CategoryRow[]).map(toCategory))
         setActivities((acts.data as ActivityRow[]).map(toActivity))
         setEntries((ents.data as EntryRow[]).map(toEntry))
         setProfiles((profs.data as ProfileRow[]).map(toProfile))
         setWishlist((wishes.data as WishlistRow[]).map(toWishlistItem))
+        setHomeState(toHome(space.data as SpaceHomeRow))
       } catch (err) {
         if (!cancelled) setError(message(err))
       } finally {
@@ -198,6 +267,11 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const addEntry = useCallback(
     async (draft: EntryDraft) => {
+      setNotice(null)
+      const address = draft.address.trim()
+      // Geocode before persisting so the row carries coords (or stays off-map).
+      const point = await resolveCoords(address)
+      const coords = point ?? NO_COORDS
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('entries')
@@ -208,6 +282,9 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
             entry_date: draft.date || today(),
             description: draft.description,
             rating: draft.rating,
+            address,
+            lat: coords.lat,
+            lng: coords.lng,
             // created_by defaults to auth.uid() server-side; the inserted row is
             // read back below, so the UI gets the resolved creator id.
           })
@@ -232,15 +309,29 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           description: draft.description,
           rating: draft.rating,
           createdBy: userId,
+          address,
+          lat: coords.lat,
+          lng: coords.lng,
         },
       ])
       return id
     },
-    [spaceId, userId],
+    [spaceId, userId, resolveCoords],
   )
 
   const updateEntry = useCallback(
     async (id: string, draft: EntryDraft) => {
+      setNotice(null)
+      const address = draft.address.trim()
+      const existing = entriesRef.current.find((e) => e.id === id)
+      // Re-geocode only when the address text actually changed; otherwise keep
+      // the coords already on the row (respects Nominatim's rate policy).
+      let coords: { lat: number | null; lng: number | null }
+      if (existing && existing.address.trim() === address) {
+        coords = { lat: existing.lat, lng: existing.lng }
+      } else {
+        coords = (await resolveCoords(address)) ?? NO_COORDS
+      }
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('entries')
@@ -250,6 +341,9 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
             entry_date: draft.date || today(),
             description: draft.description,
             rating: draft.rating,
+            address,
+            lat: coords.lat,
+            lng: coords.lng,
           })
           .eq('id', id)
           .select(ENTRY_COLUMNS)
@@ -271,12 +365,15 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
                 date: draft.date,
                 description: draft.description,
                 rating: draft.rating,
+                address,
+                lat: coords.lat,
+                lng: coords.lng,
               }
             : entry,
         ),
       )
     },
-    [spaceId],
+    [spaceId, resolveCoords],
   )
 
   const deleteEntry = useCallback(
@@ -309,7 +406,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         const { data, error: err } = await supabase
           .from('activities')
           .insert({ space_id: spaceId, category_id: categoryId, name: trimmed })
-          .select('id,category_id,name')
+          .select(ACTIVITY_COLUMNS)
           .single()
         if (err) {
           setError(err.message)
@@ -318,7 +415,22 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         setActivities((prev) => [...prev, toActivity(data as ActivityRow)])
         return
       }
-      setActivities((prev) => [...prev, { id: nextId(), categoryId, name: trimmed }])
+      setActivities((prev) => [...prev, { id: nextId(), categoryId, name: trimmed, emoji: '' }])
+    },
+    [spaceId],
+  )
+
+  const setActivityEmoji = useCallback(
+    async (id: string, emoji: string) => {
+      const next = firstGrapheme(emoji)
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('activities').update({ emoji: next }).eq('id', id)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setActivities((prev) => prev.map((a) => (a.id === id ? { ...a, emoji: next } : a)))
     },
     [spaceId],
   )
@@ -384,6 +496,30 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       setCategories((prev) => prev.filter((category) => category.id !== id))
     },
     [spaceId],
+  )
+
+  // --- Home (map center). Lives on the space row; geocoded on save. ---
+
+  const setHome = useCallback(
+    async (address: string) => {
+      setNotice(null)
+      const trimmed = address.trim()
+      const point = await resolveCoords(trimmed)
+      const coords = point ?? NO_COORDS
+      const next: Home = { address: trimmed, lat: coords.lat, lng: coords.lng }
+      if (supabase && spaceId) {
+        const { error: err } = await supabase
+          .from('spaces')
+          .update({ home_address: trimmed, home_lat: coords.lat, home_lng: coords.lng })
+          .eq('id', spaceId)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setHomeState(next)
+    },
+    [spaceId, resolveCoords],
   )
 
   // --- Wishlist actions. Like category/activity actions, these record errors
@@ -478,15 +614,20 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     entries,
     profiles,
     wishlist,
+    home,
     loading,
     error,
+    notice,
+    clearNotice,
     addEntry,
     updateEntry,
     deleteEntry,
     addActivity,
     deleteActivity,
+    setActivityEmoji,
     addCategory,
     deleteCategory,
+    setHome,
     addWishlistItem,
     updateWishlistItem,
     deleteWishlistItem,

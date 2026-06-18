@@ -19,9 +19,13 @@
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.spaces (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
-  created_at  timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  -- Shared map center. Address is geocoded client-side (Nominatim) on save.
+  home_address  text,
+  home_lat      double precision,
+  home_lng      double precision,
+  created_at    timestamptz not null default now()
 );
 
 create table if not exists public.space_members (
@@ -44,6 +48,8 @@ create table if not exists public.activities (
   space_id    uuid not null references public.spaces (id) on delete cascade,
   category_id uuid not null references public.categories (id) on delete cascade,
   name        text not null,
+  -- Single emoji used as this activity's map-pin icon (nullable / '' = none).
+  emoji       text not null default '',
   created_at  timestamptz not null default now()
 );
 
@@ -58,11 +64,28 @@ create table if not exists public.entries (
   -- Who logged this outing. Defaults to the inserting user; the UI resolves the
   -- name via the `profiles` table (the browser can't read auth.users directly).
   created_by  uuid references auth.users (id) default auth.uid(),
+  -- Optional place this outing happened. Address is geocoded client-side
+  -- (Nominatim) on save; lat/lng stay null when blank or unlocatable. An entry
+  -- with coords shows as a pin on the map view.
+  address     text not null default '',
+  lat         double precision,
+  lng         double precision,
   created_at  timestamptz not null default now()
 );
 
 -- If the entries table already exists from an earlier schema, add the column:
 alter table public.entries add column if not exists created_by uuid references auth.users (id) default auth.uid();
+
+-- ---------------------------------------------------------------------------
+-- Map feature migration (run if these tables predate the map feature):
+-- ---------------------------------------------------------------------------
+alter table public.spaces     add column if not exists home_address text;
+alter table public.spaces     add column if not exists home_lat double precision;
+alter table public.spaces     add column if not exists home_lng double precision;
+alter table public.activities add column if not exists emoji text not null default '';
+alter table public.entries    add column if not exists address text not null default '';
+alter table public.entries    add column if not exists lat double precision;
+alter table public.entries    add column if not exists lng double precision;
 
 -- ---------------------------------------------------------------------------
 -- Wishlist: free-text "things we want to try". Checking one off in the UI opens

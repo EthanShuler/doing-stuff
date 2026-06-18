@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Box, Button, Group, Paper, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
-import type { Activity, Category } from '../types'
+import type { Activity, Category, Home } from '../types'
 import { colors, fonts, palette, swatchFor } from '../theme'
 import { ModalShell } from './ModalShell'
 
@@ -8,10 +8,13 @@ interface ManageModalProps {
   opened: boolean
   categories: Category[]
   activities: Activity[]
+  home: Home
   onAddActivity: (categoryId: string, name: string) => void
   onDeleteActivity: (id: string) => void
+  onSetActivityEmoji: (id: string, emoji: string) => void
   onAddCategory: (name: string, colorIndex: number) => void
   onDeleteCategory: (id: string) => void
+  onSetHome: (address: string) => void
   onClose: () => void
 }
 
@@ -19,16 +22,41 @@ export function ManageModal({
   opened,
   categories,
   activities,
+  home,
   onAddActivity,
   onDeleteActivity,
+  onSetActivityEmoji,
   onAddCategory,
   onDeleteCategory,
+  onSetHome,
   onClose,
 }: ManageModalProps) {
   // Per-category "add activity" text inputs, keyed by category id.
   const [activityDrafts, setActivityDrafts] = useState<Record<string, string>>({})
+  // Per-activity emoji edits, keyed by activity id; committed on blur / Enter.
+  const [emojiDrafts, setEmojiDrafts] = useState<Record<string, string>>({})
   const [newCatName, setNewCatName] = useState('')
   const [newCatColor, setNewCatColor] = useState(3)
+
+  const commitEmoji = (activity: Activity) => {
+    const draft = emojiDrafts[activity.id]
+    if (draft !== undefined && draft !== activity.emoji) onSetActivityEmoji(activity.id, draft)
+  }
+  // Home address is edited locally and committed (geocoded) on blur / Enter /
+  // button, so we don't hit Nominatim on every keystroke.
+  const [homeDraft, setHomeDraft] = useState(home.address)
+
+  // Adopt the stored address once it loads / changes (the input is otherwise
+  // uncontrolled by the prop so typing isn't clobbered mid-edit).
+  useEffect(() => {
+    setHomeDraft(home.address)
+  }, [home.address])
+
+  const commitHome = () => {
+    if (homeDraft.trim() !== home.address) onSetHome(homeDraft)
+  }
+
+  const homeUnlocated = home.address.trim().length > 0 && home.lat === null
 
   const submitActivity = (categoryId: string) => {
     onAddActivity(categoryId, activityDrafts[categoryId] ?? '')
@@ -52,6 +80,40 @@ export function ManageModal({
           Done
         </Button>
       </Group>
+
+      {/* HOME BASE — the shared map center. */}
+      <Paper
+        bg="#fff"
+        withBorder
+        p="16px 18px"
+        mb={18}
+        style={{ borderColor: colors.cardBorder, borderRadius: 14 }}
+      >
+        <Text fz={12} fw={700} tt="uppercase" c={colors.muted} mb={11} style={{ letterSpacing: '0.07em' }}>
+          🏠 Home base
+        </Text>
+        <Group gap={8} align="flex-end" wrap="nowrap">
+          <TextInput
+            flex={1}
+            value={homeDraft}
+            onChange={(e) => setHomeDraft(e.currentTarget.value)}
+            onBlur={commitHome}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitHome()
+            }}
+            placeholder="Your address — the center of the map"
+            styles={{ input: { fontSize: 13 } }}
+          />
+          <Button variant="default" onClick={commitHome} radius={9} styles={addButtonStyles}>
+            Save
+          </Button>
+        </Group>
+        {homeUnlocated && (
+          <Text fz={12} c={colors.muted} mt={8} style={{ fontStyle: 'italic', fontFamily: fonts.serif }}>
+            Couldn't locate that address — the map will use a default center.
+          </Text>
+        )}
+      </Paper>
 
       {categories.map((category) => {
         const swatch = swatchFor(category.colorIndex)
@@ -86,16 +148,38 @@ export function ManageModal({
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 4,
                     fontSize: 13,
                     fontWeight: 500,
                     background: colors.chip,
                     color: '#5c574e',
-                    padding: '5px 6px 5px 12px',
+                    padding: '4px 6px 4px 6px',
                     borderRadius: 20,
                   }}
                 >
-                  {activity.name}
+                  <input
+                    value={emojiDrafts[activity.id] ?? activity.emoji}
+                    onChange={(e) => setEmojiDrafts((prev) => ({ ...prev, [activity.id]: e.currentTarget.value }))}
+                    onBlur={() => commitEmoji(activity)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur()
+                    }}
+                    placeholder="📍"
+                    aria-label={`Emoji for ${activity.name}`}
+                    style={{
+                      width: 26,
+                      textAlign: 'center',
+                      border: 'none',
+                      outline: 'none',
+                      background: '#fff',
+                      borderRadius: '50%',
+                      padding: '3px 0',
+                      fontSize: 15,
+                      lineHeight: 1,
+                      cursor: 'text',
+                    }}
+                  />
+                  <span style={{ padding: '0 2px' }}>{activity.name}</span>
                   <UnstyledButton
                     onClick={() => onDeleteActivity(activity.id)}
                     aria-label={`Remove ${activity.name}`}
