@@ -12,6 +12,7 @@ import { colors, fonts } from './theme'
 import { AuthScreen } from './components/AuthScreen'
 import { Dashboard } from './components/Dashboard'
 import { EntryModal } from './components/EntryModal'
+import { RepeatModal } from './components/RepeatModal'
 import { ManageModal } from './components/ManageModal'
 import { MapView } from './components/MapView'
 import { Wishlist } from './components/Wishlist'
@@ -19,7 +20,7 @@ import { Wishlist } from './components/Wishlist'
 const APP_TITLE = 'Doing Stuff'
 const APP_SUBTITLE = ""
 
-type Modal = 'entry' | 'manage' | null
+type Modal = 'entry' | 'manage' | 'repeat' | null
 
 function emptyDraft(): EntryDraft {
   return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0, address: '' }
@@ -71,15 +72,17 @@ function AppShell({ session, configured }: { session: Session | null; configured
   // Set when the entry modal was opened by checking off a wishlist item; on a
   // successful save we link that item to the new entry (marking it done).
   const [pendingWishId, setPendingWishId] = useState<string | null>(null)
+  // Entry whose repeat modal is open.
+  const [repeatEntryId, setRepeatEntryId] = useState<string | null>(null)
 
   const rows = useMemo(() => {
-    const joined = joinRows(store.entries, store.activities, store.categories, store.profiles, userId)
+    const joined = joinRows(store.entries, store.activities, store.categories, store.profiles, userId, store.repeats)
     return filterAndSort(joined, filterCategoryId, sort, search)
-  }, [store.entries, store.activities, store.categories, store.profiles, filterCategoryId, sort, search, userId])
+  }, [store.entries, store.activities, store.categories, store.profiles, store.repeats, filterCategoryId, sort, search, userId])
 
   const wishlistItems = useMemo(() => sortWishlist(store.wishlist), [store.wishlist])
 
-  const stats = useMemo(() => computeStats(store.entries), [store.entries])
+  const stats = useMemo(() => computeStats(store.entries, store.repeats), [store.entries, store.repeats])
 
   const markers = useMemo(
     () => mapMarkers(store.entries, store.activities, store.categories),
@@ -120,10 +123,16 @@ function AppShell({ session, configured }: { session: Session | null; configured
     setModal('entry')
   }
 
+  const openRepeat = (id: string) => {
+    setRepeatEntryId(id)
+    setModal('repeat')
+  }
+
   const closeModal = () => {
     setModal(null)
     setEditingId(null)
     setPendingWishId(null)
+    setRepeatEntryId(null)
   }
 
   const saveEntry = async () => {
@@ -279,6 +288,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
           onManage={() => setModal('manage')}
           onEdit={openEdit}
           onDelete={store.deleteEntry}
+          onRepeat={openRepeat}
         />
       )}
 
@@ -293,6 +303,22 @@ function AppShell({ session, configured }: { session: Session | null; configured
         onDelete={deleteEditingEntry}
         onClose={closeModal}
       />
+
+      {(() => {
+        const entry = repeatEntryId ? store.entries.find((e) => e.id === repeatEntryId) : null
+        const title = entry ? entry.title || store.activities.find((a) => a.id === entry.activityId)?.name || 'this outing' : ''
+        return (
+          <RepeatModal
+            opened={modal === 'repeat'}
+            entryTitle={title}
+            firstDate={entry ? entry.date : today()}
+            repeats={entry ? store.repeats.filter((r) => r.entryId === entry.id) : []}
+            onAdd={(date) => entry && store.addRepeat(entry.id, date).catch(() => {})}
+            onRemove={(repeatId) => store.deleteRepeat(repeatId).catch(() => {})}
+            onClose={closeModal}
+          />
+        )
+      })()}
 
       <ManageModal
         opened={modal === 'manage'}

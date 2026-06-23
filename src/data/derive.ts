@@ -1,4 +1,4 @@
-import type { Activity, Category, Entry, Profile, SortKey, WishlistItem } from '../types'
+import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem } from '../types'
 import { FALLBACK_COLOR, swatchFor } from '../theme'
 import { currentMonthPrefix } from '../lib/format'
 
@@ -10,7 +10,13 @@ export interface DisplayRow {
   categoryId: string | null
   categoryColor: string
   activityName: string
+  /** Most recent date (max of the first entry and any repeats). Drives the
+   *  displayed date and the "recent" sort, so a repeat resurfaces the entry. */
   date: string
+  /** The original (first) entry date. Shown as "since …" when there are repeats. */
+  firstDate: string
+  /** Total times logged: 1 (the entry) + its repeats. */
+  totalCount: number
   description: string
   rating: number
   /** Display label for who logged the entry: "You", a name, or "" if unknown. */
@@ -41,14 +47,25 @@ export function joinRows(
   categories: Category[],
   profiles: Profile[] = [],
   currentUserId: string | null = null,
+  repeats: Repeat[] = [],
 ): DisplayRow[] {
   const activityById = new Map(activities.map((a) => [a.id, a]))
   const categoryById = new Map(categories.map((c) => [c.id, c]))
   const profilesById = new Map(profiles.map((p) => [p.id, p]))
 
+  // Group repeat dates by entry so we can derive count + latest date per entry.
+  const repeatDatesByEntry = new Map<string, string[]>()
+  for (const repeat of repeats) {
+    const dates = repeatDatesByEntry.get(repeat.entryId)
+    if (dates) dates.push(repeat.date)
+    else repeatDatesByEntry.set(repeat.entryId, [repeat.date])
+  }
+
   return entries.map((entry) => {
     const activity = activityById.get(entry.activityId)
     const category = activity ? categoryById.get(activity.categoryId) : undefined
+    const repeatDates = repeatDatesByEntry.get(entry.id) ?? []
+    const latestDate = repeatDates.reduce((max, date) => (date > max ? date : max), entry.date)
     return {
       id: entry.id,
       title: entry.title || (activity ? activity.name : '(deleted)'),
@@ -56,7 +73,9 @@ export function joinRows(
       categoryId: category ? category.id : null,
       categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
       activityName: activity ? activity.name : '(deleted)',
-      date: entry.date,
+      date: latestDate,
+      firstDate: entry.date,
+      totalCount: 1 + repeatDates.length,
       description: entry.description,
       rating: entry.rating,
       createdBy: creatorLabel(entry.createdBy, profilesById, currentUserId),
@@ -169,8 +188,12 @@ export function sortWishlist(items: WishlistItem[]): WishlistItem[] {
   })
 }
 
-export function computeStats(entries: Entry[]): Stats {
+export function computeStats(entries: Entry[], repeats: Repeat[] = []): Stats {
   const prefix = currentMonthPrefix()
-  const thisMonth = entries.filter((entry) => entry.date.startsWith(prefix)).length
+  // "This month" counts everything logged in the month — first entries and
+  // repeats alike — so returning to a place this month bumps the count.
+  const thisMonth =
+    entries.filter((entry) => entry.date.startsWith(prefix)).length +
+    repeats.filter((repeat) => repeat.date.startsWith(prefix)).length
   return { total: entries.length, thisMonth }
 }

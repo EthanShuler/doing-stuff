@@ -39,6 +39,7 @@ interface DashboardProps {
   onManage: () => void
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  onRepeat: (id: string) => void
 }
 
 const eyebrowStyle = {
@@ -75,6 +76,7 @@ export function Dashboard({
   onManage,
   onEdit,
   onDelete,
+  onRepeat,
 }: DashboardProps) {
   const isEmpty = rows.length === 0
 
@@ -191,9 +193,9 @@ export function Dashboard({
         {isEmpty ? (
           <EmptyState onAdd={onAdd} />
         ) : view === 'cards' ? (
-          <CardGrid rows={rows} onEdit={onEdit} onDelete={onDelete} />
+          <CardGrid rows={rows} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} />
         ) : (
-          <Table rows={rows} onEdit={onEdit} onDelete={onDelete} />
+          <Table rows={rows} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} />
         )}
       </Box>
     </Box>
@@ -265,10 +267,12 @@ function CardGrid({
   rows,
   onEdit,
   onDelete,
+  onRepeat,
 }: {
   rows: DisplayRow[]
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  onRepeat: (id: string) => void
 }) {
   return (
     <SimpleGrid cols={2} spacing={14} mt={20}>
@@ -297,13 +301,14 @@ function CardGrid({
           <Text fz={22} lh={1.12} mb={8} style={{ fontFamily: fonts.serif }}>
             {row.title}
           </Text>
-          <Box mb={10}>
+          <Group mb={10} gap={10} align="center">
             <Stars rating={row.rating} />
-          </Box>
+            {row.totalCount > 1 && <RepeatBadge count={row.totalCount} since={row.firstDate} />}
+          </Group>
           <Text fz={14} lh={1.5} c="#6b665e" flex={1} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
             {row.description}
           </Text>
-          <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} bordered />
+          <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} bordered />
         </Paper>
       ))}
     </SimpleGrid>
@@ -316,10 +321,12 @@ function Table({
   rows,
   onEdit,
   onDelete,
+  onRepeat,
 }: {
   rows: DisplayRow[]
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  onRepeat: (id: string) => void
 }) {
   return (
     <Paper
@@ -364,9 +371,16 @@ function Table({
             alignItems: 'center',
           }}
         >
-          <Text fz={17} lh={1.2} style={{ fontFamily: fonts.serif }}>
-            {row.title}
-          </Text>
+          <Group gap={8} align="center">
+            <Text fz={17} lh={1.2} style={{ fontFamily: fonts.serif }}>
+              {row.title}
+            </Text>
+            {row.totalCount > 1 && (
+              <Text c={colors.muted} style={{ fontFamily: fonts.mono, fontSize: 11, flexShrink: 0 }}>
+                {row.totalCount}×
+              </Text>
+            )}
+          </Group>
           <Group component="span" gap={7} align="center" fz={13} c="#5c574e">
             <Box component="span" display="block" w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor, flexShrink: 0 }} />
             {row.categoryName}
@@ -383,7 +397,7 @@ function Table({
           <Text fz={13} c="#6b665e">
             {row.createdBy || '—'}
           </Text>
-          <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} align="flex-end" />
+          <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} align="flex-end" />
         </Box>
       ))}
     </Paper>
@@ -394,12 +408,14 @@ function RowActions({
   id,
   onEdit,
   onDelete,
+  onRepeat,
   bordered,
   align = 'flex-start',
 }: {
   id: string
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  onRepeat: (id: string) => void
   bordered?: boolean
   align?: 'flex-start' | 'flex-end'
 }) {
@@ -411,6 +427,9 @@ function RowActions({
       pt={bordered ? 12 : 0}
       style={bordered ? { borderTop: '1px dotted rgba(120,100,80,0.3)' } : undefined}
     >
+      <Anchor component="button" onClick={() => onRepeat(id)} fz={12} fw={600} c={ACCENT} underline="never">
+        + Repeat
+      </Anchor>
       <Anchor component="button" onClick={() => onEdit(id)} fz={12} fw={600} c={colors.muted} underline="never">
         Edit
       </Anchor>
@@ -418,6 +437,28 @@ function RowActions({
         Delete
       </Anchor>
     </Group>
+  )
+}
+
+/** Small pill on repeated-entry cards: "3× · since Jun 12". */
+function RepeatBadge({ count, since }: { count: number; since: string }) {
+  return (
+    <Box
+      px={9}
+      py={3}
+      style={{
+        borderRadius: 30,
+        background: colors.chip,
+        border: '1px solid rgba(120,100,80,0.14)',
+        fontFamily: fonts.mono,
+        fontSize: 10,
+        letterSpacing: '0.06em',
+        color: colors.muted,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {count}× · SINCE {formatDate(since).toUpperCase()}
+    </Box>
   )
 }
 

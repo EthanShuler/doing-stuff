@@ -42,6 +42,19 @@ export interface Entry {
   lng: number | null
 }
 
+/**
+ * A repeat — an additional time you returned to an entry. The entry's own
+ * `date` is the first entry; each Repeat adds one more. One row in `entry_repeats`.
+ */
+export interface Repeat {
+  id: string
+  entryId: string
+  /** ISO date string of this repeat, e.g. "2026-06-20". */
+  date: string
+  /** auth.users id of the member who logged this repeat (null for legacy rows). */
+  createdBy: string | null
+}
+
 /** The space's shared map center, geocoded from a typed address. */
 export interface Home {
   address: string

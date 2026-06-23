@@ -128,6 +128,33 @@ export interface Database {
         }
         Relationships: []
       }
+      entry_repeats: {
+        Row: {
+          id: string
+          space_id: string
+          entry_id: string
+          repeat_date: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          entry_id: string
+          repeat_date: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          entry_id?: string
+          repeat_date?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {

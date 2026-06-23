@@ -109,6 +109,22 @@ create table if not exists public.wishlist_items (
 -- show "who logged this" by joining entries.created_by → profiles.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Repeats: each row is an *additional* time you returned to an entry's
+-- place/activity. The entry's own `entry_date` is the first entry; these are
+-- the repeats. Total count = 1 + number of these rows (derived, never stored).
+-- ON DELETE CASCADE from entries cleans them up when the entry is removed.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.entry_repeats (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id)  on delete cascade,
+  entry_id    uuid not null references public.entries (id) on delete cascade,
+  repeat_date date not null,
+  created_by  uuid references auth.users (id) default auth.uid(),
+  created_at  timestamptz not null default now()
+);
+
 create table if not exists public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
   email        text,
@@ -122,6 +138,8 @@ create index if not exists activities_space_idx on public.activities (space_id);
 create index if not exists entries_space_idx     on public.entries (space_id);
 create index if not exists entries_activity_idx  on public.entries (activity_id);
 create index if not exists wishlist_space_idx     on public.wishlist_items (space_id);
+create index if not exists entry_repeats_space_idx on public.entry_repeats (space_id);
+create index if not exists entry_repeats_entry_idx on public.entry_repeats (entry_id);
 
 -- ---------------------------------------------------------------------------
 -- Membership helper
@@ -230,6 +248,7 @@ alter table public.activities    enable row level security;
 alter table public.entries       enable row level security;
 alter table public.profiles      enable row level security;
 alter table public.wishlist_items enable row level security;
+alter table public.entry_repeats enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -294,6 +313,10 @@ drop policy if exists "space members all" on public.wishlist_items;
 create policy "space members all" on public.wishlist_items
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
+drop policy if exists "space members all" on public.entry_repeats;
+create policy "space members all" on public.entry_repeats
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
 -- ---------------------------------------------------------------------------
 -- Grants (needed because "Automatically expose new tables" is OFF).
 -- RLS still governs *which rows* — these grants just expose the tables to the
@@ -303,7 +326,7 @@ create policy "space members all" on public.wishlist_items
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
-  public.wishlist_items
+  public.wishlist_items, public.entry_repeats
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;

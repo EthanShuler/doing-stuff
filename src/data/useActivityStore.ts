@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Activity, Category, Entry, EntryDraft, Home, Profile, WishlistItem } from '../types'
+import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../types'
 import { supabase } from '../lib/supabase'
 import { today } from '../lib/format'
 import { geocode } from '../lib/geocode'
@@ -18,6 +18,7 @@ interface SeedData {
   categories: Category[]
   activities: Activity[]
   entries: Entry[]
+  repeats: Repeat[]
   profiles: Profile[]
   wishlist: WishlistItem[]
   home: Home
@@ -63,6 +64,12 @@ function seed(): SeedData {
       { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null },
       { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5, createdBy: 'u2', address: 'Powell\'s City of Books, Portland, OR', lat: 45.5232, lng: -122.6819 },
     ],
+    // A couple of repeats so the repeated-entry UI shows in keyless dev mode.
+    repeats: [
+      { id: 'r1', entryId: 'i1', date: '2026-06-18', createdBy: 'u2' },
+      { id: 'r2', entryId: 'i1', date: '2026-06-21', createdBy: 'u1' },
+      { id: 'r3', entryId: 'i3', date: '2026-06-15', createdBy: 'u1' },
+    ],
   }
 }
 
@@ -90,6 +97,12 @@ type WishlistRow = {
   entry_id: string | null
   created_by: string | null
   created_at: string
+}
+type RepeatRow = {
+  id: string
+  entry_id: string
+  repeat_date: string
+  created_by: string | null
 }
 
 const toCategory = (r: CategoryRow): Category => ({ id: r.id, name: r.name, colorIndex: r.color_index })
@@ -121,10 +134,17 @@ const toWishlistItem = (r: WishlistRow): WishlistItem => ({
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
+const toRepeat = (r: RepeatRow): Repeat => ({
+  id: r.id,
+  entryId: r.entry_id,
+  date: r.repeat_date,
+  createdBy: r.created_by,
+})
 
 const ACTIVITY_COLUMNS = 'id,category_id,name,emoji'
 const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by,address,lat,lng'
 const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at'
+const REPEAT_COLUMNS = 'id,entry_id,repeat_date,created_by'
 const SPACE_HOME_COLUMNS = 'home_address,home_lat,home_lng'
 
 const message = (err: unknown): string =>
@@ -153,6 +173,8 @@ export interface ActivityStore {
   categories: Category[]
   activities: Activity[]
   entries: Entry[]
+  /** Additional repeats, keyed to their entry via `entryId`. */
+  repeats: Repeat[]
   profiles: Profile[]
   wishlist: WishlistItem[]
   /** The space's shared map center. */
@@ -167,6 +189,11 @@ export interface ActivityStore {
   addEntry: (draft: EntryDraft) => Promise<string>
   updateEntry: (id: string, draft: EntryDraft) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
+
+  /** Log a repeat of an entry. Throws on failure (the modal stays open). */
+  addRepeat: (entryId: string, date: string) => Promise<void>
+  /** Remove a single repeat. Throws on failure. */
+  deleteRepeat: (repeatId: string) => Promise<void>
 
   addActivity: (categoryId: string, name: string) => Promise<void>
   deleteActivity: (id: string) => Promise<void>
@@ -193,6 +220,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   const [categories, setCategories] = useState<Category[]>(() => (supabase ? [] : seed().categories))
   const [activities, setActivities] = useState<Activity[]>(() => (supabase ? [] : seed().activities))
   const [entries, setEntries] = useState<Entry[]>(() => (supabase ? [] : seed().entries))
+  const [repeats, setRepeats] = useState<Repeat[]>(() => (supabase ? [] : seed().repeats))
   const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
   const [wishlist, setWishlist] = useState<WishlistItem[]>(() => (supabase ? [] : seed().wishlist))
   const [home, setHomeState] = useState<Home>(() => (supabase ? EMPTY_HOME : seed().home))
@@ -229,10 +257,11 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       setLoading(true)
       setError(null)
       try {
-        const [cats, acts, ents, profs, wishes, space] = await Promise.all([
+        const [cats, acts, ents, reps, profs, wishes, space] = await Promise.all([
           supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
           supabase.from('activities').select(ACTIVITY_COLUMNS).eq('space_id', spaceId).order('created_at'),
           supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
+          supabase.from('entry_repeats').select(REPEAT_COLUMNS).eq('space_id', spaceId).order('repeat_date'),
           // RLS scopes this to the current user + anyone they share a space with.
           supabase.from('profiles').select('id,email,display_name'),
           supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
@@ -241,6 +270,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         if (cats.error) throw cats.error
         if (acts.error) throw acts.error
         if (ents.error) throw ents.error
+        if (reps.error) throw reps.error
         if (profs.error) throw profs.error
         if (wishes.error) throw wishes.error
         if (space.error) throw space.error
@@ -248,6 +278,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         setCategories((cats.data as CategoryRow[]).map(toCategory))
         setActivities((acts.data as ActivityRow[]).map(toActivity))
         setEntries((ents.data as EntryRow[]).map(toEntry))
+        setRepeats((reps.data as RepeatRow[]).map(toRepeat))
         setProfiles((profs.data as ProfileRow[]).map(toProfile))
         setWishlist((wishes.data as WishlistRow[]).map(toWishlistItem))
         setHomeState(toHome(space.data as SpaceHomeRow))
@@ -386,11 +417,48 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         }
       }
       setEntries((prev) => prev.filter((entry) => entry.id !== id))
+      // The DB cascades this entry's repeats; mirror it locally.
+      setRepeats((prev) => prev.filter((repeat) => repeat.entryId !== id))
       // The DB's ON DELETE SET NULL reopens any wishlist item linked to this
       // entry; mirror that locally so a checked-off wish un-checks itself.
       setWishlist((prev) =>
         prev.map((item) => (item.entryId === id ? { ...item, entryId: null } : item)),
       )
+    },
+    [spaceId],
+  )
+
+  const addRepeat = useCallback(
+    async (entryId: string, date: string) => {
+      const repeatDate = date || today()
+      if (supabase && spaceId) {
+        const { data, error: err } = await supabase
+          .from('entry_repeats')
+          .insert({ space_id: spaceId, entry_id: entryId, repeat_date: repeatDate })
+          .select(REPEAT_COLUMNS)
+          .single()
+        if (err) {
+          setError(err.message)
+          throw err
+        }
+        setRepeats((prev) => [...prev, toRepeat(data as RepeatRow)])
+        return
+      }
+      setRepeats((prev) => [...prev, { id: nextId(), entryId, date: repeatDate, createdBy: userId }])
+    },
+    [spaceId, userId],
+  )
+
+  const deleteRepeat = useCallback(
+    async (repeatId: string) => {
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('entry_repeats').delete().eq('id', repeatId)
+        if (err) {
+          setError(err.message)
+          throw err
+        }
+      }
+      setRepeats((prev) => prev.filter((repeat) => repeat.id !== repeatId))
     },
     [spaceId],
   )
@@ -612,6 +680,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     categories,
     activities,
     entries,
+    repeats,
     profiles,
     wishlist,
     home,
@@ -622,6 +691,8 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     addEntry,
     updateEntry,
     deleteEntry,
+    addRepeat,
+    deleteRepeat,
     addActivity,
     deleteActivity,
     setActivityEmoji,
