@@ -76,7 +76,7 @@ export interface WishlistItem {
 
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
-export type Screen = 'log' | 'wishlist' | 'map'
+export type Screen = 'log' | 'wishlist' | 'map' | 'calendar'
 
 /** The draft backing the new/edit entry modal. */
 export interface EntryDraft {

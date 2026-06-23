@@ -5,8 +5,9 @@ import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from './type
 import { useActivityStore } from './data/useActivityStore'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
-import { computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist } from './data/derive'
-import { today } from './lib/format'
+import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist } from './data/derive'
+import { currentYearMonth, today } from './lib/format'
+import type { YearMonth } from './lib/format'
 import { supabase } from './lib/supabase'
 import { colors, fonts } from './theme'
 import { AuthScreen } from './components/AuthScreen'
@@ -15,6 +16,7 @@ import { EntryModal } from './components/EntryModal'
 import { RepeatModal } from './components/RepeatModal'
 import { ManageModal } from './components/ManageModal'
 import { MapView } from './components/MapView'
+import { CalendarView } from './components/CalendarView'
 import { Wishlist } from './components/Wishlist'
 
 const APP_TITLE = 'Doing Stuff'
@@ -64,6 +66,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
   const [view, setView] = useState<ViewMode>('cards')
+  const [calendarMonth, setCalendarMonth] = useState<YearMonth>(currentYearMonth)
 
   // Modal state.
   const [modal, setModal] = useState<Modal>(null)
@@ -89,10 +92,15 @@ function AppShell({ session, configured }: { session: Session | null; configured
     [store.entries, store.activities, store.categories],
   )
 
-  const openAdd = () => {
+  const calendarGrid = useMemo(
+    () => calendarDays(calendarMonth, store.entries, store.repeats, store.activities, store.categories, filterCategoryId),
+    [calendarMonth, store.entries, store.repeats, store.activities, store.categories, filterCategoryId],
+  )
+
+  const openAdd = (date?: string) => {
     setEditingId(null)
     setPendingWishId(null)
-    setDraft(emptyDraft())
+    setDraft(date ? { ...emptyDraft(), date } : emptyDraft())
     setModal('entry')
   }
 
@@ -265,6 +273,22 @@ function AppShell({ session, configured }: { session: Session | null; configured
           onScreenChange={setScreen}
           onNewEntry={openAdd}
           onManage={() => setModal('manage')}
+          onEditEntry={openEdit}
+        />
+      ) : screen === 'calendar' ? (
+        <CalendarView
+          title={APP_TITLE}
+          categories={store.categories}
+          filterCategoryId={filterCategoryId}
+          onFilter={setFilterCategoryId}
+          days={calendarGrid}
+          month={calendarMonth}
+          onMonthChange={setCalendarMonth}
+          onToday={() => setCalendarMonth(currentYearMonth())}
+          screen={screen}
+          onScreenChange={setScreen}
+          onManage={() => setModal('manage')}
+          onNewEntry={openAdd}
           onEditEntry={openEdit}
         />
       ) : (

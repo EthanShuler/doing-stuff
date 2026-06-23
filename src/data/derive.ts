@@ -1,6 +1,7 @@
 import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem } from '../types'
+import type { YearMonth } from '../lib/format'
 import { FALLBACK_COLOR, swatchFor } from '../theme'
-import { currentMonthPrefix } from '../lib/format'
+import { currentMonthPrefix, isoDate, today } from '../lib/format'
 
 /** An entry joined with its activity + category, ready for display. */
 export interface DisplayRow {
@@ -186,6 +187,101 @@ export function sortWishlist(items: WishlistItem[]): WishlistItem[] {
     if (aDone !== bDone) return aDone ? 1 : -1
     return byCreatedAsc(a, b)
   })
+}
+
+/** One logged outing (a first visit or a repeat) landing on a calendar day. */
+export interface CalendarMark {
+  /** Unique within its day cell — drives the React key and the edit click. */
+  key: string
+  /** The entry to open when this chip is clicked. */
+  entryId: string
+  title: string
+  categoryColor: string
+  categoryId: string | null
+}
+
+/** One cell in the month grid. */
+export interface CalendarDay {
+  /** ISO date this cell represents ("YYYY-MM-DD"). */
+  date: string
+  /** Day-of-month number shown in the corner (1–31). */
+  dayOfMonth: number
+  /** False for the leading/trailing days that belong to the adjacent months. */
+  inMonth: boolean
+  /** True for the cell representing today. */
+  isToday: boolean
+  /** Outings on this day, in the order entries appear in the store. */
+  marks: CalendarMark[]
+}
+
+/**
+ * Build the month grid for `ym` (year + 1-based month), week starting Sunday.
+ * Flattens both first-entry dates and repeat dates into per-day marks, so a
+ * return visit shows on its own day. Honors the category filter ('all' = no
+ * filter). Pure aside from reading "today" for the highlight. Leading/trailing
+ * cells from the neighboring months are included with `inMonth: false`.
+ */
+export function calendarDays(
+  ym: YearMonth,
+  entries: Entry[],
+  repeats: Repeat[],
+  activities: Activity[],
+  categories: Category[],
+  filterCategoryId: string,
+): CalendarDay[] {
+  const activityById = new Map(activities.map((a) => [a.id, a]))
+  const categoryById = new Map(categories.map((c) => [c.id, c]))
+
+  // Resolve an entry to its display chip, or null if filtered out.
+  const markFor = (entry: Entry, key: string): CalendarMark | null => {
+    const activity = activityById.get(entry.activityId)
+    const category = activity ? categoryById.get(activity.categoryId) : undefined
+    const categoryId = category ? category.id : null
+    if (filterCategoryId !== 'all' && categoryId !== filterCategoryId) return null
+    return {
+      key,
+      entryId: entry.id,
+      title: entry.title || (activity ? activity.name : '(deleted)'),
+      categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
+      categoryId,
+    }
+  }
+
+  // Bucket every outing (first visit + each repeat) by its ISO date.
+  const marksByDate = new Map<string, CalendarMark[]>()
+  const push = (date: string, mark: CalendarMark | null) => {
+    if (!mark) return
+    const existing = marksByDate.get(date)
+    if (existing) existing.push(mark)
+    else marksByDate.set(date, [mark])
+  }
+  const entryById = new Map(entries.map((e) => [e.id, e]))
+  for (const entry of entries) push(entry.date, markFor(entry, `e:${entry.id}`))
+  for (const repeat of repeats) {
+    const entry = entryById.get(repeat.entryId)
+    if (entry) push(repeat.date, markFor(entry, `r:${repeat.id}`))
+  }
+
+  const todayIso = today()
+  const daysInMonth = new Date(ym.year, ym.month, 0).getDate()
+  const leading = new Date(ym.year, ym.month - 1, 1).getDay() // 0 = Sunday
+  const totalCells = Math.ceil((leading + daysInMonth) / 7) * 7
+
+  const cells: CalendarDay[] = []
+  for (let i = 0; i < totalCells; i += 1) {
+    // Day-of-month relative to the 1st; can be ≤0 (prev month) or >daysInMonth (next).
+    const offset = i - leading + 1
+    const d = new Date(ym.year, ym.month - 1, offset)
+    const date = isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate())
+    cells.push({
+      date,
+      dayOfMonth: d.getDate(),
+      inMonth: offset >= 1 && offset <= daysInMonth,
+      isToday: date === todayIso,
+      marks: marksByDate.get(date) ?? [],
+    })
+  }
+  return cells
 }
 
 export function computeStats(entries: Entry[], repeats: Repeat[] = []): Stats {
