@@ -40,6 +40,8 @@ export interface Entry {
   /** Geocoded from `address` on save (Nominatim). null when absent or unlocatable. */
   lat: number | null
   lng: number | null
+  /** When true, this entry is omitted from the map even if it has coords. */
+  hideFromMap: boolean
 }
 
 /**
@@ -87,4 +89,5 @@ export interface EntryDraft {
   description: string
   rating: number
   address: string
+  hideFromMap: boolean
 }

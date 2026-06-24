@@ -111,6 +111,7 @@ export function mapMarkers(entries: Entry[], activities: Activity[], categories:
   const markers: MapMarker[] = []
   for (const entry of entries) {
     if (entry.lat === null || entry.lng === null) continue
+    if (entry.hideFromMap) continue
     const activity = activityById.get(entry.activityId)
     const category = activity ? categoryById.get(activity.categoryId) : undefined
     markers.push({

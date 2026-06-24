@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Checkbox,
   Group,
   Rating,
   Select,
@@ -111,8 +112,18 @@ export function EntryModal({
         value={draft.address}
         onChange={(e) => onChange({ address: e.currentTarget.value })}
         placeholder="Where was it? (optional — drops a pin on the map)"
-        mb={18}
+        mb={draft.address.trim() ? 10 : 18}
       />
+
+      {draft.address.trim() && (
+        <Checkbox
+          label="Hide this entry from the map"
+          checked={draft.hideFromMap}
+          onChange={(e) => onChange({ hideFromMap: e.currentTarget.checked })}
+          mb={18}
+          styles={{ label: { fontSize: 13, color: colors.muted } }}
+        />
+      )}
 
       <Box mb={18}>
         <Text component="label" style={labelStyle}>

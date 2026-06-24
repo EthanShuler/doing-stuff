@@ -25,7 +25,7 @@ const APP_SUBTITLE = ""
 type Modal = 'entry' | 'manage' | 'repeat' | null
 
 function emptyDraft(): EntryDraft {
-  return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0, address: '' }
+  return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0, address: '', hideFromMap: false }
 }
 
 /** Full-screen centered message — used for loading and fatal errors. */
@@ -118,6 +118,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
       description: entry.description,
       rating: entry.rating,
       address: entry.address,
+      hideFromMap: entry.hideFromMap,
     })
     setModal('entry')
   }

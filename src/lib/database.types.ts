@@ -64,6 +64,7 @@ export interface Database {
           address: string | null
           lat: number | null
           lng: number | null
+          hide_from_map: boolean
         }
         Insert: {
           id?: string
@@ -78,6 +79,7 @@ export interface Database {
           address?: string | null
           lat?: number | null
           lng?: number | null
+          hide_from_map?: boolean
         }
         Update: {
           id?: string
@@ -92,6 +94,7 @@ export interface Database {
           address?: string | null
           lat?: number | null
           lng?: number | null
+          hide_from_map?: boolean
         }
         Relationships: []
       }

@@ -70,6 +70,8 @@ create table if not exists public.entries (
   address     text not null default '',
   lat         double precision,
   lng         double precision,
+  -- When true, this entry is omitted from the map even if it has coords.
+  hide_from_map boolean not null default false,
   created_at  timestamptz not null default now()
 );
 
@@ -86,6 +88,7 @@ alter table public.activities add column if not exists emoji text not null defau
 alter table public.entries    add column if not exists address text not null default '';
 alter table public.entries    add column if not exists lat double precision;
 alter table public.entries    add column if not exists lng double precision;
+alter table public.entries    add column if not exists hide_from_map boolean not null default false;
 
 -- ---------------------------------------------------------------------------
 -- Wishlist: free-text "things we want to try". Checking one off in the UI opens

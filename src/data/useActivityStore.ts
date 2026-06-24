@@ -55,14 +55,14 @@ function seed(): SeedData {
       { id: 'a8', categoryId: 'c3', name: 'Piano lesson', emoji: '🎹' },
     ],
     entries: [
-      { id: 'i1', activityId: 'a1', title: 'Riverside picnic', date: '2026-06-12', description: 'Golden hour picnic and a long walk by the water.', rating: 5, createdBy: 'u1', address: 'Tom McCall Waterfront Park, Portland, OR', lat: 45.5176, lng: -122.6708 },
-      { id: 'i2', activityId: 'a5', title: 'Dinner at Tabella', date: '2026-06-08', description: 'Shared the cacio e pepe. Cozy corner table.', rating: 4, createdBy: 'u2', address: '', lat: null, lng: null },
-      { id: 'i3', activityId: 'a7', title: 'ASL — Lesson 4', date: '2026-06-03', description: 'Finally got the alphabet down. Practiced over coffee.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null },
-      { id: 'i4', activityId: 'a3', title: 'Pine Ridge overnight', date: '2026-05-30', description: 'Overnight on the trail. Tough climb, worth it.', rating: 5, createdBy: 'u2', address: 'Forest Park, Portland, OR', lat: 45.5786, lng: -122.7565 },
-      { id: 'i5', activityId: 'a4', title: 'Sci-fi at the Roxy', date: '2026-06-10', description: 'Saw the new release. Split a popcorn.', rating: 3, createdBy: 'u1', address: '', lat: null, lng: null },
-      { id: 'i6', activityId: 'a2', title: 'Morning laps', date: '2026-06-14', description: 'Early swim at the community pool.', rating: 4, createdBy: 'u2', address: '', lat: null, lng: null },
-      { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null },
-      { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5, createdBy: 'u2', address: 'Powell\'s City of Books, Portland, OR', lat: 45.5232, lng: -122.6819 },
+      { id: 'i1', activityId: 'a1', title: 'Riverside picnic', date: '2026-06-12', description: 'Golden hour picnic and a long walk by the water.', rating: 5, createdBy: 'u1', address: 'Tom McCall Waterfront Park, Portland, OR', lat: 45.5176, lng: -122.6708, hideFromMap: false },
+      { id: 'i2', activityId: 'a5', title: 'Dinner at Tabella', date: '2026-06-08', description: 'Shared the cacio e pepe. Cozy corner table.', rating: 4, createdBy: 'u2', address: '', lat: null, lng: null, hideFromMap: false },
+      { id: 'i3', activityId: 'a7', title: 'ASL — Lesson 4', date: '2026-06-03', description: 'Finally got the alphabet down. Practiced over coffee.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null, hideFromMap: false },
+      { id: 'i4', activityId: 'a3', title: 'Pine Ridge overnight', date: '2026-05-30', description: 'Overnight on the trail. Tough climb, worth it.', rating: 5, createdBy: 'u2', address: 'Forest Park, Portland, OR', lat: 45.5786, lng: -122.7565, hideFromMap: false },
+      { id: 'i5', activityId: 'a4', title: 'Sci-fi at the Roxy', date: '2026-06-10', description: 'Saw the new release. Split a popcorn.', rating: 3, createdBy: 'u1', address: '', lat: null, lng: null, hideFromMap: false },
+      { id: 'i6', activityId: 'a2', title: 'Morning laps', date: '2026-06-14', description: 'Early swim at the community pool.', rating: 4, createdBy: 'u2', address: '', lat: null, lng: null, hideFromMap: false },
+      { id: 'i7', activityId: 'a8', title: 'Clair de Lune, pt. 1', date: '2026-05-22', description: 'Learned the first half of the piece.', rating: 4, createdBy: 'u1', address: '', lat: null, lng: null, hideFromMap: false },
+      { id: 'i8', activityId: 'a6', title: 'Vellum & Vine browse', date: '2026-06-01', description: 'Browsed an hour. Found a poetry collection.', rating: 5, createdBy: 'u2', address: 'Powell\'s City of Books, Portland, OR', lat: 45.5232, lng: -122.6819, hideFromMap: false },
     ],
     // A couple of repeats so the repeated-entry UI shows in keyless dev mode.
     repeats: [
@@ -88,6 +88,7 @@ type EntryRow = {
   address: string | null
   lat: number | null
   lng: number | null
+  hide_from_map: boolean | null
 }
 type SpaceHomeRow = { home_address: string | null; home_lat: number | null; home_lng: number | null }
 type ProfileRow = { id: string; email: string | null; display_name: string | null }
@@ -123,6 +124,7 @@ const toEntry = (r: EntryRow): Entry => ({
   address: r.address ?? '',
   lat: r.lat,
   lng: r.lng,
+  hideFromMap: r.hide_from_map ?? false,
 })
 const toHome = (r: SpaceHomeRow | null): Home =>
   r ? { address: r.home_address ?? '', lat: r.home_lat, lng: r.home_lng } : EMPTY_HOME
@@ -142,7 +144,7 @@ const toRepeat = (r: RepeatRow): Repeat => ({
 })
 
 const ACTIVITY_COLUMNS = 'id,category_id,name,emoji'
-const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by,address,lat,lng'
+const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by,address,lat,lng,hide_from_map'
 const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at'
 const REPEAT_COLUMNS = 'id,entry_id,repeat_date,created_by'
 const SPACE_HOME_COLUMNS = 'home_address,home_lat,home_lng'
@@ -316,6 +318,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
             address,
             lat: coords.lat,
             lng: coords.lng,
+            hide_from_map: draft.hideFromMap,
             // created_by defaults to auth.uid() server-side; the inserted row is
             // read back below, so the UI gets the resolved creator id.
           })
@@ -343,6 +346,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           address,
           lat: coords.lat,
           lng: coords.lng,
+          hideFromMap: draft.hideFromMap,
         },
       ])
       return id
@@ -375,6 +379,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
             address,
             lat: coords.lat,
             lng: coords.lng,
+            hide_from_map: draft.hideFromMap,
           })
           .eq('id', id)
           .select(ENTRY_COLUMNS)
@@ -399,6 +404,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
                 address,
                 lat: coords.lat,
                 lng: coords.lng,
+                hideFromMap: draft.hideFromMap,
               }
             : entry,
         ),

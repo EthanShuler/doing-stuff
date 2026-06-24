@@ -1,6 +1,4 @@
-- Map feature (sort by wishlist vs activity). When viewing by activity, specify further filtering.
-- Support repeat visits (new table??) - increase counter, log date of each entry. Shouldn't need new activity entry. "Add repeat" button that just accepts a date
-- Add a calendar 
-- hide from map toggle
+- Map feature (sort by wishlist vs activity). When viewing by activity, specify further filtering.    
+- [x] hide from map toggle
 - heat map option
 - wishlist on map
