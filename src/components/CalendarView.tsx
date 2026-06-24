@@ -271,19 +271,24 @@ function Chip({ mark, onClick }: { mark: CalendarMark; onClick: () => void }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 5,
+        gap: 4,
         width: '100%',
         padding: '2px 6px',
         borderRadius: 6,
-        background: colors.chip,
-        border: '1px solid rgba(120,100,80,0.12)',
+        background: mark.categoryTint,
+        borderLeft: `3px solid ${mark.categoryColor}`,
       }}
     >
-      <Box w={6} h={6} style={{ flexShrink: 0, borderRadius: '50%', background: mark.categoryColor }} />
+      {mark.emoji && (
+        <Box component="span" style={{ flexShrink: 0, fontSize: 11, lineHeight: 1 }}>
+          {mark.emoji}
+        </Box>
+      )}
       <Text
         fz={11}
         lh={1.25}
-        c="#5c574e"
+        c={mark.categoryInk}
+        fw={500}
         style={{ fontFamily: fonts.sans, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
       >
         {mark.title}

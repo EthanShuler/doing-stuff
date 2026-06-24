@@ -196,7 +196,14 @@ export interface CalendarMark {
   /** The entry to open when this chip is clicked. */
   entryId: string
   title: string
+  /** Parent activity's emoji, or '' when none is set (chip shows no icon). */
+  emoji: string
+  /** Solid category color (chip border / accent). */
   categoryColor: string
+  /** Pale category tint — the chip background, so categories read at a glance. */
+  categoryTint: string
+  /** Darker category ink — readable chip text on the tint. */
+  categoryInk: string
   categoryId: string | null
 }
 
@@ -238,11 +245,16 @@ export function calendarDays(
     const category = activity ? categoryById.get(activity.categoryId) : undefined
     const categoryId = category ? category.id : null
     if (filterCategoryId !== 'all' && categoryId !== filterCategoryId) return null
+    const swatch = category ? swatchFor(category.colorIndex) : null
     return {
       key,
       entryId: entry.id,
       title: entry.title || (activity ? activity.name : '(deleted)'),
-      categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
+      emoji: activity ? activity.emoji : '',
+      categoryColor: swatch ? swatch.color : FALLBACK_COLOR,
+      // Deleted-category fallback: neutral chip tint + muted ink.
+      categoryTint: swatch ? swatch.tint : '#f3f0ea',
+      categoryInk: swatch ? swatch.ink : '#5c574e',
       categoryId,
     }
   }
