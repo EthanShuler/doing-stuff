@@ -5,7 +5,7 @@ import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from './type
 import { useActivityStore } from './data/useActivityStore'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
-import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist } from './data/derive'
+import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist, wishMarkers } from './data/derive'
 import { currentYearMonth, today } from './lib/format'
 import type { YearMonth } from './lib/format'
 import { supabase } from './lib/supabase'
@@ -87,9 +87,13 @@ function AppShell({ session, configured }: { session: Session | null; configured
 
   const stats = useMemo(() => computeStats(store.entries, store.repeats), [store.entries, store.repeats])
 
+  // Logged-entry pins plus open-wish ⭐ pins, drawn on the same map.
   const markers = useMemo(
-    () => mapMarkers(store.entries, store.activities, store.categories),
-    [store.entries, store.activities, store.categories],
+    () => [
+      ...mapMarkers(store.entries, store.activities, store.categories),
+      ...wishMarkers(store.wishlist),
+    ],
+    [store.entries, store.activities, store.categories, store.wishlist],
   )
 
   const calendarGrid = useMemo(
@@ -128,7 +132,8 @@ function AppShell({ session, configured }: { session: Session | null; configured
   const checkWish = (item: WishlistItem) => {
     setEditingId(null)
     setPendingWishId(item.id)
-    setDraft({ ...emptyDraft(), title: item.text })
+    // Carry the wish's place into the entry; it re-geocodes on save.
+    setDraft({ ...emptyDraft(), title: item.text, address: item.address })
     setModal('entry')
   }
 
@@ -263,6 +268,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
           onUncheck={store.unlinkWishlistItem}
           onAdd={store.addWishlistItem}
           onEdit={store.updateWishlistItem}
+          onSetAddress={store.setWishlistAddress}
           onDelete={store.deleteWishlistItem}
         />
       ) : screen === 'map' ? (

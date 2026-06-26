@@ -19,6 +19,8 @@ interface WishlistProps {
   onUncheck: (id: string) => void
   onAdd: (text: string) => void
   onEdit: (id: string, text: string) => void
+  /** Set (or clear, when empty) the place for a wish; geocodes for a map pin. */
+  onSetAddress: (id: string, address: string) => void
   onDelete: (id: string) => void
 }
 
@@ -40,11 +42,15 @@ export function Wishlist({
   onUncheck,
   onAdd,
   onEdit,
+  onSetAddress,
   onDelete,
 }: WishlistProps) {
   const [addText, setAddText] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  // The wish whose inline address field is open, and its working text.
+  const [locationId, setLocationId] = useState<string | null>(null)
+  const [locationText, setLocationText] = useState('')
 
   const submitAdd = () => {
     const trimmed = addText.trim()
@@ -62,6 +68,23 @@ export function Wishlist({
     const trimmed = editText.trim()
     if (trimmed && trimmed !== item.text) onEdit(item.id, trimmed)
     setEditingId(null)
+  }
+
+  // 📍 toggles the address field for a wish; opening seeds it with the current
+  // value so editing/clearing works in place.
+  const toggleLocation = (item: WishlistItem) => {
+    if (locationId === item.id) {
+      setLocationId(null)
+      return
+    }
+    setLocationId(item.id)
+    setLocationText(item.address)
+  }
+
+  const commitLocation = (item: WishlistItem) => {
+    const trimmed = locationText.trim()
+    if (trimmed !== item.address.trim()) onSetAddress(item.id, trimmed)
+    setLocationId(null)
   }
 
   return (
@@ -159,19 +182,35 @@ export function Wishlist({
                         styles={{ input: { fontFamily: fonts.serif, fontSize: 16 } }}
                       />
                     ) : (
-                      <Text
-                        flex={1}
-                        onClick={() => startEdit(item)}
-                        fz={17}
-                        c={done ? colors.faint : colors.ink}
-                        style={{
-                          fontFamily: fonts.serif,
-                          cursor: 'text',
-                          textDecoration: done ? 'line-through' : 'none',
-                        }}
+                      <Box flex={1}>
+                        <Text
+                          onClick={() => startEdit(item)}
+                          fz={17}
+                          c={done ? colors.faint : colors.ink}
+                          style={{
+                            fontFamily: fonts.serif,
+                            cursor: 'text',
+                            textDecoration: done ? 'line-through' : 'none',
+                          }}
+                        >
+                          {item.text}
+                        </Text>
+                        {!done && item.address && locationId !== item.id && (
+                          <Text fz={12} c={colors.muted} mt={2}>
+                            📍 {item.address}
+                          </Text>
+                        )}
+                      </Box>
+                    )}
+                    {!done && (
+                      <ActionIcon
+                        variant="subtle"
+                        onClick={() => toggleLocation(item)}
+                        c={item.address ? ACCENT : colors.faint}
+                        aria-label={item.address ? 'Edit location' : 'Add location'}
                       >
-                        {item.text}
-                      </Text>
+                        <span style={{ fontSize: 16, lineHeight: 1 }}>📍</span>
+                      </ActionIcon>
                     )}
                     <ActionIcon
                       variant="subtle"
@@ -182,6 +221,21 @@ export function Wishlist({
                       <span style={{ fontSize: 18, lineHeight: 1 }}>×</span>
                     </ActionIcon>
                   </Group>
+                  {!done && locationId === item.id && (
+                    <TextInput
+                      mt={12}
+                      value={locationText}
+                      onChange={(e) => setLocationText(e.currentTarget.value)}
+                      onBlur={() => commitLocation(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitLocation(item)
+                        if (e.key === 'Escape') setLocationId(null)
+                      }}
+                      autoFocus
+                      placeholder="Address or place — leave empty to remove from map"
+                      styles={{ input: { fontFamily: fonts.serif, fontSize: 15 } }}
+                    />
+                  )}
                 </Paper>
               )
             })}

@@ -35,9 +35,9 @@ function seed(): SeedData {
       { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
     ],
     wishlist: [
-      { id: 'w1', text: 'Sunrise hike up Eagle Ridge', entryId: null, createdBy: 'u1', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'w2', text: 'Try the new ramen place downtown', entryId: null, createdBy: 'u2', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'w3', text: 'Visit the botanical garden', entryId: null, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      { id: 'w1', text: 'Sunrise hike up Eagle Ridge', entryId: null, createdBy: 'u1', createdAt: '2026-06-02T09:00:00Z', address: '', lat: null, lng: null },
+      { id: 'w2', text: 'Try the new ramen place downtown', entryId: null, createdBy: 'u2', createdAt: '2026-06-05T09:00:00Z', address: '', lat: null, lng: null },
+      { id: 'w3', text: 'Visit the botanical garden', entryId: null, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z', address: 'Crystal Springs Rhododendron Garden, Portland, OR', lat: 45.4806, lng: -122.6362 },
     ],
     categories: [
       { id: 'c1', name: 'Outdoor', colorIndex: 0 },
@@ -98,6 +98,9 @@ type WishlistRow = {
   entry_id: string | null
   created_by: string | null
   created_at: string
+  address: string | null
+  lat: number | null
+  lng: number | null
 }
 type RepeatRow = {
   id: string
@@ -135,6 +138,9 @@ const toWishlistItem = (r: WishlistRow): WishlistItem => ({
   entryId: r.entry_id,
   createdBy: r.created_by,
   createdAt: r.created_at,
+  address: r.address ?? '',
+  lat: r.lat,
+  lng: r.lng,
 })
 const toRepeat = (r: RepeatRow): Repeat => ({
   id: r.id,
@@ -145,7 +151,7 @@ const toRepeat = (r: RepeatRow): Repeat => ({
 
 const ACTIVITY_COLUMNS = 'id,category_id,name,emoji'
 const ENTRY_COLUMNS = 'id,activity_id,title,entry_date,description,rating,created_by,address,lat,lng,hide_from_map'
-const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at'
+const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at,address,lat,lng'
 const REPEAT_COLUMNS = 'id,entry_id,repeat_date,created_by'
 const SPACE_HOME_COLUMNS = 'home_address,home_lat,home_lng'
 
@@ -210,6 +216,8 @@ export interface ActivityStore {
 
   addWishlistItem: (text: string) => Promise<void>
   updateWishlistItem: (id: string, text: string) => Promise<void>
+  /** Set (or clear, when empty) a wish's place; geocodes it for a map pin. */
+  setWishlistAddress: (id: string, address: string) => Promise<void>
   deleteWishlistItem: (id: string) => Promise<void>
   /** Mark an item done by linking it to the entry it produced. */
   linkWishlistItem: (id: string, entryId: string) => Promise<void>
@@ -235,6 +243,11 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   // re-creating the callback on every entries change.
   const entriesRef = useRef(entries)
   entriesRef.current = entries
+
+  // Same idea for wishlist: setWishlistAddress reads the prior address to decide
+  // whether to re-geocode, without re-creating its callback on every change.
+  const wishlistRef = useRef(wishlist)
+  wishlistRef.current = wishlist
 
   // Geocode an address for a save: returns coords (or null) and posts a
   // non-blocking notice when a non-empty address can't be located.
@@ -618,7 +631,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       }
       setWishlist((prev) => [
         ...prev,
-        { id: nextId(), text: trimmed, entryId: null, createdBy: userId, createdAt: today() },
+        { id: nextId(), text: trimmed, entryId: null, createdBy: userId, createdAt: today(), address: '', lat: null, lng: null },
       ])
     },
     [spaceId, userId],
@@ -638,6 +651,38 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       setWishlist((prev) => prev.map((item) => (item.id === id ? { ...item, text: trimmed } : item)))
     },
     [spaceId],
+  )
+
+  const setWishlistAddress = useCallback(
+    async (id: string, address: string) => {
+      setNotice(null)
+      const trimmed = address.trim()
+      const existing = wishlistRef.current.find((item) => item.id === id)
+      // Re-geocode only when the address text actually changed; an empty address
+      // clears the pin (null coords). Mirrors updateEntry's policy.
+      let coords: { lat: number | null; lng: number | null }
+      if (existing && existing.address.trim() === trimmed) {
+        coords = { lat: existing.lat, lng: existing.lng }
+      } else {
+        coords = (await resolveCoords(trimmed)) ?? NO_COORDS
+      }
+      if (supabase && spaceId) {
+        const { error: err } = await supabase
+          .from('wishlist_items')
+          .update({ address: trimmed, lat: coords.lat, lng: coords.lng })
+          .eq('id', id)
+        if (err) {
+          setError(err.message)
+          return
+        }
+      }
+      setWishlist((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, address: trimmed, lat: coords.lat, lng: coords.lng } : item,
+        ),
+      )
+    },
+    [spaceId, resolveCoords],
   )
 
   const deleteWishlistItem = useCallback(
@@ -707,6 +752,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     setHome,
     addWishlistItem,
     updateWishlistItem,
+    setWishlistAddress,
     deleteWishlistItem,
     linkWishlistItem,
     unlinkWishlistItem,

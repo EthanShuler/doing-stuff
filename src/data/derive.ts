@@ -1,6 +1,6 @@
 import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem } from '../types'
 import type { YearMonth } from '../lib/format'
-import { FALLBACK_COLOR, swatchFor } from '../theme'
+import { ACCENT, FALLBACK_COLOR, swatchFor } from '../theme'
 import { currentMonthPrefix, isoDate, today } from '../lib/format'
 
 /** An entry joined with its activity + category, ready for display. */
@@ -84,21 +84,31 @@ export function joinRows(
   })
 }
 
-/** An entry that has coordinates, ready to draw as a map pin. */
+/** A geocoded point ready to draw as a map pin — a logged entry or an open wish. */
 export interface MapMarker {
+  /** 'entry' = a logged outing (emoji + activity/date/rating popup, editable);
+   *  'wish' = an open wishlist place (⭐ + text/address popup, no actions). */
+  kind: 'entry' | 'wish'
   id: string
   lat: number
   lng: number
-  /** Parent activity's emoji, or 📍 when none is set. */
+  /** Parent activity's emoji (entries), 📍 fallback, or ⭐ for wishes. */
   emoji: string
   title: string
+  /** Entries only: the activity name shown under the title. '' for wishes. */
   activityName: string
   categoryColor: string
+  /** Entries only. '' for wishes. */
   date: string
+  /** Entries only. 0 for wishes. */
   rating: number
+  /** Wishes only: the place text shown in the popup. */
+  address?: string
 }
 
 const DEFAULT_PIN = '📍'
+const WISH_PIN = '⭐'
+const WISH_COLOR = ACCENT
 
 /**
  * Entries that have been geocoded, joined to their activity's emoji + category
@@ -115,6 +125,7 @@ export function mapMarkers(entries: Entry[], activities: Activity[], categories:
     const activity = activityById.get(entry.activityId)
     const category = activity ? categoryById.get(activity.categoryId) : undefined
     markers.push({
+      kind: 'entry',
       id: entry.id,
       lat: entry.lat,
       lng: entry.lng,
@@ -124,6 +135,33 @@ export function mapMarkers(entries: Entry[], activities: Activity[], categories:
       categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
       date: entry.date,
       rating: entry.rating,
+    })
+  }
+  return markers
+}
+
+/**
+ * Open wishlist items that have been geocoded, as ⭐ "wishist" pins. Done
+ * items (linked to an entry) are excluded — the entry's own pin represents them.
+ * Pure.
+ */
+export function wishMarkers(items: WishlistItem[]): MapMarker[] {
+  const markers: MapMarker[] = []
+  for (const item of items) {
+    if (item.entryId !== null) continue
+    if (item.lat === null || item.lng === null) continue
+    markers.push({
+      kind: 'wish',
+      id: item.id,
+      lat: item.lat,
+      lng: item.lng,
+      emoji: WISH_PIN,
+      title: item.text,
+      activityName: '',
+      categoryColor: WISH_COLOR,
+      date: '',
+      rating: 0,
+      address: item.address,
     })
   }
   return markers

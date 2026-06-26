@@ -103,7 +103,11 @@ create table if not exists public.wishlist_items (
   text        text not null default '',
   entry_id    uuid references public.entries (id) on delete set null,
   created_by  uuid references auth.users (id) default auth.uid(),
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  -- Optional place we want to go, geocoded for an open-wish ⭐ pin on the map.
+  address     text,
+  lat         double precision,
+  lng         double precision
 );
 
 -- ---------------------------------------------------------------------------

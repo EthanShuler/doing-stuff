@@ -112,6 +112,9 @@ export interface Database {
           entry_id: string | null
           created_by: string | null
           created_at: string
+          address: string | null
+          lat: number | null
+          lng: number | null
         }
         Insert: {
           id?: string
@@ -120,6 +123,9 @@ export interface Database {
           entry_id?: string | null
           created_by?: string | null
           created_at?: string
+          address?: string | null
+          lat?: number | null
+          lng?: number | null
         }
         Update: {
           id?: string
@@ -128,6 +134,9 @@ export interface Database {
           entry_id?: string | null
           created_by?: string | null
           created_at?: string
+          address?: string | null
+          lat?: number | null
+          lng?: number | null
         }
         Relationships: []
       }

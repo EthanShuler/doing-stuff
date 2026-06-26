@@ -128,6 +128,28 @@ export function MapView({
             />
             {hasHome && <Marker position={[home.lat as number, home.lng as number]} icon={HOME_ICON} />}
             {markers.map((m) => {
+              // Wishlist pins: text + place only, no actions (text-only popup).
+              if (m.kind === 'wish') {
+                return (
+                  <Marker key={m.id} position={[m.lat, m.lng]} icon={emojiIcon(m.emoji)}>
+                    <Popup>
+                      <Box style={{ fontFamily: fonts.sans, minWidth: 160 }}>
+                        <Text c="clay.6" mb={4} style={eyebrowStyle}>
+                          Wishlist
+                        </Text>
+                        <Text fz={15} fw={700} c={colors.ink} mb={m.address ? 2 : 0}>
+                          {m.title}
+                        </Text>
+                        {m.address && (
+                          <Text fz={12} c={colors.muted}>
+                            {m.address}
+                          </Text>
+                        )}
+                      </Box>
+                    </Popup>
+                  </Marker>
+                )
+              }
               const star = stars(m.rating)
               return (
                 <Marker key={m.id} position={[m.lat, m.lng]} icon={emojiIcon(m.emoji)}>

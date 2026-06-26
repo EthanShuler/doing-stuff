@@ -74,6 +74,11 @@ export interface WishlistItem {
   createdBy: string | null
   /** ISO timestamp; used to order the list. */
   createdAt: string
+  /** Optional place we want to go. '' = none; clearing it removes the map pin. */
+  address: string
+  /** Geocoded from `address` on save (Nominatim). null when absent or unlocatable. */
+  lat: number | null
+  lng: number | null
 }
 
 export type SortKey = 'recent' | 'rating' | 'category'
