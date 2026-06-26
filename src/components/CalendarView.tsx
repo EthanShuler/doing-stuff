@@ -108,6 +108,16 @@ export function CalendarView({
             >
               Today
             </Button>
+            {expanded.size > 0 && (
+              <Button
+                variant="default"
+                onClick={() => setExpanded(new Set())}
+                radius={9}
+                styles={{ root: { background: 'transparent', border: '1px solid rgba(120,100,80,0.3)', color: '#5c574e' } }}
+              >
+                Reset view
+              </Button>
+            )}
           </Group>
           <Group gap={8} wrap="wrap">
             <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />

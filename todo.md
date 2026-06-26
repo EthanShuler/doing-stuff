@@ -1,4 +1,2 @@
 - Map feature (sort by wishlist vs activity). When viewing by activity, specify further filtering.    
-- [x] hide from map toggle
 - heat map option
-- wishlist on map
