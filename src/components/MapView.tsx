@@ -1,17 +1,18 @@
-import { Box, Button, Group, Text, Title } from '@mantine/core'
+import { Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect } from 'react'
-import type { Home, Screen } from '../types'
+import { useEffect, useMemo, useState } from 'react'
+import type { Category, Home, Screen } from '../types'
 import type { MapMarker } from '../data/derive'
-import { ACCENT, colors, fonts } from '../theme'
+import { ACCENT, colors, fonts, swatchFor } from '../theme'
 import { formatDate, stars } from '../lib/format'
 import { HeaderActions } from './HeaderActions'
 
 interface MapViewProps {
   title: string
   home: Home
+  categories: Category[]
   markers: MapMarker[]
   screen: Screen
   onScreenChange: (screen: Screen) => void
@@ -20,6 +21,9 @@ interface MapViewProps {
   /** Open the entry modal for the entry behind a pin. */
   onEditEntry: (id: string) => void
 }
+
+/** Map filter: 'all', a category id (entry pins), or 'wishlist' (⭐ pins). */
+type MapFilter = string
 
 // Fallback center when neither a home nor any pin is set (continental US),
 // zoomed out — see CENTER/ZOOM below.
@@ -61,6 +65,7 @@ function Recenter({ center, zoom }: { center: [number, number]; zoom: number }) 
 export function MapView({
   title,
   home,
+  categories,
   markers,
   screen,
   onScreenChange,
@@ -68,13 +73,31 @@ export function MapView({
   onManage,
   onEditEntry,
 }: MapViewProps) {
+  // Map-local filter: 'all', a category id, or 'wishlist'. Kept here (not in the
+  // shared dashboard filter) because 'wishlist' is map-specific.
+  const [filter, setFilter] = useState<MapFilter>('all')
+
+  // Only show categories that actually have pins on the map, so the filter row
+  // doesn't list empty categories.
+  const shownCategories = useMemo(() => {
+    const ids = new Set(markers.filter((m) => m.kind === 'entry').map((m) => m.categoryId))
+    return categories.filter((c) => ids.has(c.id))
+  }, [categories, markers])
+  const hasWishes = useMemo(() => markers.some((m) => m.kind === 'wish'), [markers])
+
+  const visibleMarkers = useMemo(() => {
+    if (filter === 'all') return markers
+    if (filter === 'wishlist') return markers.filter((m) => m.kind === 'wish')
+    return markers.filter((m) => m.kind === 'entry' && m.categoryId === filter)
+  }, [markers, filter])
+
   const hasHome = home.lat !== null && home.lng !== null
   const center: [number, number] = hasHome
     ? [home.lat as number, home.lng as number]
-    : markers.length > 0
-      ? [markers[0].lat, markers[0].lng]
+    : visibleMarkers.length > 0
+      ? [visibleMarkers[0].lat, visibleMarkers[0].lng]
       : DEFAULT_CENTER
-  const zoom = hasHome || markers.length > 0 ? PLACE_ZOOM : DEFAULT_ZOOM
+  const zoom = hasHome || visibleMarkers.length > 0 ? PLACE_ZOOM : DEFAULT_ZOOM
 
   return (
     <Box mih="100vh" bg={colors.pageBg} c={colors.ink} pt={48} pb={80} px={24} style={{ fontFamily: fonts.sans }}>
@@ -102,6 +125,36 @@ export function MapView({
           </Text>
         )}
 
+        {/* CATEGORY / WISHLIST FILTER */}
+        {(shownCategories.length > 0 || hasWishes) && (
+          <Group gap={8} wrap="wrap" mt={20}>
+            <Pill label="All" active={filter === 'all'} activeBg="#3a352e" onClick={() => setFilter('all')} />
+            {shownCategories.map((category) => {
+              const swatch = swatchFor(category.colorIndex)
+              const active = filter === category.id
+              return (
+                <Pill
+                  key={category.id}
+                  label={category.name}
+                  active={active}
+                  activeBg={swatch.color}
+                  dotColor={active ? '#fff' : swatch.color}
+                  onClick={() => setFilter(category.id)}
+                />
+              )
+            })}
+            {hasWishes && (
+              <Pill
+                label="Wishlist"
+                active={filter === 'wishlist'}
+                activeBg={ACCENT}
+                dotColor={filter === 'wishlist' ? '#fff' : ACCENT}
+                onClick={() => setFilter('wishlist')}
+              />
+            )}
+          </Group>
+        )}
+
         {/* MAP */}
         <Box
           mt={20}
@@ -124,7 +177,7 @@ export function MapView({
               subdomains="abcd"
             />
             {hasHome && <Marker position={[home.lat as number, home.lng as number]} icon={HOME_ICON} />}
-            {markers.map((m) => {
+            {visibleMarkers.map((m) => {
               // Wishlist pins: text + place only, no actions (text-only popup).
               if (m.kind === 'wish') {
                 return (
@@ -174,5 +227,41 @@ export function MapView({
         </Box>
       </Box>
     </Box>
+  )
+}
+
+function Pill({
+  label,
+  active,
+  activeBg,
+  dotColor,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  activeBg: string
+  dotColor?: string
+  onClick: () => void
+}) {
+  return (
+    <UnstyledButton
+      onClick={onClick}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        fontFamily: fonts.sans,
+        fontSize: 13,
+        padding: '8px 16px',
+        borderRadius: 30,
+        fontWeight: active ? 600 : 500,
+        background: active ? activeBg : colors.chip,
+        color: active ? '#fff' : '#6b665e',
+        border: active ? `1px solid ${activeBg}` : '1px solid rgba(120,100,80,0.12)',
+      }}
+    >
+      {dotColor && <Box w={7} h={7} style={{ borderRadius: '50%', background: dotColor }} />}
+      {label}
+    </UnstyledButton>
   )
 }

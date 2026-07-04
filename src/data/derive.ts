@@ -97,6 +97,8 @@ export interface MapMarker {
   title: string
   /** Entries only: the activity name shown under the title. '' for wishes. */
   activityName: string
+  /** Parent category id (entries); null for wishes and deleted categories. */
+  categoryId: string | null
   categoryColor: string
   /** Entries only. '' for wishes. */
   date: string
@@ -132,6 +134,7 @@ export function mapMarkers(entries: Entry[], activities: Activity[], categories:
       emoji: activity && activity.emoji ? activity.emoji : DEFAULT_PIN,
       title: entry.title || (activity ? activity.name : '(deleted)'),
       activityName: activity ? activity.name : '(deleted)',
+      categoryId: category ? category.id : null,
       categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
       date: entry.date,
       rating: entry.rating,
@@ -158,6 +161,7 @@ export function wishMarkers(items: WishlistItem[]): MapMarker[] {
       emoji: WISH_PIN,
       title: item.text,
       activityName: '',
+      categoryId: null,
       categoryColor: WISH_COLOR,
       date: '',
       rating: 0,

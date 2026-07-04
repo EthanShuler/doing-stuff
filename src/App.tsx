@@ -275,6 +275,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
         <MapView
           title={APP_TITLE}
           home={store.home}
+          categories={store.categories}
           markers={markers}
           screen={screen}
           onScreenChange={setScreen}
