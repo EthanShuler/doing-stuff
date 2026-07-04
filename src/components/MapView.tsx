@@ -1,4 +1,4 @@
-import { Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
+import { Box, Button, Group, Text, Title } from '@mantine/core'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -8,6 +8,7 @@ import type { MapMarker } from '../data/derive'
 import { ACCENT, colors, fonts, swatchFor } from '../theme'
 import { formatDate, stars } from '../lib/format'
 import { HeaderActions } from './HeaderActions'
+import { Pill } from './Pill'
 
 interface MapViewProps {
   title: string
@@ -227,41 +228,5 @@ export function MapView({
         </Box>
       </Box>
     </Box>
-  )
-}
-
-function Pill({
-  label,
-  active,
-  activeBg,
-  dotColor,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  activeBg: string
-  dotColor?: string
-  onClick: () => void
-}) {
-  return (
-    <UnstyledButton
-      onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 7,
-        fontFamily: fonts.sans,
-        fontSize: 13,
-        padding: '8px 16px',
-        borderRadius: 30,
-        fontWeight: active ? 600 : 500,
-        background: active ? activeBg : colors.chip,
-        color: active ? '#fff' : '#6b665e',
-        border: active ? `1px solid ${activeBg}` : '1px solid rgba(120,100,80,0.12)',
-      }}
-    >
-      {dotColor && <Box w={7} h={7} style={{ borderRadius: '50%', background: dotColor }} />}
-      {label}
-    </UnstyledButton>
   )
 }
