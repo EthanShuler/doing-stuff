@@ -41,6 +41,13 @@ export function ManageModal({
   const commitEmoji = (activity: Activity) => {
     const draft = emojiDrafts[activity.id]
     if (draft !== undefined && draft !== activity.emoji) onSetActivityEmoji(activity.id, draft)
+    // Drop the draft either way: the input falls back to the store's value, so
+    // a failed save visibly reverts instead of showing the uncommitted emoji.
+    setEmojiDrafts((prev) => {
+      const next = { ...prev }
+      delete next[activity.id]
+      return next
+    })
   }
   // Home address is edited locally and committed (geocoded) on blur / Enter /
   // button, so we don't hit Nominatim on every keystroke.

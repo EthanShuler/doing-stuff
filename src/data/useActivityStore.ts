@@ -25,6 +25,7 @@ interface SeedData {
 }
 
 const EMPTY_HOME: Home = { address: '', lat: null, lng: null }
+const NO_COORDS: { lat: number | null; lng: number | null } = { lat: null, lng: null }
 
 function seed(): SeedData {
   return {
@@ -263,8 +264,6 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     }
     return point
   }, [])
-
-  const NO_COORDS = { lat: null as number | null, lng: null as number | null }
 
   // Initial load (live mode only; waits for the space to resolve).
   useEffect(() => {
