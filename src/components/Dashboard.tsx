@@ -43,13 +43,6 @@ interface DashboardProps {
   onRepeat: (id: string) => void
 }
 
-const eyebrowStyle = {
-  fontFamily: fonts.mono,
-  fontSize: 11,
-  letterSpacing: '0.2em',
-  textTransform: 'uppercase' as const,
-}
-
 const monoLabelStyle = {
   fontFamily: fonts.mono,
   fontSize: 11,
@@ -94,8 +87,6 @@ export function Dashboard({
           style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
         >
           <Box>
-            <Text c="clay.6" mb={9} style={eyebrowStyle}>
-            </Text>
             <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
               {title}
             </Title>
@@ -240,7 +231,7 @@ function CardGrid({
   onRepeat: (id: string) => void
 }) {
   return (
-    <SimpleGrid cols={2} spacing={14} mt={20}>
+    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={14} mt={20}>
       {rows.map((row) => (
         <Paper
           key={row.id}
@@ -300,71 +291,77 @@ function Table({
       withBorder
       style={{ borderColor: colors.cardBorder, borderRadius: 14, overflow: 'hidden' }}
     >
-      <Box
-        display="grid"
-        px={20}
-        py={13}
-        c={colors.muted}
-        style={{
-          gridTemplateColumns: TABLE_COLUMNS,
-          gap: 12,
-          borderBottom: '1px dotted rgba(120,100,80,0.3)',
-          fontFamily: fonts.mono,
-          fontSize: 10,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >
-        <span>Title</span>
-        <span>Category</span>
-        <span>Activity</span>
-        <span>Date</span>
-        <span>Rating</span>
-        <span>By</span>
-        <span />
-      </Box>
-      {rows.map((row) => (
-        <Box
-          key={row.id}
-          display="grid"
-          px={20}
-          py={14}
-          style={{
-            gridTemplateColumns: TABLE_COLUMNS,
-            gap: 12,
-            borderTop: '1px dotted rgba(120,100,80,0.16)',
-            alignItems: 'center',
-          }}
-        >
-          <Group gap={8} align="center">
-            <Text fz={17} lh={1.2} style={{ fontFamily: fonts.serif }}>
-              {row.title}
-            </Text>
-            {row.totalCount > 1 && (
-              <Text c={colors.muted} style={{ fontFamily: fonts.mono, fontSize: 11, flexShrink: 0 }}>
-                {row.totalCount}×
-              </Text>
-            )}
-          </Group>
-          <Group component="span" gap={7} align="center" fz={13} c="#5c574e">
-            <Box component="span" display="block" w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor, flexShrink: 0 }} />
-            {row.categoryName}
-          </Group>
-          <Text fz={13} c="#6b665e">
-            {row.activityName}
-          </Text>
-          <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 12 }}>
-            {formatDate(row.date)}
-          </Text>
-          <Box fz={13}>
-            <Stars rating={row.rating} fontSize={13} />
+      {/* The 7-column grid needs real width; scroll it sideways on phones
+          rather than crushing the columns. */}
+      <Box style={{ overflowX: 'auto' }}>
+        <Box miw={640}>
+          <Box
+            display="grid"
+            px={20}
+            py={13}
+            c={colors.muted}
+            style={{
+              gridTemplateColumns: TABLE_COLUMNS,
+              gap: 12,
+              borderBottom: '1px dotted rgba(120,100,80,0.3)',
+              fontFamily: fonts.mono,
+              fontSize: 10,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}
+          >
+            <span>Title</span>
+            <span>Category</span>
+            <span>Activity</span>
+            <span>Date</span>
+            <span>Rating</span>
+            <span>By</span>
+            <span />
           </Box>
-          <Text fz={13} c="#6b665e">
-            {row.createdBy || '—'}
-          </Text>
-          <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} align="flex-end" />
+          {rows.map((row) => (
+            <Box
+              key={row.id}
+              display="grid"
+              px={20}
+              py={14}
+              style={{
+                gridTemplateColumns: TABLE_COLUMNS,
+                gap: 12,
+                borderTop: '1px dotted rgba(120,100,80,0.16)',
+                alignItems: 'center',
+              }}
+            >
+              <Group gap={8} align="center">
+                <Text fz={17} lh={1.2} style={{ fontFamily: fonts.serif }}>
+                  {row.title}
+                </Text>
+                {row.totalCount > 1 && (
+                  <Text c={colors.muted} style={{ fontFamily: fonts.mono, fontSize: 11, flexShrink: 0 }}>
+                    {row.totalCount}×
+                  </Text>
+                )}
+              </Group>
+              <Group component="span" gap={7} align="center" fz={13} c="#5c574e">
+                <Box component="span" display="block" w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor, flexShrink: 0 }} />
+                {row.categoryName}
+              </Group>
+              <Text fz={13} c="#6b665e">
+                {row.activityName}
+              </Text>
+              <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 12 }}>
+                {formatDate(row.date)}
+              </Text>
+              <Box fz={13}>
+                <Stars rating={row.rating} fontSize={13} />
+              </Box>
+              <Text fz={13} c="#6b665e">
+                {row.createdBy || '—'}
+              </Text>
+              <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} align="flex-end" />
+            </Box>
+          ))}
         </Box>
-      ))}
+      </Box>
     </Paper>
   )
 }

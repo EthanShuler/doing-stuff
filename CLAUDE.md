@@ -57,11 +57,13 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # tsc -b && vite build  (this is the typecheck-on-build gate)
 npm run typecheck  # tsc -b --noEmit
+npm test           # vitest run — covers the pure logic in src/data/derive.ts
 npm run preview    # serve the production build
 ```
 
-There is **no test runner and no linter configured.** After code changes, run
-`npm run build` (or `npm run typecheck`) to confirm the project still compiles.
+**Vitest** covers `src/data/derive.ts` (see `derive.test.ts` — new derive logic
+should get a test there). There is **no linter configured.** After code changes,
+run `npm run build` (or `npm run typecheck`) and `npm test`.
 
 ## Current state: backend is live
 

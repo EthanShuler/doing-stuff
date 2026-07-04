@@ -24,13 +24,6 @@ interface WishlistProps {
   onDelete: (id: string) => void
 }
 
-const eyebrowStyle = {
-  fontFamily: fonts.mono,
-  fontSize: 11,
-  letterSpacing: '0.2em',
-  textTransform: 'uppercase' as const,
-}
-
 export function Wishlist({
   title,
   items,

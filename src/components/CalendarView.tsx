@@ -145,40 +145,46 @@ export function CalendarView({
           bg="#fff"
           style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 16, overflow: 'hidden' }}
         >
-          {/* Weekday header */}
-          <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
-            {WEEKDAYS.map((label) => (
-              <Box
-                key={label}
-                py={10}
-                ta="center"
-                c={colors.muted}
-                style={{
-                  fontFamily: fonts.mono,
-                  fontSize: 10,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  borderBottom: '1px dotted rgba(120,100,80,0.3)',
-                }}
-              >
-                {label}
+          {/* Seven day columns need real width; scroll sideways on phones
+              rather than crushing the cells. */}
+          <Box style={{ overflowX: 'auto' }}>
+            <Box miw={560}>
+              {/* Weekday header */}
+              <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                {WEEKDAYS.map((label) => (
+                  <Box
+                    key={label}
+                    py={10}
+                    ta="center"
+                    c={colors.muted}
+                    style={{
+                      fontFamily: fonts.mono,
+                      fontSize: 10,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      borderBottom: '1px dotted rgba(120,100,80,0.3)',
+                    }}
+                  >
+                    {label}
+                  </Box>
+                ))}
               </Box>
-            ))}
-          </Box>
-          {/* Day cells */}
-          <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
-            {days.map((day, i) => (
-              <DayCell
-                key={day.date}
-                day={day}
-                expanded={expanded.has(day.date)}
-                onExpand={() => toggleExpand(day.date)}
-                onAdd={() => onNewEntry(day.date)}
-                onEditEntry={onEditEntry}
-                // Top-row cells need no top border (the weekday header draws it).
-                topBorder={i >= 7}
-              />
-            ))}
+              {/* Day cells */}
+              <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                {days.map((day, i) => (
+                  <DayCell
+                    key={day.date}
+                    day={day}
+                    expanded={expanded.has(day.date)}
+                    onExpand={() => toggleExpand(day.date)}
+                    onAdd={() => onNewEntry(day.date)}
+                    onEditEntry={onEditEntry}
+                    // Top-row cells need no top border (the weekday header draws it).
+                    topBorder={i >= 7}
+                  />
+                ))}
+              </Box>
+            </Box>
           </Box>
         </Box>
       </Box>
