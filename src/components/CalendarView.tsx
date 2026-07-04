@@ -33,13 +33,6 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 // How many chips a day shows before collapsing the rest behind "+N more".
 const CHIP_CAP = 3
 
-const eyebrowStyle = {
-  fontFamily: fonts.mono,
-  fontSize: 11,
-  letterSpacing: '0.2em',
-  textTransform: 'uppercase' as const,
-}
-
 export function CalendarView({
   title,
   categories,
@@ -78,9 +71,6 @@ export function CalendarView({
           style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
         >
           <Box>
-            <Text c="clay.6" mb={9} style={eyebrowStyle}>
-              When we did it
-            </Text>
             <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
               {title}
             </Title>
