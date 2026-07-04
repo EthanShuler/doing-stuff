@@ -100,9 +100,6 @@ export function Wishlist({
           style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
         >
           <Box>
-            <Text c="clay.6" mb={9} style={eyebrowStyle}>
-              Things we want to try
-            </Text>
             <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
               {title}
             </Title>
