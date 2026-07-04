@@ -133,7 +133,15 @@ export function ManageModal({
                 {category.name}
               </Text>
               <UnstyledButton
-                onClick={() => onDeleteCategory(category.id)}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Remove "${category.name}"? All of its activities and their logged entries are deleted too.`,
+                    )
+                  ) {
+                    onDeleteCategory(category.id)
+                  }
+                }}
                 ml="auto"
                 style={{ fontFamily: fonts.sans, fontSize: 11, fontWeight: 600, color: colors.faint }}
               >
@@ -181,7 +189,11 @@ export function ManageModal({
                   />
                   <span style={{ padding: '0 2px' }}>{activity.name}</span>
                   <UnstyledButton
-                    onClick={() => onDeleteActivity(activity.id)}
+                    onClick={() => {
+                      if (window.confirm(`Remove "${activity.name}"? Its logged entries are deleted too.`)) {
+                        onDeleteActivity(activity.id)
+                      }
+                    }}
                     aria-label={`Remove ${activity.name}`}
                     style={{ fontFamily: fonts.sans, fontSize: 14, lineHeight: 1, color: '#b3ada3', padding: '0 2px' }}
                   >

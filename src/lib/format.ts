@@ -39,9 +39,12 @@ export function isoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-/** Today as an ISO date string ("YYYY-MM-DD"). */
+/** Today as an ISO date string ("YYYY-MM-DD"), in the user's local timezone
+ *  (not UTC — `toISOString()` would report tomorrow during the evening for
+ *  anyone west of UTC, skewing default dates, stats, and the calendar). */
 export function today(): string {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  return isoDate(now.getFullYear(), now.getMonth() + 1, now.getDate())
 }
 
 /** "YYYY-MM" prefix for the current month, used for the "this month" stat. */

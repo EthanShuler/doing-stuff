@@ -188,7 +188,9 @@ export interface ActivityStore {
   /** The space's shared map center. */
   home: Home
   loading: boolean
+  /** Last failed write's message. Cleared when a new write starts, or via clearError. */
   error: string | null
+  clearError: () => void
   /** Non-fatal warning (e.g. an address that couldn't be geocoded). Dismiss with clearNotice. */
   notice: string | null
   clearNotice: () => void
@@ -237,6 +239,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const clearError = useCallback(() => setError(null), [])
   const clearNotice = useCallback(() => setNotice(null), [])
 
   // Latest entries, read by updateEntry to compare the prior address without
@@ -313,6 +316,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const addEntry = useCallback(
     async (draft: EntryDraft) => {
+      setError(null)
       setNotice(null)
       const address = draft.address.trim()
       // Geocode before persisting so the row carries coords (or stays off-map).
@@ -369,6 +373,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const updateEntry = useCallback(
     async (id: string, draft: EntryDraft) => {
+      setError(null)
       setNotice(null)
       const address = draft.address.trim()
       const existing = entriesRef.current.find((e) => e.id === id)
@@ -428,6 +433,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const deleteEntry = useCallback(
     async (id: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('entries').delete().eq('id', id)
         if (err) {
@@ -449,6 +455,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const addRepeat = useCallback(
     async (entryId: string, date: string) => {
+      setError(null)
       const repeatDate = date || today()
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
@@ -470,6 +477,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const deleteRepeat = useCallback(
     async (repeatId: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('entry_repeats').delete().eq('id', repeatId)
         if (err) {
@@ -489,6 +497,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     async (categoryId: string, name: string) => {
       const trimmed = name.trim()
       if (!trimmed) return
+      setError(null)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('activities')
@@ -509,6 +518,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const setActivityEmoji = useCallback(
     async (id: string, emoji: string) => {
+      setError(null)
       const next = firstGrapheme(emoji)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('activities').update({ emoji: next }).eq('id', id)
@@ -524,6 +534,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const deleteActivity = useCallback(
     async (id: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('activities').delete().eq('id', id)
         if (err) {
@@ -542,6 +553,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     async (name: string, colorIndex: number) => {
       const trimmed = name.trim()
       if (!trimmed) return
+      setError(null)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('categories')
@@ -562,6 +574,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const deleteCategory = useCallback(
     async (id: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('categories').delete().eq('id', id)
         if (err) {
@@ -589,6 +602,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const setHome = useCallback(
     async (address: string) => {
+      setError(null)
       setNotice(null)
       const trimmed = address.trim()
       const point = await resolveCoords(trimmed)
@@ -616,6 +630,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     async (text: string) => {
       const trimmed = text.trim()
       if (!trimmed) return
+      setError(null)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('wishlist_items')
@@ -641,6 +656,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     async (id: string, text: string) => {
       const trimmed = text.trim()
       if (!trimmed) return
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('wishlist_items').update({ text: trimmed }).eq('id', id)
         if (err) {
@@ -655,6 +671,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const setWishlistAddress = useCallback(
     async (id: string, address: string) => {
+      setError(null)
       setNotice(null)
       const trimmed = address.trim()
       const existing = wishlistRef.current.find((item) => item.id === id)
@@ -687,6 +704,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const deleteWishlistItem = useCallback(
     async (id: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('wishlist_items').delete().eq('id', id)
         if (err) {
@@ -701,6 +719,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const linkWishlistItem = useCallback(
     async (id: string, entryId: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('wishlist_items').update({ entry_id: entryId }).eq('id', id)
         if (err) {
@@ -715,6 +734,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   const unlinkWishlistItem = useCallback(
     async (id: string) => {
+      setError(null)
       if (supabase && spaceId) {
         const { error: err } = await supabase.from('wishlist_items').update({ entry_id: null }).eq('id', id)
         if (err) {
@@ -737,6 +757,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     home,
     loading,
     error,
+    clearError,
     notice,
     clearNotice,
     addEntry,

@@ -164,11 +164,22 @@ function AppShell({ session, configured }: { session: Session | null; configured
     }
   }
 
+  const confirmDeleteEntry = () =>
+    window.confirm('Delete this entry? Any repeats logged on it are deleted too.')
+
+  const deleteRow = (id: string) => {
+    if (!confirmDeleteEntry()) return
+    store.deleteEntry(id).catch(() => {
+      // Failure surfaces via the store.error banner.
+    })
+  }
+
   const deleteEditingEntry = async () => {
     if (!editingId) {
       closeModal()
       return
     }
+    if (!confirmDeleteEntry()) return
     try {
       await store.deleteEntry(editingId)
       closeModal()
@@ -208,6 +219,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
           c="oklch(0.45 0.14 25)"
           px={14}
           py={9}
+          onClick={store.clearError}
           style={{
             position: 'fixed',
             top: 16,
@@ -222,9 +234,11 @@ function AppShell({ session, configured }: { session: Session | null; configured
             fontWeight: 500,
             fontFamily: fonts.sans,
             boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
+            cursor: 'pointer',
           }}
         >
           {store.error}
+          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
         </Box>
       )}
 
@@ -319,7 +333,7 @@ function AppShell({ session, configured }: { session: Session | null; configured
           onAdd={openAdd}
           onManage={() => setModal('manage')}
           onEdit={openEdit}
-          onDelete={store.deleteEntry}
+          onDelete={deleteRow}
           onRepeat={openRepeat}
         />
       )}
