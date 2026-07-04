@@ -21,3 +21,5 @@ dist-ssr
 
 # Design source export
 "Ethan Test 2.zip"
+
+*.tsbuildinfo
