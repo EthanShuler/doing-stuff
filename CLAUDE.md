@@ -46,7 +46,9 @@ paper), ported from the Claude Design "Compass" direction.
   in `src/lib/geocode.ts`. Coords are stored on the row; the map never geocodes
   at render time.
 - **Supabase** (`@supabase/supabase-js`) — Postgres + Auth, called directly from
-  the browser. Protected by Row Level Security, not by a server.
+  the browser. Protected by Row Level Security, not by a server. **Realtime**
+  (`postgres_changes`) streams the partner's edits into an open tab; the space
+  tables must be in the `supabase_realtime` publication (see `schema.sql`).
 - **Hosting target: Cloudflare Pages** (build `npm run build`, output `dist`).
   Deliberately not Vercel.
 
@@ -88,6 +90,16 @@ modal stays open and `store.error` surfaces the reason); category / activity /
 wishlist / home actions record the error without throwing. `store.error` clears
 when a new write starts or when the banner is clicked; `store.notice` is a
 non-fatal warning (e.g. an un-geocodable address), dismissed via `clearNotice`.
+
+In live mode the store also subscribes to **Supabase Realtime** (one channel per
+space) so the partner's edits appear without a reload: INSERT/UPDATE events are
+filtered to the space server-side and **upserted by id** (which makes echoes of
+this client's own writes idempotent); DELETE events can't be filtered
+server-side (Postgres replicates only the PK), so they're matched by id and
+ignored if unknown. DB cascades arrive as their own events, so no
+special-casing. A dropped-then-rejoined channel refetches the full snapshot
+(`fetchAll`/`applySnapshot`) to cover anything missed while offline. Keyless
+seed mode skips all of this.
 
 ### Space bootstrap & the sharing model
 

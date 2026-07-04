@@ -339,6 +339,30 @@ grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
 grant execute on function public.shares_space_with(uuid) to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Realtime: add the space-scoped tables to the `supabase_realtime` publication
+-- so an open tab streams the partner's changes live (the app subscribes via
+-- postgres_changes in useActivityStore). INSERT/UPDATE events respect RLS;
+-- DELETE events carry only the row's primary key. Guarded because a plain
+-- ALTER PUBLICATION ... ADD TABLE errors on re-run.
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array
+    array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items']
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
 -- ============================================================================
 -- Optional: seed your own space with the design's starter data. Run this AFTER
 -- you've signed up once, replacing nothing — it uses your current auth.uid().

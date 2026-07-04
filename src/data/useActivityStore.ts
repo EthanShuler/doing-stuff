@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../types'
 import { supabase } from '../lib/supabase'
 import { today } from '../lib/format'
@@ -14,7 +15,9 @@ import { geocode } from '../lib/geocode'
 //
 // The action signatures are identical in both modes, so components never change.
 
-interface SeedData {
+// One full load of a space's data — what the initial fetch (and the resync
+// after a realtime reconnect) applies, and what keyless dev mode seeds.
+interface Snapshot {
   categories: Category[]
   activities: Activity[]
   entries: Entry[]
@@ -27,7 +30,7 @@ interface SeedData {
 const EMPTY_HOME: Home = { address: '', lat: null, lng: null }
 const NO_COORDS: { lat: number | null; lng: number | null } = { lat: null, lng: null }
 
-function seed(): SeedData {
+function seed(): Snapshot {
   return {
     // A demo center + a few pre-geocoded pins so the map works in keyless mode.
     home: { address: 'Portland, OR', lat: 45.5152, lng: -122.6784 },
@@ -265,6 +268,49 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     return point
   }, [])
 
+  // Fetch one full snapshot of the space (live mode only). Shared by the
+  // initial load and the resync after a realtime reconnect. Throws on the
+  // first failed query; callers decide how to surface it.
+  const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
+    if (!supabase || !spaceId) return null
+    const [cats, acts, ents, reps, profs, wishes, space] = await Promise.all([
+      supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
+      supabase.from('activities').select(ACTIVITY_COLUMNS).eq('space_id', spaceId).order('created_at'),
+      supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
+      supabase.from('entry_repeats').select(REPEAT_COLUMNS).eq('space_id', spaceId).order('repeat_date'),
+      // RLS scopes this to the current user + anyone they share a space with.
+      supabase.from('profiles').select('id,email,display_name'),
+      supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
+      supabase.from('spaces').select(SPACE_HOME_COLUMNS).eq('id', spaceId).single(),
+    ])
+    if (cats.error) throw cats.error
+    if (acts.error) throw acts.error
+    if (ents.error) throw ents.error
+    if (reps.error) throw reps.error
+    if (profs.error) throw profs.error
+    if (wishes.error) throw wishes.error
+    if (space.error) throw space.error
+    return {
+      categories: (cats.data as CategoryRow[]).map(toCategory),
+      activities: (acts.data as ActivityRow[]).map(toActivity),
+      entries: (ents.data as EntryRow[]).map(toEntry),
+      repeats: (reps.data as RepeatRow[]).map(toRepeat),
+      profiles: (profs.data as ProfileRow[]).map(toProfile),
+      wishlist: (wishes.data as WishlistRow[]).map(toWishlistItem),
+      home: toHome(space.data as SpaceHomeRow),
+    }
+  }, [spaceId])
+
+  const applySnapshot = useCallback((snap: Snapshot) => {
+    setCategories(snap.categories)
+    setActivities(snap.activities)
+    setEntries(snap.entries)
+    setRepeats(snap.repeats)
+    setProfiles(snap.profiles)
+    setWishlist(snap.wishlist)
+    setHomeState(snap.home)
+  }, [])
+
   // Initial load (live mode only; waits for the space to resolve).
   useEffect(() => {
     if (!supabase || !spaceId) return
@@ -274,31 +320,8 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       setLoading(true)
       setError(null)
       try {
-        const [cats, acts, ents, reps, profs, wishes, space] = await Promise.all([
-          supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
-          supabase.from('activities').select(ACTIVITY_COLUMNS).eq('space_id', spaceId).order('created_at'),
-          supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
-          supabase.from('entry_repeats').select(REPEAT_COLUMNS).eq('space_id', spaceId).order('repeat_date'),
-          // RLS scopes this to the current user + anyone they share a space with.
-          supabase.from('profiles').select('id,email,display_name'),
-          supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
-          supabase.from('spaces').select(SPACE_HOME_COLUMNS).eq('id', spaceId).single(),
-        ])
-        if (cats.error) throw cats.error
-        if (acts.error) throw acts.error
-        if (ents.error) throw ents.error
-        if (reps.error) throw reps.error
-        if (profs.error) throw profs.error
-        if (wishes.error) throw wishes.error
-        if (space.error) throw space.error
-        if (cancelled) return
-        setCategories((cats.data as CategoryRow[]).map(toCategory))
-        setActivities((acts.data as ActivityRow[]).map(toActivity))
-        setEntries((ents.data as EntryRow[]).map(toEntry))
-        setRepeats((reps.data as RepeatRow[]).map(toRepeat))
-        setProfiles((profs.data as ProfileRow[]).map(toProfile))
-        setWishlist((wishes.data as WishlistRow[]).map(toWishlistItem))
-        setHomeState(toHome(space.data as SpaceHomeRow))
+        const snap = await fetchAll()
+        if (!cancelled && snap) applySnapshot(snap)
       } catch (err) {
         if (!cancelled) setError(message(err))
       } finally {
@@ -309,7 +332,88 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     return () => {
       cancelled = true
     }
-  }, [spaceId])
+  }, [spaceId, fetchAll, applySnapshot])
+
+  // Realtime: stream the partner's changes into local state so their edits
+  // appear without a reload. Requires the tables to be in the
+  // `supabase_realtime` publication (see schema.sql). Events apply as
+  // upsert/remove-by-id, so echoes of this client's own writes are idempotent —
+  // and cascades need no special-casing, because the DB emits the cascaded
+  // deletes (and the wish-reopen UPDATE) as their own events.
+  useEffect(() => {
+    if (!supabase || !spaceId) return
+    const client = supabase
+    let cancelled = false
+
+    const upsertBy = <T extends { id: string }>(set: Dispatch<SetStateAction<T[]>>, item: T) =>
+      set((prev) =>
+        prev.some((x) => x.id === item.id)
+          ? prev.map((x) => (x.id === item.id ? item : x))
+          : [...prev, item],
+      )
+    const removeBy = <T extends { id: string }>(set: Dispatch<SetStateAction<T[]>>, id: string) =>
+      set((prev) => (prev.some((x) => x.id === id) ? prev.filter((x) => x.id !== id) : prev))
+
+    const spaceFilter = `space_id=eq.${spaceId}`
+    let channel = client.channel(`space:${spaceId}`)
+
+    // INSERT/UPDATE are filtered to this space server-side. DELETE can't be —
+    // Postgres puts only the primary key in the replicated old record — so we
+    // listen unfiltered and drop the id if we happen to hold it.
+    const sync = <Row extends object, T extends { id: string }>(
+      table: string,
+      map: (row: Row) => T,
+      set: Dispatch<SetStateAction<T[]>>,
+    ) => {
+      channel = channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter: spaceFilter }, (p) =>
+          upsertBy(set, map(p.new as Row)),
+        )
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter: spaceFilter }, (p) =>
+          upsertBy(set, map(p.new as Row)),
+        )
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, (p) =>
+          removeBy(set, (p.old as { id: string }).id),
+        )
+    }
+
+    sync('categories', toCategory, setCategories)
+    sync('activities', toActivity, setActivities)
+    sync('entries', toEntry, setEntries)
+    sync('entry_repeats', toRepeat, setRepeats)
+    sync('wishlist_items', toWishlistItem, setWishlist)
+
+    // Home lives on the space row itself; only updates matter.
+    channel = channel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'spaces', filter: `id=eq.${spaceId}` },
+      (p) => setHomeState(toHome(p.new as SpaceHomeRow)),
+    )
+
+    let subscribedOnce = false
+    channel.subscribe((status) => {
+      if (status !== 'SUBSCRIBED') return
+      // The first subscribe races the initial load, which already covers it.
+      // Later ones mean the socket dropped and rejoined (laptop sleep, network
+      // blip) — refetch to pick up anything missed while disconnected.
+      if (!subscribedOnce) {
+        subscribedOnce = true
+        return
+      }
+      fetchAll()
+        .then((snap) => {
+          if (!cancelled && snap) applySnapshot(snap)
+        })
+        .catch((err) => {
+          if (!cancelled) setError(message(err))
+        })
+    })
+
+    return () => {
+      cancelled = true
+      client.removeChannel(channel)
+    }
+  }, [spaceId, fetchAll, applySnapshot])
 
   // --- Entry actions. These throw on failure so the modal can stay open. ---
 
