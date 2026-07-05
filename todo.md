@@ -1,2 +1,3 @@
-- Map feature (sort by wishlist vs activity). When viewing by activity, specify further filtering.    
 - heat map option
+- movie + tv tier lists
+- french toast blog
