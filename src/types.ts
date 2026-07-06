@@ -115,6 +115,26 @@ export interface TierPlacement {
   position: number
 }
 
+/**
+ * A "want to watch" item in the space's SHARED watchlist — one row in
+ * `watchlist_items`. Checking it off creates a `tier_items` row in the pool and
+ * links to it via `tierItemId` (null = still open). The whole list is shared,
+ * so any member can add / edit / check off.
+ */
+export interface WatchlistItem {
+  id: string
+  kind: TierKind
+  title: string
+  /** Optional poster URL; carried onto the tier card when checked off. '' = none. */
+  imageUrl: string
+  /** The tier item this produced when checked off; null while still "want to watch". */
+  tierItemId: string | null
+  /** auth.users id of the member who added it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; orders the list. */
+  createdAt: string
+}
+
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
 export type Screen = 'log' | 'wishlist' | 'map' | 'calendar'

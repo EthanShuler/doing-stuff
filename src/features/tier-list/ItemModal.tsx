@@ -17,6 +17,7 @@ export function ItemModal({
   kind,
   draft,
   isEditing,
+  variant = 'board',
   onChange,
   onSave,
   onDelete,
@@ -26,6 +27,9 @@ export function ItemModal({
   kind: TierKind
   draft: ItemDraft
   isEditing: boolean
+  /** 'board' adds straight to the tier pool; 'watchlist' adds a "want to watch"
+   *  item that only reaches the board once it's checked off. Just tweaks copy. */
+  variant?: 'board' | 'watchlist'
   onChange: (patch: Partial<ItemDraft>) => void
   onSave: () => void
   onDelete: () => void
@@ -33,6 +37,20 @@ export function ItemModal({
 }) {
   const noun = KIND_NOUN[kind]
   const canSave = Boolean(draft.title.trim())
+  const isWatchlist = variant === 'watchlist'
+
+  const heading = isWatchlist
+    ? isEditing
+      ? 'Edit watchlist item'
+      : `Add a ${noun} to watch`
+    : isEditing
+      ? `Edit ${noun}`
+      : `Add a ${noun}`
+  const hint = isWatchlist
+    ? `Check it off later and it joins both of your unranked shelves.`
+    : `New ${noun}s land on both of your unranked shelves.`
+  const saveLabel = isEditing ? 'Save changes' : isWatchlist ? 'Add to watchlist' : `Add ${noun}`
+  const deleteLabel = isWatchlist ? 'Remove from watchlist' : `Delete ${noun}`
 
   // Live preview of the card exactly as it will render on the board.
   const previewItem: TierItem = {
@@ -47,7 +65,7 @@ export function ItemModal({
   return (
     <ModalShell opened={opened} onClose={onClose}>
       <Title order={3} fz={28} mb={22}>
-        {isEditing ? `Edit ${noun}` : `Add a ${noun}`}
+        {heading}
       </Title>
 
       <Group gap={20} align="flex-start" wrap="nowrap">
@@ -68,7 +86,7 @@ export function ItemModal({
             mb={6}
           />
           <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans }}>
-            New {noun}s land on both of your unranked shelves.
+            {hint}
           </Text>
         </Box>
         {/* Keyed on the URL so pasting a new link retries a broken image. */}
@@ -83,7 +101,7 @@ export function ItemModal({
             onClick={onDelete}
             style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
           >
-            Delete {noun}
+            {deleteLabel}
           </UnstyledButton>
         )}
         <Group gap={10} ml="auto">
@@ -91,7 +109,7 @@ export function ItemModal({
             Cancel
           </Button>
           <Button onClick={onSave} disabled={!canSave} radius={10}>
-            {isEditing ? 'Save changes' : `Add ${noun}`}
+            {saveLabel}
           </Button>
         </Group>
       </Group>

@@ -187,6 +187,31 @@ create index if not exists tier_placements_space_idx on public.tier_placements (
 create index if not exists tier_placements_item_idx  on public.tier_placements (item_id);
 
 -- ---------------------------------------------------------------------------
+-- Watchlist (movies + TV): a SHARED list of things we want to watch, per kind.
+-- Mirrors the wishlist → entry pattern: checking one off creates a `tier_items`
+-- row in the shared pool (so it lands on both members' unranked shelves) and
+-- links to it via `tier_item_id` (null = still "want to watch", set = added to
+-- the board). ON DELETE SET NULL means removing that tier item later reopens the
+-- watchlist item rather than orphaning it. Unlike placements, the whole list is
+-- shared — any member can add/edit/check off — so it uses the "all" policy.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.watchlist_items (
+  id           uuid primary key default gen_random_uuid(),
+  space_id     uuid not null references public.spaces (id) on delete cascade,
+  kind         text not null check (kind in ('movie', 'tv')),
+  title        text not null,
+  -- Optional poster, pasted as a URL; carried onto the tier card when checked off.
+  image_url    text not null default '',
+  -- The tier item this produced when checked off; null while still open.
+  tier_item_id uuid references public.tier_items (id) on delete set null,
+  created_by   uuid references auth.users (id) default auth.uid(),
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists watchlist_items_space_idx on public.watchlist_items (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -296,6 +321,7 @@ alter table public.wishlist_items enable row level security;
 alter table public.entry_repeats enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
+alter table public.watchlist_items  enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -390,6 +416,11 @@ drop policy if exists "delete own placements" on public.tier_placements;
 create policy "delete own placements" on public.tier_placements
   for delete using (user_id = auth.uid());
 
+-- The watchlist is shared like the pool: full access iff you belong to the space.
+drop policy if exists "space members all" on public.watchlist_items;
+create policy "space members all" on public.watchlist_items
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
 -- ---------------------------------------------------------------------------
 -- Grants (needed because "Automatically expose new tables" is OFF).
 -- RLS still governs *which rows* — these grants just expose the tables to the
@@ -399,7 +430,8 @@ create policy "delete own placements" on public.tier_placements
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
-  public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements
+  public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
+  public.watchlist_items
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -419,7 +451,7 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_items', 'tier_placements']
+          'tier_items', 'tier_placements', 'watchlist_items']
   loop
     if not exists (
       select 1 from pg_publication_tables

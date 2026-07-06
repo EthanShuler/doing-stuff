@@ -1,18 +1,26 @@
 import { useMemo, useState } from 'react'
 import { Box, Button, Center, Group, SegmentedControl, Text } from '@mantine/core'
-import type { Tier, TierItem, TierKind } from '../../types'
+import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
 import { colors, fonts } from '../../theme'
 import { useTierListStore } from './useTierListStore'
 import { deriveBoard } from './derive'
 import { TierBoard } from './TierBoard'
 import { BoardView } from './BoardView'
 import { CardVisual } from './TierCard'
+import { Watchlist } from './Watchlist'
 import { ItemModal } from './ItemModal'
 import type { ItemDraft } from './ItemModal'
+
+type Mode = 'board' | 'watchlist'
 
 const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
 
 const emptyDraft = (): ItemDraft => ({ title: '', imageUrl: '' })
+
+const segmentedStyles = {
+  root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
+  label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
+} as const
 
 interface TierListPageProps {
   kind: TierKind
@@ -28,6 +36,10 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const store = useTierListStore(spaceId, userId)
   const noun = KIND_NOUN[kind]
 
+  // Board (tier ranking) vs. Watchlist (things we want to watch). Both live in
+  // the same tab; the store survives the switch just like Movies ↔ TV.
+  const [mode, setMode] = useState<Mode>('board')
+
   // Whose board is showing. Yours is drag-and-drop; the partner's renders the
   // same layout read-only (their placements are also read-only under RLS).
   const [viewer, setViewer] = useState<'you' | 'partner'>('you')
@@ -35,10 +47,21 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const partnerName = partner?.displayName || (partner?.email ? partner.email.split('@')[0] : 'Partner')
   const showingPartner = viewer === 'partner' && partner !== null
 
-  // Modal state.
+  // Modal state. `variant` selects the save path: a board add/edit writes to the
+  // tier pool; a watchlist add/edit writes to `watchlist_items`.
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalVariant, setModalVariant] = useState<Mode>('board')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<ItemDraft>(emptyDraft)
+
+  // The watchlist for this kind: open items first, then checked-off ones.
+  const watchItems = useMemo(() => {
+    const mine = store.watchlist.filter((w) => w.kind === kind)
+    const rank = (w: WatchlistItem) => (w.tierItemId === null ? 0 : 1)
+    return [...mine].sort((a, b) =>
+      rank(a) !== rank(b) ? rank(a) - rank(b) : a.createdAt < b.createdAt ? -1 : 1,
+    )
+  }, [store.watchlist, kind])
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
@@ -52,13 +75,23 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     [store.placements, store.selfId],
   )
 
+  // The "+ Add" button adds to whichever view you're in.
   const openAdd = () => {
+    setModalVariant(mode)
     setEditingId(null)
     setDraft(emptyDraft())
     setModalOpen(true)
   }
 
   const openEdit = (item: TierItem) => {
+    setModalVariant('board')
+    setEditingId(item.id)
+    setDraft({ title: item.title, imageUrl: item.imageUrl })
+    setModalOpen(true)
+  }
+
+  const openEditWatch = (item: WatchlistItem) => {
+    setModalVariant('watchlist')
     setEditingId(item.id)
     setDraft({ title: item.title, imageUrl: item.imageUrl })
     setModalOpen(true)
@@ -72,8 +105,13 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const saveItem = async () => {
     if (!draft.title.trim()) return
     try {
-      if (editingId) await store.updateItem(editingId, draft.title, draft.imageUrl)
-      else await store.addItem(kind, draft.title, draft.imageUrl)
+      if (modalVariant === 'watchlist') {
+        if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl)
+        else await store.addWatchlistItem(kind, draft.title, draft.imageUrl)
+      } else {
+        if (editingId) await store.updateItem(editingId, draft.title, draft.imageUrl)
+        else await store.addItem(kind, draft.title, draft.imageUrl)
+      }
       closeModal()
     } catch {
       // Write failed — keep the modal open; store.error shows the reason.
@@ -85,9 +123,13 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       closeModal()
       return
     }
-    if (!window.confirm(`Delete this ${noun} for both of you? Everyone's rankings of it are removed too.`)) return
     try {
-      await store.deleteItem(editingId)
+      if (modalVariant === 'watchlist') {
+        await store.deleteWatchlistItem(editingId)
+      } else {
+        if (!window.confirm(`Delete this ${noun} for both of you? Everyone's rankings of it are removed too.`)) return
+        await store.deleteItem(editingId)
+      }
       closeModal()
     } catch {
       // Keep the modal open on failure.
@@ -144,31 +186,56 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
             pb={18}
             style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
           >
-            {partner ? (
+            <Group gap={12} align="center" wrap="wrap">
               <SegmentedControl
-                value={viewer}
-                onChange={(value) => setViewer(value as 'you' | 'partner')}
+                value={mode}
+                onChange={(value) => setMode(value as Mode)}
                 data={[
-                  { label: 'You', value: 'you' },
-                  { label: partnerName, value: 'partner' },
+                  { label: 'Board', value: 'board' },
+                  { label: 'Watchlist', value: 'watchlist' },
                 ]}
                 radius={9}
-                styles={{
-                  root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
-                  label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
-                }}
+                styles={segmentedStyles}
               />
-            ) : (
-              <Text fz={13} c={colors.muted} style={{ fontFamily: fonts.sans }}>
-                Just your board for now — rankings are per person once your partner joins.
-              </Text>
-            )}
+              {mode === 'board' &&
+                (partner ? (
+                  <SegmentedControl
+                    value={viewer}
+                    onChange={(value) => setViewer(value as 'you' | 'partner')}
+                    data={[
+                      { label: 'You', value: 'you' },
+                      { label: partnerName, value: 'partner' },
+                    ]}
+                    radius={9}
+                    styles={segmentedStyles}
+                  />
+                ) : (
+                  <Text fz={13} c={colors.muted} style={{ fontFamily: fonts.sans }}>
+                    Just your board for now — rankings are per person once your partner joins.
+                  </Text>
+                ))}
+            </Group>
             <Button onClick={openAdd} radius={10}>
               + Add {noun}
             </Button>
           </Group>
 
-          {showingPartner ? (
+          {mode === 'watchlist' ? (
+            <Watchlist
+              items={watchItems}
+              kind={kind}
+              onCheck={(item) => {
+                void store.checkOffWatchlistItem(item)
+              }}
+              onUncheck={(id) => {
+                void store.uncheckWatchlistItem(id)
+              }}
+              onEdit={openEditWatch}
+              onDelete={(id) => {
+                void store.deleteWatchlistItem(id)
+              }}
+            />
+          ) : showingPartner ? (
             <>
               <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
                 {partnerName}'s board — just for looking.
@@ -196,7 +263,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               shelfHint={
                 board.unranked.length === 0 &&
                 Object.values(board.tiers).every((t) => t.length === 0)
-                  ? `No ${noun}s yet — add your first with the button above.`
+                  ? `No ${noun}s yet — add one, or check something off your watchlist.`
                   : 'Everything is ranked. Nice.'
               }
             />
@@ -209,6 +276,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         kind={kind}
         draft={draft}
         isEditing={editingId !== null}
+        variant={modalVariant}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
         onSave={saveItem}
         onDelete={deleteEditingItem}

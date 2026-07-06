@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { Profile, Tier, TierItem, TierKind, TierPlacement } from '../../types'
+import type { Profile, Tier, TierItem, TierKind, TierPlacement, WatchlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { renormalizedPositions } from './derive'
 
@@ -18,6 +18,7 @@ interface Snapshot {
   items: TierItem[]
   placements: TierPlacement[]
   profiles: Profile[]
+  watchlist: WatchlistItem[]
 }
 
 // Seed viewer: keyless mode has no auth user, so the page ranks as this
@@ -57,6 +58,12 @@ function seed(): Snapshot {
       { id: 'p10', itemId: 't1', userId: 'u2', tier: 'B', position: 1 },
       { id: 'p11', itemId: 't4', userId: 'u2', tier: 'S', position: 1 },
     ],
+    // A couple open wishes per kind so the watchlist is demoable offline.
+    watchlist: [
+      { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
+      { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
+      { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
+    ],
   }
 }
 
@@ -78,6 +85,15 @@ type TierPlacementRow = {
   position: number
 }
 type ProfileRow = { id: string; email: string | null; display_name: string | null }
+type WatchlistItemRow = {
+  id: string
+  kind: string
+  title: string
+  image_url: string | null
+  tier_item_id: string | null
+  created_by: string | null
+  created_at: string
+}
 
 const toTierItem = (r: TierItemRow): TierItem => ({
   id: r.id,
@@ -95,9 +111,19 @@ const toTierPlacement = (r: TierPlacementRow): TierPlacement => ({
   position: r.position,
 })
 const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
+const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
+  id: r.id,
+  kind: r.kind as TierKind,
+  title: r.title,
+  imageUrl: r.image_url ?? '',
+  tierItemId: r.tier_item_id,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+})
 
 const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
+const WATCHLIST_COLUMNS = 'id,kind,title,image_url,tier_item_id,created_by,created_at'
 
 const message = (err: unknown): string =>
   err instanceof Error ? err.message : 'Something went wrong.'
@@ -121,6 +147,8 @@ export interface TierListStore {
   items: TierItem[]
   /** All members' placements; deriveBoard picks one viewer's. */
   placements: TierPlacement[]
+  /** The shared watchlist — both kinds; filter by kind in the UI. */
+  watchlist: WatchlistItem[]
   profiles: Profile[]
   /** Whose board "You" is: the auth user, or the seed self in keyless mode. */
   selfId: string | null
@@ -143,12 +171,25 @@ export interface TierListStore {
   unplaceItem: (itemId: string) => Promise<void>
   /** Rewrite one tier's ordering at integer positions (float-precision rescue). */
   placeTier: (tier: Tier, orderedItemIds: string[]) => Promise<void>
+
+  /** Add a "want to watch" item to the shared watchlist. Throws on failure. */
+  addWatchlistItem: (kind: TierKind, title: string, imageUrl: string) => Promise<void>
+  /** Edit a watchlist item's title/poster (open items only). Throws on failure. */
+  updateWatchlistItem: (id: string, title: string, imageUrl: string) => Promise<void>
+  /** Remove a watchlist item (does not touch any tier item it created). Throws on failure. */
+  deleteWatchlistItem: (id: string) => Promise<void>
+  /** Check off an open item: create the tier item in the pool and link to it.
+   *  Inline flow — records the error instead of throwing. */
+  checkOffWatchlistItem: (item: WatchlistItem) => Promise<void>
+  /** Reopen a checked item (clears the link; the tier item stays on the board). */
+  uncheckWatchlistItem: (id: string) => Promise<void>
 }
 
 export function useTierListStore(spaceId: string | null, userId: string | null = null): TierListStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
   const [items, setItems] = useState<TierItem[]>(() => (supabase ? [] : seed().items))
   const [placements, setPlacements] = useState<TierPlacement[]>(() => (supabase ? [] : seed().placements))
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => (supabase ? [] : seed().watchlist))
   const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
@@ -161,19 +202,22 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // optimistic drop. Throws on the first failed query.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [its, places, profs] = await Promise.all([
+    const [its, places, profs, watches] = await Promise.all([
       supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
       // RLS scopes this to the current user + anyone they share a space with.
       supabase.from('profiles').select('id,email,display_name'),
+      supabase.from('watchlist_items').select(WATCHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
     ])
     if (its.error) throw its.error
     if (places.error) throw places.error
     if (profs.error) throw profs.error
+    if (watches.error) throw watches.error
     return {
       items: (its.data as TierItemRow[]).map(toTierItem),
       placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
       profiles: (profs.data as ProfileRow[]).map(toProfile),
+      watchlist: (watches.data as WatchlistItemRow[]).map(toWatchlistItem),
     }
   }, [spaceId])
 
@@ -181,6 +225,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     setItems(snap.items)
     setPlacements(snap.placements)
     setProfiles(snap.profiles)
+    setWatchlist(snap.watchlist)
   }, [])
 
   // Resync after a failed inline write: the optimistic local change is wrong,
@@ -234,6 +279,11 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           : [...prev, item],
       )
 
+    const upsertWatch = (w: WatchlistItem) =>
+      setWatchlist((prev) =>
+        prev.some((x) => x.id === w.id) ? prev.map((x) => (x.id === w.id ? w : x)) : [...prev, w],
+      )
+
     // INSERT/UPDATE are filtered to this space server-side. DELETE can't be —
     // Postgres puts only the primary key in the replicated old record — so we
     // listen unfiltered and drop the id if we happen to hold it.
@@ -259,6 +309,18 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tier_placements' }, (p) => {
         const id = (p.old as { id: string }).id
         setPlacements((prev) => prev.filter((x) => x.id !== id))
+      })
+      // Watchlist: shared, so INSERT/UPDATE (incl. the tier_item_id set-null that
+      // a cascaded tier-item delete produces) stream in filtered to the space.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'watchlist_items', filter: spaceFilter }, (p) =>
+        upsertWatch(toWatchlistItem(p.new as WatchlistItemRow)),
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'watchlist_items', filter: spaceFilter }, (p) =>
+        upsertWatch(toWatchlistItem(p.new as WatchlistItemRow)),
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'watchlist_items' }, (p) => {
+        const id = (p.old as { id: string }).id
+        setWatchlist((prev) => prev.filter((x) => x.id !== id))
       })
 
     let subscribedOnce = false
@@ -349,6 +411,9 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       // DB cascades every member's placements of the item; mirror it locally.
       setItems((prev) => prev.filter((x) => x.id !== id))
       setPlacements((prev) => prev.filter((p) => p.itemId !== id))
+      // The FK is ON DELETE SET NULL, so any watchlist item that produced this
+      // tier item reopens. Mirror that locally too.
+      setWatchlist((prev) => prev.map((w) => (w.tierItemId === id ? { ...w, tierItemId: null } : w)))
     },
     [spaceId],
   )
@@ -436,9 +501,139 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     [spaceId, selfId, resync],
   )
 
+  // --- Watchlist actions. Add/update/delete throw so the modal can stay open;
+  //     check-off / uncheck are inline (checkbox) and record the error instead. ---
+
+  const addWatchlistItem = useCallback(
+    async (kind: TierKind, title: string, imageUrl: string) => {
+      const trimmed = title.trim()
+      if (!trimmed) return
+      setError(null)
+      const image = imageUrl.trim()
+      if (supabase && spaceId) {
+        const { data, error: err } = await supabase
+          .from('watchlist_items')
+          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image })
+          .select(WATCHLIST_COLUMNS)
+          .single()
+        if (err) {
+          setError(err.message)
+          throw err
+        }
+        setWatchlist((prev) => [...prev, toWatchlistItem(data as WatchlistItemRow)])
+        return
+      }
+      setWatchlist((prev) => [
+        ...prev,
+        { id: nextId(), kind, title: trimmed, imageUrl: image, tierItemId: null, createdBy: selfId, createdAt: new Date().toISOString() },
+      ])
+    },
+    [spaceId, selfId],
+  )
+
+  const updateWatchlistItem = useCallback(
+    async (id: string, title: string, imageUrl: string) => {
+      const trimmed = title.trim()
+      if (!trimmed) return
+      setError(null)
+      const image = imageUrl.trim()
+      if (supabase && spaceId) {
+        const { error: err } = await supabase
+          .from('watchlist_items')
+          .update({ title: trimmed, image_url: image })
+          .eq('id', id)
+        if (err) {
+          setError(err.message)
+          throw err
+        }
+      }
+      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, title: trimmed, imageUrl: image } : w)))
+    },
+    [spaceId],
+  )
+
+  const deleteWatchlistItem = useCallback(
+    async (id: string) => {
+      setError(null)
+      if (supabase && spaceId) {
+        const { error: err } = await supabase.from('watchlist_items').delete().eq('id', id)
+        if (err) {
+          setError(err.message)
+          throw err
+        }
+      }
+      setWatchlist((prev) => prev.filter((w) => w.id !== id))
+    },
+    [spaceId],
+  )
+
+  const checkOffWatchlistItem = useCallback(
+    async (wi: WatchlistItem) => {
+      // Already checked off — nothing to do.
+      if (wi.tierItemId) return
+      setError(null)
+      if (supabase && spaceId) {
+        // 1. Create the tier item in the shared pool (lands on both unranked shelves).
+        const { data: itemData, error: itemErr } = await supabase
+          .from('tier_items')
+          .insert({ space_id: spaceId, kind: wi.kind, title: wi.title, image_url: wi.imageUrl })
+          .select(TIER_ITEM_COLUMNS)
+          .single()
+        if (itemErr) {
+          setError(itemErr.message)
+          return
+        }
+        const created = toTierItem(itemData as TierItemRow)
+        setItems((prev) => (prev.some((x) => x.id === created.id) ? prev : [...prev, created]))
+        // 2. Link the watchlist item to it (marks it done).
+        const { error: linkErr } = await supabase
+          .from('watchlist_items')
+          .update({ tier_item_id: created.id })
+          .eq('id', wi.id)
+        if (linkErr) {
+          // The tier item exists; the link write failed. Surface it and resync
+          // so local state matches the DB (the item is on the board regardless).
+          setError(linkErr.message)
+          resync()
+          return
+        }
+        setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
+        return
+      }
+      // Seed mode: create the pool item and link locally.
+      const created: TierItem = {
+        id: nextId(),
+        kind: wi.kind,
+        title: wi.title,
+        imageUrl: wi.imageUrl,
+        createdBy: selfId,
+        createdAt: new Date().toISOString(),
+      }
+      setItems((prev) => [...prev, created])
+      setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
+    },
+    [spaceId, selfId, resync],
+  )
+
+  const uncheckWatchlistItem = useCallback(
+    async (id: string) => {
+      setError(null)
+      // Reopen the wish; the tier item it created stays on the board.
+      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, tierItemId: null } : w)))
+      if (!supabase || !spaceId) return
+      const { error: err } = await supabase.from('watchlist_items').update({ tier_item_id: null }).eq('id', id)
+      if (err) {
+        setError(err.message)
+        resync()
+      }
+    },
+    [spaceId, resync],
+  )
+
   return {
     items,
     placements,
+    watchlist,
     profiles,
     selfId,
     loading,
@@ -450,5 +645,10 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     placeItem,
     unplaceItem,
     placeTier,
+    addWatchlistItem,
+    updateWatchlistItem,
+    deleteWatchlistItem,
+    checkOffWatchlistItem,
+    uncheckWatchlistItem,
   }
 }

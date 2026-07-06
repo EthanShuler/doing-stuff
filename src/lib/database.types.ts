@@ -200,6 +200,39 @@ export interface Database {
         }
         Relationships: []
       }
+      watchlist_items: {
+        Row: {
+          id: string
+          space_id: string
+          kind: string
+          title: string
+          image_url: string
+          tier_item_id: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          kind: string
+          title: string
+          image_url?: string
+          tier_item_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          kind?: string
+          title?: string
+          image_url?: string
+          tier_item_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       entry_repeats: {
         Row: {
           id: string
