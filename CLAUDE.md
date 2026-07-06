@@ -7,12 +7,11 @@ Guidance for working in this repo. Read this before making changes.
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
-`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`,
-`/french-toast`, `/parks`, and `/spoons` are placeholder pages for features not
-built yet (movie/TV drag-n-drop tier lists, a french toast ranking, a
-63-national-parks visit tracker, a souvenir-spoon collection map). All features
-share the one space — new tables follow the same `space_id` + `is_space_member()`
-RLS pattern.
+`/calendar` are the Doing Stuff feature's screens; `/movies` and `/tv` are the
+**Tier Lists** feature; `/french-toast`, `/parks`, and `/spoons` are placeholder
+pages for features not built yet (a french toast ranking, a 63-national-parks
+visit tracker, a souvenir-spoon collection map). All features share the one
+space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
 **Doing Stuff** — the landing feature — is a shared activity tracker for logging
 things done together in a new city. The domain model:
@@ -40,6 +39,27 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
+**Tier Lists** (`/movies`, `/tv`) — drag-n-drop S/A/B/C/D/F boards. The domain
+model splits pool from opinion:
+
+- **Tier item** (`tier_items`) — a movie or show in the space's **shared pool**
+  (a `kind 'movie'|'tv'` column, a title, a hand-pasted poster `image_url`).
+  Any member can add/edit/delete; deleting removes everyone's rankings of it.
+- **Tier placement** (`tier_placements`) — **one person's** ranking of one item:
+  `tier` + fractional `position` within the tier (midpoint insertion on drop =
+  one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
+  to integers if float precision ever runs out). "Unranked" is the absence of a
+  placement row. RLS is split: members **read** everyone's placements but
+  **write only their own** — the partner's board is read-only at the security
+  boundary, not just in the UI.
+
+Both routes render the same `TierListPage` (kind prop), so the store — holding
+both kinds and all users' placements — survives Movies ↔ TV switches. A
+You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
+(`TierBoard`), the partner's is the same layout with no drag wiring
+(`BoardView`). Drops are optimistic: on write failure the store records the
+error and refetches, so the card snaps back.
+
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
 paper), ported from the Claude Design "Compass" direction.
 
@@ -56,6 +76,12 @@ paper), ported from the Claude Design "Compass" direction.
   referencing `theme.ts`. **No Tailwind, no CSS files** — `index.css` stays
   empty; Mantine's stylesheet provides the reset.
 - **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles).
+- **@dnd-kit** (`core` + `sortable` + `utilities`) for the tier-list drag-n-drop.
+  Multi-container pattern: each tier row is a droppable + `SortableContext`;
+  cross-row moves happen in `onDragOver` against a board copy frozen at drag
+  start (so realtime updates can't yank cards mid-drag); `onDragEnd` writes one
+  placement row. Mouse sensor uses a 4px activation distance so plain clicks
+  still open the card editor; touch uses a 200ms long-press so pages scroll.
 - **Nominatim** (OpenStreetMap) for address → lat/lng geocoding, called from
   the browser **on save only**, never per keystroke — see the rate-policy notes
   in `src/lib/geocode.ts`. Coords are stored on the row; the map never geocodes
@@ -143,7 +169,12 @@ schema in `supabase/schema.sql` is already applied to the current project.
 `supabase/schema.sql` is the source of truth for the database. Key points:
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
-  `entry_repeats`, `wishlist_items`, `profiles`.
+  `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`.
+- Most tables use the uniform "space members all" `for all` policy. The two
+  exceptions: `profiles` (read self + co-members, update self) and
+  **`tier_placements`** (members read all, but insert/update/delete require
+  `user_id = auth.uid()` — rankings are personal). Follow the placement pattern
+  for any future per-person opinion data.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via
@@ -201,6 +232,15 @@ src/
       ManageModal.tsx      categories & activities editor + home base
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
+    tier-list/             movie + TV tier boards (/movies + /tv, kind prop)
+      TierListPage.tsx     owns the store, You/Partner toggle, item modal state
+      useTierListStore.ts  data seam: pool + placements CRUD (or seed fallback)
+      derive.ts            pure board building, moveItem, fractional positions
+      derive.test.ts       vitest coverage for derive.ts
+      TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
+      BoardView.tsx        pure board layout (tier rows + unranked shelf)
+      TierCard.tsx         CardVisual (poster + fallback) + SortableCard
+      ItemModal.tsx        add/edit pool item with live card preview
 supabase/
   schema.sql               tables + RLS + grants
 ```

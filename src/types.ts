@@ -81,6 +81,40 @@ export interface WishlistItem {
   lng: number | null
 }
 
+// --- Tier lists (movies + TV) ------------------------------------------------
+
+export type TierKind = 'movie' | 'tv'
+
+/** The fixed tier ladder — not user-editable. */
+export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
+
+/** A movie or show in the space's SHARED pool — one row in `tier_items`. */
+export interface TierItem {
+  id: string
+  kind: TierKind
+  title: string
+  /** Poster image URL, pasted by hand. '' = none (card shows a fallback). */
+  imageUrl: string
+  /** auth.users id of the member who added it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; orders the unranked shelf. */
+  createdAt: string
+}
+
+/**
+ * One person's ranking of one item — one row in `tier_placements`. Each member
+ * places the same shared items independently; an item with no placement for a
+ * viewer is "unranked" for them (absence of a row, never a tier value).
+ */
+export interface TierPlacement {
+  id: string
+  itemId: string
+  userId: string
+  tier: Tier
+  /** Fractional ordering within the tier (midpoint insertion on drop). */
+  position: number
+}
+
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
 export type Screen = 'log' | 'wishlist' | 'map' | 'calendar'

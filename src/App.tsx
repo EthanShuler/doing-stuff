@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { Center } from '@mantine/core'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import type { Screen } from './types'
+import type { Screen, TierKind } from './types'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
 import { colors, fonts } from './theme'
@@ -9,6 +9,7 @@ import { AppLayout } from './layout/AppLayout'
 import { AuthScreen } from './components/AuthScreen'
 import { ComingSoon } from './components/ComingSoon'
 import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
+import { TierListPage } from './features/tier-list/TierListPage'
 
 /** Full-screen centered message — used for loading and fatal errors. */
 function Splash({ text }: { text: string }) {
@@ -56,6 +57,12 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <DoingStuffPage screen={screen} spaceId={spaceId} userId={userId} configured={configured} />
   )
 
+  // Same trick for the tier lists: /movies and /tv render one component, so
+  // its store survives switching kinds — the board just re-derives.
+  const tierList = (kind: TierKind) => (
+    <TierListPage kind={kind} spaceId={spaceId} userId={userId} configured={configured} />
+  )
+
   return (
     <BrowserRouter>
       <AppLayout>
@@ -64,14 +71,8 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           <Route path="/wishlist" element={doingStuff('wishlist')} />
           <Route path="/map" element={doingStuff('map')} />
           <Route path="/calendar" element={doingStuff('calendar')} />
-          <Route
-            path="/movies"
-            element={<ComingSoon title="Movie tier list" blurb="Drag-and-drop movie rankings, coming soon." />}
-          />
-          <Route
-            path="/tv"
-            element={<ComingSoon title="TV tier list" blurb="Drag-and-drop TV rankings, coming soon." />}
-          />
+          <Route path="/movies" element={tierList('movie')} />
+          <Route path="/tv" element={tierList('tv')} />
           <Route
             path="/french-toast"
             element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}

@@ -149,6 +149,44 @@ create index if not exists entry_repeats_space_idx on public.entry_repeats (spac
 create index if not exists entry_repeats_entry_idx on public.entry_repeats (entry_id);
 
 -- ---------------------------------------------------------------------------
+-- Tier lists (movies + TV): a SHARED pool of items, PER-PERSON rankings.
+-- `tier_items` is the pool — any space member can add/edit. `tier_placements`
+-- holds one member's ranking of one item (tier + fractional position within
+-- the tier); "unranked" is simply the absence of a placement row. Placements
+-- are opinion data, so RLS below lets members READ each other's but WRITE
+-- only their own — the partner's board is read-only at the security boundary.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.tier_items (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  kind        text not null check (kind in ('movie', 'tv')),
+  title       text not null,
+  -- Poster image, pasted as a URL ('' = none; the card shows a fallback).
+  image_url   text not null default '',
+  created_by  uuid references auth.users (id) default auth.uid(),
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.tier_placements (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  item_id     uuid not null references public.tier_items (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) default auth.uid(),
+  tier        text not null check (tier in ('S', 'A', 'B', 'C', 'D', 'F')),
+  -- Fractional ordering within the tier (midpoint insertion; the client
+  -- renormalizes a tier to integers if float precision ever runs out).
+  position    double precision not null,
+  created_at  timestamptz not null default now(),
+  -- One ranking per person per item — also the upsert conflict target.
+  unique (item_id, user_id)
+);
+
+create index if not exists tier_items_space_idx      on public.tier_items (space_id);
+create index if not exists tier_placements_space_idx on public.tier_placements (space_id);
+create index if not exists tier_placements_item_idx  on public.tier_placements (item_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -256,6 +294,8 @@ alter table public.entries       enable row level security;
 alter table public.profiles      enable row level security;
 alter table public.wishlist_items enable row level security;
 alter table public.entry_repeats enable row level security;
+alter table public.tier_items       enable row level security;
+alter table public.tier_placements  enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -324,6 +364,32 @@ drop policy if exists "space members all" on public.entry_repeats;
 create policy "space members all" on public.entry_repeats
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
+-- tier lists -------------------------------------------------------------------
+-- The item pool is shared: any member has full access.
+drop policy if exists "space members all" on public.tier_items;
+create policy "space members all" on public.tier_items
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+-- Placements are per-person: members read everyone's (the partner's board
+-- renders read-only), but each user can write only rows carrying their own
+-- user_id. The `with check` on update also blocks reassigning a row's owner.
+drop policy if exists "members read placements" on public.tier_placements;
+create policy "members read placements" on public.tier_placements
+  for select using (public.is_space_member(space_id));
+
+drop policy if exists "insert own placements" on public.tier_placements;
+create policy "insert own placements" on public.tier_placements
+  for insert with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "update own placements" on public.tier_placements;
+create policy "update own placements" on public.tier_placements
+  for update using (user_id = auth.uid())
+  with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "delete own placements" on public.tier_placements;
+create policy "delete own placements" on public.tier_placements
+  for delete using (user_id = auth.uid());
+
 -- ---------------------------------------------------------------------------
 -- Grants (needed because "Automatically expose new tables" is OFF).
 -- RLS still governs *which rows* — these grants just expose the tables to the
@@ -333,7 +399,7 @@ create policy "space members all" on public.entry_repeats
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
-  public.wishlist_items, public.entry_repeats
+  public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -352,7 +418,8 @@ declare
   t text;
 begin
   foreach t in array
-    array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items']
+    array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
+          'tier_items', 'tier_placements']
   loop
     if not exists (
       select 1 from pg_publication_tables

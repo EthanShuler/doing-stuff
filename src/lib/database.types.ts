@@ -140,6 +140,66 @@ export interface Database {
         }
         Relationships: []
       }
+      tier_items: {
+        Row: {
+          id: string
+          space_id: string
+          kind: string
+          title: string
+          image_url: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          kind: string
+          title: string
+          image_url?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          kind?: string
+          title?: string
+          image_url?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tier_placements: {
+        Row: {
+          id: string
+          space_id: string
+          item_id: string
+          user_id: string
+          tier: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          item_id: string
+          user_id?: string
+          tier: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          item_id?: string
+          user_id?: string
+          tier?: string
+          position?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       entry_repeats: {
         Row: {
           id: string
