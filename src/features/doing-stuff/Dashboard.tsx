@@ -9,25 +9,19 @@ import {
   SimpleGrid,
   Text,
   TextInput,
-  Title,
   UnstyledButton,
 } from '@mantine/core'
-import type { Category, Screen, SortKey, ViewMode } from '../types'
-import type { DisplayRow, Stats } from '../data/derive'
-import { ACCENT, colors, fonts, swatchFor } from '../theme'
-import { formatDate } from '../lib/format'
-import { Stars } from './Stars'
-import { HeaderActions } from './HeaderActions'
-import { Pill } from './Pill'
+import type { Category, SortKey, ViewMode } from '../../types'
+import type { DisplayRow, Stats } from './derive'
+import { ACCENT, colors, fonts, swatchFor } from '../../theme'
+import { formatDate } from '../../lib/format'
+import { Stars } from '../../components/Stars'
+import { Pill } from '../../components/Pill'
 
 interface DashboardProps {
-  title: string
-  subtitle: string
   stats: Stats
   categories: Category[]
   rows: DisplayRow[]
-  screen: Screen
-  onScreenChange: (screen: Screen) => void
   filterCategoryId: string
   search: string
   sort: SortKey
@@ -37,7 +31,6 @@ interface DashboardProps {
   onSort: (sort: SortKey) => void
   onView: (view: ViewMode) => void
   onAdd: () => void
-  onManage: () => void
   onEdit: (id: string) => void
   onDelete: (id: string) => void
   onRepeat: (id: string) => void
@@ -51,13 +44,9 @@ const monoLabelStyle = {
 }
 
 export function Dashboard({
-  title,
-  subtitle,
   stats,
   categories,
   rows,
-  screen,
-  onScreenChange,
   filterCategoryId,
   search,
   sort,
@@ -67,7 +56,6 @@ export function Dashboard({
   onSort,
   onView,
   onAdd,
-  onManage,
   onEdit,
   onDelete,
   onRepeat,
@@ -75,122 +63,100 @@ export function Dashboard({
   const isEmpty = rows.length === 0
 
   return (
-    <Box mih="100vh" bg={colors.pageBg} c={colors.ink} pt={48} pb={80} px={24} style={{ fontFamily: fonts.sans }}>
-      <Box maw={960} mx="auto">
-        {/* HEADER */}
-        <Group
-          justify="space-between"
-          align="flex-end"
-          gap={24}
-          wrap="wrap"
-          pb={22}
-          style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
-        >
-          <Box>
-            <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
-              {title}
-            </Title>
-            <Text fz={14} c={colors.muted} mt={6}>
-              {subtitle}
-            </Text>
-          </Box>
-          <HeaderActions screen={screen} onScreenChange={onScreenChange} onManage={onManage} onAdd={onAdd} />
-        </Group>
+    <>
+      {/* STATS */}
+      <Group gap={14} mt={26} wrap="wrap" align="stretch">
+        <StatCard value={stats.total} label="Total entries" bg="oklch(0.96 0.018 78)" />
+        <StatCard
+          value={stats.thisMonth}
+          label="This month"
+          bg="oklch(0.95 0.032 150)"
+          valueColor="oklch(0.42 0.06 150)"
+          labelColor="oklch(0.45 0.05 150)"
+        />
+      </Group>
 
-        {/* STATS */}
-        <Group gap={14} mt={26} wrap="wrap" align="stretch">
-          <StatCard value={stats.total} label="Total entries" bg="oklch(0.96 0.018 78)" />
-          <StatCard
-            value={stats.thisMonth}
-            label="This month"
-            bg="oklch(0.95 0.032 150)"
-            valueColor="oklch(0.42 0.06 150)"
-            labelColor="oklch(0.45 0.05 150)"
-          />
-        </Group>
-
-        {/* CONTROLS */}
-        <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
-          <Group gap={8} wrap="wrap">
-            <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
-            {categories.map((category) => {
-              const swatch = swatchFor(category.colorIndex)
-              const active = filterCategoryId === category.id
-              return (
-                <Pill
-                  key={category.id}
-                  label={category.name}
-                  active={active}
-                  activeBg={swatch.color}
-                  dotColor={active ? '#fff' : swatch.color}
-                  onClick={() => onFilter(category.id)}
-                />
-              )
-            })}
-          </Group>
-          <Group align="center" gap={14} wrap="wrap">
-            <TextInput
-              value={search}
-              onChange={(event) => onSearch(event.currentTarget.value)}
-              placeholder="Search titles…"
-              aria-label="Search entries by title"
-              rightSection={
-                search ? (
-                  <UnstyledButton
-                    onClick={() => onSearch('')}
-                    aria-label="Clear search"
-                    style={{ color: colors.faint, fontSize: 14, lineHeight: 1 }}
-                  >
-                    ✕
-                  </UnstyledButton>
-                ) : null
-              }
-              w={200}
-              styles={{ input: { fontFamily: fonts.sans } }}
-            />
-            <SegmentedControl
-              value={view}
-              onChange={(value) => onView(value as ViewMode)}
-              data={[
-                { label: 'Cards', value: 'cards' },
-                { label: 'Table', value: 'table' },
-              ]}
-              radius={9}
-              styles={{
-                root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
-                label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
-              }}
-            />
-            <Group align="center" gap={9}>
-              <Text c={colors.muted} style={monoLabelStyle}>
-                Sort
-              </Text>
-              <Select
-                value={sort}
-                onChange={(value) => value && onSort(value as SortKey)}
-                allowDeselect={false}
-                data={[
-                  { value: 'recent', label: 'Most recent' },
-                  { value: 'rating', label: 'Highest rated' },
-                  { value: 'category', label: 'By category' },
-                ]}
-                w={160}
-                styles={{ input: { fontWeight: 600 } }}
+      {/* CONTROLS */}
+      <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
+        <Group gap={8} wrap="wrap">
+          <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
+          {categories.map((category) => {
+            const swatch = swatchFor(category.colorIndex)
+            const active = filterCategoryId === category.id
+            return (
+              <Pill
+                key={category.id}
+                label={category.name}
+                active={active}
+                activeBg={swatch.color}
+                dotColor={active ? '#fff' : swatch.color}
+                onClick={() => onFilter(category.id)}
               />
-            </Group>
+            )
+          })}
+        </Group>
+        <Group align="center" gap={14} wrap="wrap">
+          <TextInput
+            value={search}
+            onChange={(event) => onSearch(event.currentTarget.value)}
+            placeholder="Search titles…"
+            aria-label="Search entries by title"
+            rightSection={
+              search ? (
+                <UnstyledButton
+                  onClick={() => onSearch('')}
+                  aria-label="Clear search"
+                  style={{ color: colors.faint, fontSize: 14, lineHeight: 1 }}
+                >
+                  ✕
+                </UnstyledButton>
+              ) : null
+            }
+            w={200}
+            styles={{ input: { fontFamily: fonts.sans } }}
+          />
+          <SegmentedControl
+            value={view}
+            onChange={(value) => onView(value as ViewMode)}
+            data={[
+              { label: 'Cards', value: 'cards' },
+              { label: 'Table', value: 'table' },
+            ]}
+            radius={9}
+            styles={{
+              root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
+              label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
+            }}
+          />
+          <Group align="center" gap={9}>
+            <Text c={colors.muted} style={monoLabelStyle}>
+              Sort
+            </Text>
+            <Select
+              value={sort}
+              onChange={(value) => value && onSort(value as SortKey)}
+              allowDeselect={false}
+              data={[
+                { value: 'recent', label: 'Most recent' },
+                { value: 'rating', label: 'Highest rated' },
+                { value: 'category', label: 'By category' },
+              ]}
+              w={160}
+              styles={{ input: { fontWeight: 600 } }}
+            />
           </Group>
         </Group>
+      </Group>
 
-        {/* ENTRIES */}
-        {isEmpty ? (
-          <EmptyState onAdd={onAdd} />
-        ) : view === 'cards' ? (
-          <CardGrid rows={rows} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} />
-        ) : (
-          <Table rows={rows} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} />
-        )}
-      </Box>
-    </Box>
+      {/* ENTRIES */}
+      {isEmpty ? (
+        <EmptyState onAdd={onAdd} />
+      ) : view === 'cards' ? (
+        <CardGrid rows={rows} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} />
+      ) : (
+        <Table rows={rows} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} />
+      )}
+    </>
   )
 }
 

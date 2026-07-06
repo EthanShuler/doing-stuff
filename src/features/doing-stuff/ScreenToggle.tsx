@@ -1,6 +1,6 @@
 import { SegmentedControl } from '@mantine/core'
-import type { Screen } from '../types'
-import { colors, fonts } from '../theme'
+import type { Screen } from '../../types'
+import { colors, fonts } from '../../theme'
 
 /** Top-level Log / Wishlist switcher, shown in both screens' headers. */
 export function ScreenToggle({ screen, onChange }: { screen: Screen; onChange: (screen: Screen) => void }) {

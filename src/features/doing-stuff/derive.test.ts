@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { Activity, Category, Entry, Profile, Repeat, WishlistItem } from '../types'
-import { ACCENT, FALLBACK_COLOR, swatchFor } from '../theme'
+import type { Activity, Category, Entry, Profile, Repeat, WishlistItem } from '../../types'
+import { ACCENT, FALLBACK_COLOR, swatchFor } from '../../theme'
 import {
   calendarDays,
   computeStats,

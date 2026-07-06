@@ -1,32 +1,14 @@
-import { useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { Box, Button, Center } from '@mantine/core'
-import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from './types'
-import { useActivityStore } from './data/useActivityStore'
+import { Center } from '@mantine/core'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import type { Screen } from './types'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
-import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist, wishMarkers } from './data/derive'
-import { currentYearMonth, today } from './lib/format'
-import type { YearMonth } from './lib/format'
-import { supabase } from './lib/supabase'
 import { colors, fonts } from './theme'
+import { AppLayout } from './layout/AppLayout'
 import { AuthScreen } from './components/AuthScreen'
-import { Dashboard } from './components/Dashboard'
-import { EntryModal } from './components/EntryModal'
-import { RepeatModal } from './components/RepeatModal'
-import { ManageModal } from './components/ManageModal'
-import { MapView } from './components/MapView'
-import { CalendarView } from './components/CalendarView'
-import { Wishlist } from './components/Wishlist'
-
-const APP_TITLE = 'Doing Stuff'
-const APP_SUBTITLE = ""
-
-type Modal = 'entry' | 'manage' | 'repeat' | null
-
-function emptyDraft(): EntryDraft {
-  return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0, address: '', hideFromMap: false }
-}
+import { ComingSoon } from './components/ComingSoon'
+import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
 
 /** Full-screen centered message — used for loading and fatal errors. */
 function Splash({ text }: { text: string }) {
@@ -52,333 +34,51 @@ export default function App() {
     return <AuthScreen />
   }
 
-  return <AppShell session={session} configured={configured} />
+  return <AuthedApp session={session} configured={configured} />
 }
 
-function AppShell({ session, configured }: { session: Session | null; configured: boolean }) {
+/** Post-login: resolve the shared space, then hand each feature its route.
+ *  The shell (header + feature nav) wraps everything. */
+function AuthedApp({ session, configured }: { session: Session | null; configured: boolean }) {
   const { spaceId, loading: spaceLoading, error: spaceError } = useSpace(session)
   const userId = session?.user.id ?? null
-  const store = useActivityStore(spaceId, userId)
 
-  // View state (not persisted).
-  const [screen, setScreen] = useState<Screen>('log')
-  const [filterCategoryId, setFilterCategoryId] = useState('all')
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<SortKey>('recent')
-  const [view, setView] = useState<ViewMode>('cards')
-  const [calendarMonth, setCalendarMonth] = useState<YearMonth>(currentYearMonth)
-
-  // Modal state.
-  const [modal, setModal] = useState<Modal>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<EntryDraft>(emptyDraft)
-  // Set when the entry modal was opened by checking off a wishlist item; on a
-  // successful save we link that item to the new entry (marking it done).
-  const [pendingWishId, setPendingWishId] = useState<string | null>(null)
-  // Entry whose repeat modal is open.
-  const [repeatEntryId, setRepeatEntryId] = useState<string | null>(null)
-
-  const rows = useMemo(() => {
-    const joined = joinRows(store.entries, store.activities, store.categories, store.profiles, userId, store.repeats)
-    return filterAndSort(joined, filterCategoryId, sort, search)
-  }, [store.entries, store.activities, store.categories, store.profiles, store.repeats, filterCategoryId, sort, search, userId])
-
-  const wishlistItems = useMemo(() => sortWishlist(store.wishlist), [store.wishlist])
-
-  const stats = useMemo(() => computeStats(store.entries, store.repeats), [store.entries, store.repeats])
-
-  // Logged-entry pins plus open-wish ⭐ pins, drawn on the same map.
-  const markers = useMemo(
-    () => [
-      ...mapMarkers(store.entries, store.activities, store.categories),
-      ...wishMarkers(store.wishlist),
-    ],
-    [store.entries, store.activities, store.categories, store.wishlist],
-  )
-
-  const calendarGrid = useMemo(
-    () => calendarDays(calendarMonth, store.entries, store.repeats, store.activities, store.categories, filterCategoryId),
-    [calendarMonth, store.entries, store.repeats, store.activities, store.categories, filterCategoryId],
-  )
-
-  const openAdd = (date?: string) => {
-    setEditingId(null)
-    setPendingWishId(null)
-    setDraft(date ? { ...emptyDraft(), date } : emptyDraft())
-    setModal('entry')
-  }
-
-  const openEdit = (id: string) => {
-    const entry = store.entries.find((e) => e.id === id)
-    if (!entry) return
-    const activity = store.activities.find((a) => a.id === entry.activityId)
-    setEditingId(id)
-    setPendingWishId(null)
-    setDraft({
-      categoryId: activity ? activity.categoryId : '',
-      activityId: entry.activityId,
-      title: entry.title,
-      date: entry.date,
-      description: entry.description,
-      rating: entry.rating,
-      address: entry.address,
-      hideFromMap: entry.hideFromMap,
-    })
-    setModal('entry')
-  }
-
-  // Checking off a wish opens a new-entry modal prefilled with the wish text;
-  // saving will link the wish to the entry (see saveEntry).
-  const checkWish = (item: WishlistItem) => {
-    setEditingId(null)
-    setPendingWishId(item.id)
-    // Carry the wish's place into the entry; it re-geocodes on save.
-    setDraft({ ...emptyDraft(), title: item.text, address: item.address })
-    setModal('entry')
-  }
-
-  const openRepeat = (id: string) => {
-    setRepeatEntryId(id)
-    setModal('repeat')
-  }
-
-  const closeModal = () => {
-    setModal(null)
-    setEditingId(null)
-    setPendingWishId(null)
-    setRepeatEntryId(null)
-  }
-
-  const saveEntry = async () => {
-    if (!draft.activityId || !draft.rating) return
-    try {
-      if (editingId) {
-        await store.updateEntry(editingId, draft)
-      } else {
-        const newEntryId = await store.addEntry(draft)
-        if (pendingWishId) await store.linkWishlistItem(pendingWishId, newEntryId)
-      }
-      closeModal()
-    } catch {
-      // Write failed — keep the modal open; store.error shows the reason.
-    }
-  }
-
-  const confirmDeleteEntry = () =>
-    window.confirm('Delete this entry? Any repeats logged on it are deleted too.')
-
-  const deleteRow = (id: string) => {
-    if (!confirmDeleteEntry()) return
-    store.deleteEntry(id).catch(() => {
-      // Failure surfaces via the store.error banner.
-    })
-  }
-
-  const deleteEditingEntry = async () => {
-    if (!editingId) {
-      closeModal()
-      return
-    }
-    if (!confirmDeleteEntry()) return
-    try {
-      await store.deleteEntry(editingId)
-      closeModal()
-    } catch {
-      // Keep the modal open on failure.
-    }
-  }
-
-  // Gate the dashboard on the space + first data load (live mode only).
   if (configured && spaceError) {
     return <Splash text={`Couldn't load your space: ${spaceError}`} />
   }
-  if (configured && (spaceLoading || store.loading)) {
+  if (configured && spaceLoading) {
     return <Splash text="Loading your space…" />
   }
 
+  // All four doing-stuff routes render the same component (same position in
+  // the tree), so its store — and realtime channel — survive screen switches.
+  const doingStuff = (screen: Screen) => (
+    <DoingStuffPage screen={screen} spaceId={spaceId} userId={userId} configured={configured} />
+  )
+
   return (
-    <>
-      {supabase && (
-        <Button
-          variant="white"
-          onClick={() => supabase!.auth.signOut()}
-          fz={12}
-          fw={600}
-          radius={9}
-          px={12}
-          py={7}
-          c={colors.muted}
-          style={{ position: 'fixed', top: 16, right: 16, zIndex: 50, border: `1px solid ${colors.cardBorder}` }}
-        >
-          Sign out
-        </Button>
-      )}
-
-      {store.error && (
-        <Box
-          c="oklch(0.45 0.14 25)"
-          px={14}
-          py={9}
-          onClick={store.clearError}
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 60,
-            maxWidth: 'min(92vw, 520px)',
-            border: `1px solid ${colors.cardBorder}`,
-            borderRadius: 9,
-            background: 'oklch(0.96 0.04 25)',
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: fonts.sans,
-            boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
-            cursor: 'pointer',
-          }}
-        >
-          {store.error}
-          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
-        </Box>
-      )}
-
-      {store.notice && (
-        <Box
-          c="oklch(0.42 0.07 75)"
-          px={14}
-          py={9}
-          onClick={store.clearNotice}
-          style={{
-            position: 'fixed',
-            top: store.error ? 64 : 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 60,
-            maxWidth: 'min(92vw, 520px)',
-            border: '1px solid rgba(160,120,40,0.35)',
-            borderRadius: 9,
-            background: 'oklch(0.96 0.05 85)',
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: fonts.sans,
-            boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
-            cursor: 'pointer',
-          }}
-        >
-          {store.notice}
-          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
-        </Box>
-      )}
-
-      {screen === 'wishlist' ? (
-        <Wishlist
-          title={APP_TITLE}
-          items={wishlistItems}
-          screen={screen}
-          onScreenChange={setScreen}
-          onNewEntry={openAdd}
-          onManage={() => setModal('manage')}
-          onCheck={checkWish}
-          onUncheck={store.unlinkWishlistItem}
-          onAdd={store.addWishlistItem}
-          onEdit={store.updateWishlistItem}
-          onSetAddress={store.setWishlistAddress}
-          onDelete={store.deleteWishlistItem}
-        />
-      ) : screen === 'map' ? (
-        <MapView
-          title={APP_TITLE}
-          home={store.home}
-          categories={store.categories}
-          markers={markers}
-          screen={screen}
-          onScreenChange={setScreen}
-          onNewEntry={openAdd}
-          onManage={() => setModal('manage')}
-          onEditEntry={openEdit}
-        />
-      ) : screen === 'calendar' ? (
-        <CalendarView
-          title={APP_TITLE}
-          categories={store.categories}
-          filterCategoryId={filterCategoryId}
-          onFilter={setFilterCategoryId}
-          days={calendarGrid}
-          month={calendarMonth}
-          onMonthChange={setCalendarMonth}
-          onToday={() => setCalendarMonth(currentYearMonth())}
-          screen={screen}
-          onScreenChange={setScreen}
-          onManage={() => setModal('manage')}
-          onNewEntry={openAdd}
-          onEditEntry={openEdit}
-        />
-      ) : (
-        <Dashboard
-          title={APP_TITLE}
-          subtitle={APP_SUBTITLE}
-          stats={stats}
-          categories={store.categories}
-          rows={rows}
-          screen={screen}
-          onScreenChange={setScreen}
-          filterCategoryId={filterCategoryId}
-          search={search}
-          sort={sort}
-          view={view}
-          onFilter={setFilterCategoryId}
-          onSearch={setSearch}
-          onSort={setSort}
-          onView={setView}
-          onAdd={openAdd}
-          onManage={() => setModal('manage')}
-          onEdit={openEdit}
-          onDelete={deleteRow}
-          onRepeat={openRepeat}
-        />
-      )}
-
-      <EntryModal
-        opened={modal === 'entry'}
-        draft={draft}
-        isEditing={editingId !== null}
-        categories={store.categories}
-        activities={store.activities}
-        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-        onSave={saveEntry}
-        onDelete={deleteEditingEntry}
-        onClose={closeModal}
-      />
-
-      {(() => {
-        const entry = repeatEntryId ? store.entries.find((e) => e.id === repeatEntryId) : null
-        const title = entry ? entry.title || store.activities.find((a) => a.id === entry.activityId)?.name || 'this outing' : ''
-        return (
-          <RepeatModal
-            opened={modal === 'repeat'}
-            entryTitle={title}
-            firstDate={entry ? entry.date : today()}
-            repeats={entry ? store.repeats.filter((r) => r.entryId === entry.id) : []}
-            onAdd={(date) => entry && store.addRepeat(entry.id, date).catch(() => {})}
-            onRemove={(repeatId) => store.deleteRepeat(repeatId).catch(() => {})}
-            onClose={closeModal}
+    <BrowserRouter>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={doingStuff('log')} />
+          <Route path="/wishlist" element={doingStuff('wishlist')} />
+          <Route path="/map" element={doingStuff('map')} />
+          <Route path="/calendar" element={doingStuff('calendar')} />
+          <Route
+            path="/movies"
+            element={<ComingSoon title="Movie tier list" blurb="Drag-and-drop movie rankings, coming soon." />}
           />
-        )
-      })()}
-
-      <ManageModal
-        opened={modal === 'manage'}
-        categories={store.categories}
-        activities={store.activities}
-        home={store.home}
-        onAddActivity={store.addActivity}
-        onDeleteActivity={store.deleteActivity}
-        onSetActivityEmoji={store.setActivityEmoji}
-        onAddCategory={store.addCategory}
-        onDeleteCategory={store.deleteCategory}
-        onSetHome={store.setHome}
-        onClose={closeModal}
-      />
-    </>
+          <Route
+            path="/tv"
+            element={<ComingSoon title="TV tier list" blurb="Drag-and-drop TV rankings, coming soon." />}
+          />
+          <Route
+            path="/french-toast"
+            element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AppLayout>
+    </BrowserRouter>
   )
 }

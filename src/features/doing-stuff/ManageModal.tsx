@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Box, Button, Group, Paper, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
-import type { Activity, Category, Home } from '../types'
-import { colors, fonts, palette, swatchFor } from '../theme'
-import { ModalShell } from './ModalShell'
+import type { Activity, Category, Home } from '../../types'
+import { colors, fonts, palette, swatchFor } from '../../theme'
+import { ModalShell } from '../../components/ModalShell'
 
 interface ManageModalProps {
   opened: boolean

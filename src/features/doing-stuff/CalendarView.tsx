@@ -1,15 +1,13 @@
 import { useState } from 'react'
-import { Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
-import type { Category, Screen } from '../types'
-import type { CalendarDay, CalendarMark } from '../data/derive'
-import type { YearMonth } from '../lib/format'
-import { ACCENT, colors, fonts, swatchFor } from '../theme'
-import { monthLabel, shiftMonth } from '../lib/format'
-import { HeaderActions } from './HeaderActions'
-import { Pill } from './Pill'
+import { Box, Button, Group, Text, UnstyledButton } from '@mantine/core'
+import type { Category } from '../../types'
+import type { CalendarDay, CalendarMark } from './derive'
+import type { YearMonth } from '../../lib/format'
+import { ACCENT, colors, fonts, swatchFor } from '../../theme'
+import { monthLabel, shiftMonth } from '../../lib/format'
+import { Pill } from '../../components/Pill'
 
 interface CalendarViewProps {
-  title: string
   categories: Category[]
   filterCategoryId: string
   onFilter: (categoryId: string) => void
@@ -19,9 +17,6 @@ interface CalendarViewProps {
   onMonthChange: (month: YearMonth) => void
   /** Jump back to the month containing today. */
   onToday: () => void
-  screen: Screen
-  onScreenChange: (screen: Screen) => void
-  onManage: () => void
   /** Open the new-entry modal; an ISO date prefills it (used by empty days). */
   onNewEntry: (date?: string) => void
   /** Open the entry modal for the entry behind a chip. */
@@ -34,7 +29,6 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const CHIP_CAP = 3
 
 export function CalendarView({
-  title,
   categories,
   filterCategoryId,
   onFilter,
@@ -42,9 +36,6 @@ export function CalendarView({
   month,
   onMonthChange,
   onToday,
-  screen,
-  onScreenChange,
-  onManage,
   onNewEntry,
   onEditEntry,
 }: CalendarViewProps) {
@@ -59,126 +50,107 @@ export function CalendarView({
     })
 
   return (
-    <Box mih="100vh" bg={colors.pageBg} c={colors.ink} pt={48} pb={80} px={24} style={{ fontFamily: fonts.sans }}>
-      <Box maw={960} mx="auto">
-        {/* HEADER */}
-        <Group
-          justify="space-between"
-          align="flex-end"
-          gap={24}
-          wrap="wrap"
-          pb={22}
-          style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
-        >
-          <Box>
-            <Title order={1} fz={42} lh={1} style={{ letterSpacing: '-0.01em' }}>
-              {title}
-            </Title>
-          </Box>
-          <HeaderActions screen={screen} onScreenChange={onScreenChange} onManage={onManage} onAdd={() => onNewEntry()} />
-        </Group>
-
-        {/* MONTH NAV + CATEGORY FILTER */}
-        <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
-          <Group gap={10} align="center">
-            <NavArrow label="Previous month" onClick={() => onMonthChange(shiftMonth(month, -1))}>
-              ‹
-            </NavArrow>
-            <Text fz={20} miw={170} ta="center" style={{ fontFamily: fonts.serif }}>
-              {monthLabel(month)}
-            </Text>
-            <NavArrow label="Next month" onClick={() => onMonthChange(shiftMonth(month, 1))}>
-              ›
-            </NavArrow>
+    <>
+      {/* MONTH NAV + CATEGORY FILTER */}
+      <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
+        <Group gap={10} align="center">
+          <NavArrow label="Previous month" onClick={() => onMonthChange(shiftMonth(month, -1))}>
+            ‹
+          </NavArrow>
+          <Text fz={20} miw={170} ta="center" style={{ fontFamily: fonts.serif }}>
+            {monthLabel(month)}
+          </Text>
+          <NavArrow label="Next month" onClick={() => onMonthChange(shiftMonth(month, 1))}>
+            ›
+          </NavArrow>
+          <Button
+            variant="default"
+            onClick={onToday}
+            radius={9}
+            ml={6}
+            styles={{ root: { background: 'transparent', border: '1px solid rgba(120,100,80,0.3)', color: '#5c574e' } }}
+          >
+            Today
+          </Button>
+          {expanded.size > 0 && (
             <Button
               variant="default"
-              onClick={onToday}
+              onClick={() => setExpanded(new Set())}
               radius={9}
-              ml={6}
               styles={{ root: { background: 'transparent', border: '1px solid rgba(120,100,80,0.3)', color: '#5c574e' } }}
             >
-              Today
+              Reset view
             </Button>
-            {expanded.size > 0 && (
-              <Button
-                variant="default"
-                onClick={() => setExpanded(new Set())}
-                radius={9}
-                styles={{ root: { background: 'transparent', border: '1px solid rgba(120,100,80,0.3)', color: '#5c574e' } }}
-              >
-                Reset view
-              </Button>
-            )}
-          </Group>
-          <Group gap={8} wrap="wrap">
-            <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
-            {categories.map((category) => {
-              const swatch = swatchFor(category.colorIndex)
-              const active = filterCategoryId === category.id
-              return (
-                <Pill
-                  key={category.id}
-                  label={category.name}
-                  active={active}
-                  activeBg={swatch.color}
-                  dotColor={active ? '#fff' : swatch.color}
-                  onClick={() => onFilter(category.id)}
-                />
-              )
-            })}
-          </Group>
+          )}
         </Group>
+        <Group gap={8} wrap="wrap">
+          <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
+          {categories.map((category) => {
+            const swatch = swatchFor(category.colorIndex)
+            const active = filterCategoryId === category.id
+            return (
+              <Pill
+                key={category.id}
+                label={category.name}
+                active={active}
+                activeBg={swatch.color}
+                dotColor={active ? '#fff' : swatch.color}
+                onClick={() => onFilter(category.id)}
+              />
+            )
+          })}
+        </Group>
+      </Group>
 
-        {/* GRID */}
-        <Box
-          mt={20}
-          bg="#fff"
-          style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 16, overflow: 'hidden' }}
-        >
-          {/* Seven day columns need real width; scroll sideways on phones
-              rather than crushing the cells. */}
-          <Box style={{ overflowX: 'auto' }}>
-            <Box miw={560}>
-              {/* Weekday header */}
-              <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
-                {WEEKDAYS.map((label) => (
-                  <Box
-                    key={label}
-                    py={10}
-                    ta="center"
-                    c={colors.muted}
-                    style={{
-                      fontFamily: fonts.mono,
-                      fontSize: 10,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      borderBottom: '1px dotted rgba(120,100,80,0.3)',
-                    }}
-                  >
-                    {label}
-                  </Box>
-                ))}
-              </Box>
-              {/* Day cells */}
-              <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
-                {days.map((day, i) => (
-                  <DayCell
-                    key={day.date}
-                    day={day}
-                    expanded={expanded.has(day.date)}
-                    onExpand={() => toggleExpand(day.date)}
-                    onAdd={() => onNewEntry(day.date)}
-                    onEditEntry={onEditEntry}
-                    // Top-row cells need no top border (the weekday header draws it).
-                    topBorder={i >= 7}
-                  />
-                ))}
-              </Box>
+      {/* GRID */}
+      <Box
+        mt={20}
+        bg="#fff"
+        style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 16, overflow: 'hidden' }}
+      >
+        {/* Seven day columns need real width; scroll sideways on phones
+            rather than crushing the cells. */}
+        <Box style={{ overflowX: 'auto' }}>
+          <Box miw={560}>
+            {/* Weekday header */}
+            <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+              {WEEKDAYS.map((label) => (
+                <Box
+                  key={label}
+                  py={10}
+                  ta="center"
+                  c={colors.muted}
+                  style={{
+                    fontFamily: fonts.mono,
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    borderBottom: '1px dotted rgba(120,100,80,0.3)',
+                  }}
+                >
+                  {label}
+                </Box>
+              ))}
+            </Box>
+            {/* Day cells */}
+            <Box display="grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+              {days.map((day, i) => (
+                <DayCell
+                  key={day.date}
+                  day={day}
+                  expanded={expanded.has(day.date)}
+                  onExpand={() => toggleExpand(day.date)}
+                  onAdd={() => onNewEntry(day.date)}
+                  onEditEntry={onEditEntry}
+                  // Top-row cells need no top border (the weekday header draws it).
+                  topBorder={i >= 7}
+                />
+              ))}
             </Box>
           </Box>
         </Box>
       </Box>
-    </Box>
+    </>
   )
 }
 

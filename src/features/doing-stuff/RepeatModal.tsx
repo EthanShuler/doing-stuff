@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
-import type { Repeat } from '../types'
-import { colors, DANGER, fonts } from '../theme'
-import { formatDate, today } from '../lib/format'
-import { ModalShell } from './ModalShell'
+import type { Repeat } from '../../types'
+import { colors, DANGER, fonts } from '../../theme'
+import { formatDate, today } from '../../lib/format'
+import { ModalShell } from '../../components/ModalShell'
 
 interface RepeatModalProps {
   opened: boolean

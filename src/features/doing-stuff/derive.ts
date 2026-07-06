@@ -1,7 +1,7 @@
-import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem } from '../types'
-import type { YearMonth } from '../lib/format'
-import { ACCENT, FALLBACK_COLOR, swatchFor } from '../theme'
-import { currentMonthPrefix, isoDate, today } from '../lib/format'
+import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem } from '../../types'
+import type { YearMonth } from '../../lib/format'
+import { ACCENT, FALLBACK_COLOR, swatchFor } from '../../theme'
+import { currentMonthPrefix, isoDate, today } from '../../lib/format'
 
 /** An entry joined with its activity + category, ready for display. */
 export interface DisplayRow {

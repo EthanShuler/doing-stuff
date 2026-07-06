@@ -4,8 +4,15 @@ Guidance for working in this repo. Read this before making changes.
 
 ## What this is
 
-**Doing Stuff** — a shared activity tracker for logging things done together in a
-new city. The domain model:
+**cajubinile.com** — a shared personal site for two people, split into features
+behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
+Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
+`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, and
+`/french-toast` are placeholder pages for features not built yet (movie/TV
+drag-n-drop tier lists, a french toast ranking).
+
+**Doing Stuff** — the landing feature — is a shared activity tracker for logging
+things done together in a new city. The domain model:
 
 - **Category** (e.g. Outdoor, City, Brain) — has a name and a color.
 - **Activity** belongs to a category (e.g. Outdoor → Park, Swimming) and has an
@@ -21,11 +28,13 @@ new city. The domain model:
   the wish (DB `on delete set null`, mirrored in the store).
 - **Home** — a per-space address (on the `spaces` row) that centers the map.
 
-Four screens behind a header toggle, no router: **Log** (dashboard: stats,
-category filter, fuzzy title search, cards/table views, sort), **Wishlist**,
-**Map** (Leaflet; emoji pins for entries, ⭐ for open wishes, 🏠 for home, with
-its own category/wishlist filter), and **Calendar** (month grid of entries +
-repeats). Entry editing, repeats, and category/activity/home management happen
+Doing Stuff has four screens (routes) behind an in-feature toggle: **Log**
+(dashboard: stats, category filter, fuzzy title search, cards/table views,
+sort), **Wishlist**, **Map** (Leaflet; emoji pins for entries, ⭐ for open
+wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
+(month grid of entries + repeats). All four routes render the same
+`DoingStuffPage` component, so its store (and realtime channel) survives screen
+switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
@@ -33,7 +42,10 @@ paper), ported from the Claude Design "Compass" direction.
 
 ## Tech stack
 
-- **Vite + React 18 + TypeScript**, SPA.
+- **Vite + React 19 + TypeScript**, SPA.
+- **react-router v7 in plain library mode** (`BrowserRouter` + `Routes` from
+  `react-router`) — no loaders, no framework mode. Cloudflare Pages serves
+  `index.html` as the SPA fallback, so deep links work with no extra config.
 - **Mantine v8** (`@mantine/core`) for UI components. The earthy look lives in
   two files: `src/theme.ts` (raw palette, fonts, category swatches — the source
   of truth) and `src/mantineTheme.ts` (translates it into a Mantine theme so
@@ -151,43 +163,57 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 ```
 src/
-  App.tsx                  gate (auth) → AppShell; owns screen + modal state
+  App.tsx                  gate (auth → space) → BrowserRouter → AppLayout → routes
   types.ts                 domain types (mirror DB columns)
   theme.ts                 earthy palette, fonts, shared colors, swatchFor()
   mantineTheme.ts          Mantine theme override mirroring theme.ts
+  layout/
+    AppLayout.tsx          Mantine AppShell: brand, feature nav, sign-out; mobile burger
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     geocode.ts             Nominatim address → lat/lng (on save only)
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
     database.types.ts      typed schema (regenerate with supabase gen types)
-  data/
-    useActivityStore.ts    data seam: Supabase CRUD (or in-memory seed fallback)
+  data/                    shared (cross-feature) hooks
     useSession.ts          Supabase auth session hook
     useSpace.ts            resolves/creates the active space after login
-    derive.ts              pure join / filter / sort / stats / markers / calendar
-  components/
+  components/              shared UI
     AuthScreen.tsx         login / sign-up (no-op without keys)
-    Dashboard.tsx          Log screen: stats, controls, cards/table, empty state
-    Wishlist.tsx           wishlist screen (add / edit / place / check off)
-    MapView.tsx            Leaflet map with emoji pins + map-local filter
-    CalendarView.tsx       month grid of entries + repeats
-    EntryModal.tsx         new / edit entry (category→activity dropdowns)
-    RepeatModal.tsx        log / remove repeats of an entry
-    ManageModal.tsx        categories & activities editor + home base
+    ComingSoon.tsx         placeholder page for unbuilt features
     ModalShell.tsx         shared Mantine modal chrome
-    HeaderActions.tsx      screen toggle + Manage / New entry buttons
-    ScreenToggle.tsx       Log / Wishlist / Map / Calendar switcher
+    Pill.tsx               category filter pill
     Stars.tsx              read-only rating display
+  features/
+    doing-stuff/           the activity tracker (landing feature)
+      DoingStuffPage.tsx   owns the store, modal state, derive wiring, control bar
+      useActivityStore.ts  data seam: Supabase CRUD (or in-memory seed fallback)
+      derive.ts            pure join / filter / sort / stats / markers / calendar
+      derive.test.ts       vitest coverage for derive.ts
+      Dashboard.tsx        Log screen: stats, controls, cards/table, empty state
+      Wishlist.tsx         wishlist screen (add / edit / place / check off)
+      MapView.tsx          Leaflet map with emoji pins + map-local filter
+      CalendarView.tsx     month grid of entries + repeats
+      EntryModal.tsx       new / edit entry (category→activity dropdowns)
+      RepeatModal.tsx      log / remove repeats of an entry
+      ManageModal.tsx      categories & activities editor + home base
+      HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
+      ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
 supabase/
   schema.sql               tables + RLS + grants
 ```
 
+New features get their own `src/features/<name>/` directory with their own
+store hook; only truly cross-feature code goes in `src/components/`, `src/data/`,
+and `src/lib/`.
+
 ## Conventions & where logic lives
 
-- **Keep data-shaping pure and in `src/data/derive.ts`.** Joining entries to their
-  activity/category, filtering, sorting, stats, map markers, and the calendar
-  grid all live there as plain functions with no React. `App.tsx` wires them via
-  `useMemo`. Add new filter/sort/stat logic here, not inside components.
+- **Keep data-shaping pure and in `src/features/doing-stuff/derive.ts`.** Joining
+  entries to their activity/category, filtering, sorting, stats, map markers, and
+  the calendar grid all live there as plain functions with no React.
+  `DoingStuffPage.tsx` wires them via `useMemo`. Add new filter/sort/stat logic
+  here, not inside components. Future features should follow the same pattern
+  (a pure `derive.ts` with vitest coverage next to it).
 - **Deletes cascade in the store**, mirroring the DB's `on delete cascade`:
   deleting an activity drops its entries; deleting a category drops its
   activities and their entries; deleting an entry drops its repeats and reopens

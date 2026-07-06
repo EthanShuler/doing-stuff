@@ -11,9 +11,9 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core'
-import type { Activity, Category, EntryDraft } from '../types'
-import { ACCENT, colors, DANGER, fonts } from '../theme'
-import { ModalShell } from './ModalShell'
+import type { Activity, Category, EntryDraft } from '../../types'
+import { ACCENT, colors, DANGER, fonts } from '../../theme'
+import { ModalShell } from '../../components/ModalShell'
 
 interface EntryModalProps {
   opened: boolean

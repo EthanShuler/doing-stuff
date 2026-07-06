@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../types'
-import { supabase } from '../lib/supabase'
-import { today } from '../lib/format'
-import { geocode } from '../lib/geocode'
+import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../../types'
+import { supabase } from '../../lib/supabase'
+import { today } from '../../lib/format'
+import { geocode } from '../../lib/geocode'
 
 // The app's single source of domain data (categories / activities / entries).
 //
