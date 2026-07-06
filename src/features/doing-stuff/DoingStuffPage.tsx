@@ -241,15 +241,18 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
       )}
 
       <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        {/* The map gets a wider canvas than the reading-width screens. */}
-        <Box maw={screen === 'map' ? 1100 : 960} mx="auto">
+        {/* The control bar keeps a constant width so the nav doesn't shift
+            between screens; only the content below may widen (the map). */}
+        <Box maw={960} mx="auto">
           <HeaderActions
             screen={screen}
             onScreenChange={setScreen}
             onManage={() => setModal('manage')}
             onAdd={() => openAdd()}
           />
+        </Box>
 
+        <Box maw={screen === 'map' ? 1100 : 960} mx="auto">
           {screen === 'wishlist' ? (
             <Wishlist
               items={wishlistItems}
