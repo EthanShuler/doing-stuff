@@ -13,6 +13,11 @@ const FEATURES = [
   { label: 'French Toast', path: '/french-toast', matches: ['/french-toast'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
+  { label: 'Board Games', path: '/board-games', matches: ['/board-games'] },
+  { label: 'Ice Cream', path: '/ice-cream', matches: ['/ice-cream'] },
+  { label: 'Books', path: '/books', matches: ['/books'] },
+  { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
+  { label: 'Cats', path: '/cats', matches: ['/cats'] },
 ]
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.

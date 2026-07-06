@@ -1,14 +1,7 @@
 - heat map option
 - movie + tv tier lists -> symbol when we agree on tier
-- movie + tv watchlist
-- french toast blog
-- national park tracker
-- spoon map
-- games
 - ice cream
   - local flavors, brands, shops
   - favorite pints
   - where to buy them
-- cat photo wall
-- books tier list
-- recipes
+- TMDB poster lookup
