@@ -11,6 +11,8 @@ const FEATURES = [
   { label: 'Movies', path: '/movies', matches: ['/movies'] },
   { label: 'TV', path: '/tv', matches: ['/tv'] },
   { label: 'French Toast', path: '/french-toast', matches: ['/french-toast'] },
+  { label: 'Parks', path: '/parks', matches: ['/parks'] },
+  { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
 ]
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.

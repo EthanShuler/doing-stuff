@@ -7,9 +7,12 @@ Guidance for working in this repo. Read this before making changes.
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
-`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, and
-`/french-toast` are placeholder pages for features not built yet (movie/TV
-drag-n-drop tier lists, a french toast ranking).
+`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`,
+`/french-toast`, `/parks`, and `/spoons` are placeholder pages for features not
+built yet (movie/TV drag-n-drop tier lists, a french toast ranking, a
+63-national-parks visit tracker, a souvenir-spoon collection map). All features
+share the one space — new tables follow the same `space_id` + `is_space_member()`
+RLS pattern.
 
 **Doing Stuff** — the landing feature — is a shared activity tracker for logging
 things done together in a new city. The domain model:

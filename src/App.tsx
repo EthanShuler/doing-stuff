@@ -76,6 +76,14 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/french-toast"
             element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}
           />
+          <Route
+            path="/parks"
+            element={<ComingSoon title="National parks" blurb="Tracking the 63 together, coming soon." />}
+          />
+          <Route
+            path="/spoons"
+            element={<ComingSoon title="Spoon map" blurb="The souvenir spoon collection, mapped. Coming soon." />}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>
