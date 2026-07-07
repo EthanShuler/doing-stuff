@@ -86,6 +86,11 @@ paper), ported from the Claude Design "Compass" direction.
   the browser **on save only**, never per keystroke — see the rate-policy notes
   in `src/lib/geocode.ts`. Coords are stored on the row; the map never geocodes
   at render time.
+- **TMDB** for movie/TV title + poster lookup in the tier-list item modal
+  (`src/lib/tmdb.ts`, keyed by `VITE_TMDB_API_KEY` — a public browser key).
+  Debounced autocomplete; picking a suggestion just fills the title and poster
+  URL fields, so the stored rows stay plain text/URLs with no TMDB coupling.
+  Missing key = no suggestions, hand-entry still works.
 - **Supabase** (`@supabase/supabase-js`) — Postgres + Auth, called directly from
   the browser. Protected by Row Level Security, not by a server. **Realtime**
   (`postgres_changes`) streams the partner's edits into an open tab; the space
@@ -206,6 +211,7 @@ src/
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     geocode.ts             Nominatim address → lat/lng (on save only)
+    tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
     database.types.ts      typed schema (regenerate with supabase gen types)
   data/                    shared (cross-feature) hooks
