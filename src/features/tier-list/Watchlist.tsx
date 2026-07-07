@@ -2,12 +2,16 @@ import { useState } from 'react'
 import { ActionIcon, Box, Checkbox, Group, Paper, Text } from '@mantine/core'
 import type { TierKind, WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
+import { formatDate } from '../../lib/format'
 
 const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
 
 interface WatchlistProps {
   items: WatchlistItem[]
   kind: TierKind
+  /** Watched date per TIER item id — a checked wish looks its own up via
+   *  `tierItemId` (the wish row has no date; the tier item carries it). */
+  watchedDates: ReadonlyMap<string, string | null>
   /** Check off an open item — creates the tier item and drops it on the board. */
   onCheck: (item: WatchlistItem) => void
   /** Reopen a checked item (the tier item it made stays on the board). */
@@ -53,7 +57,7 @@ function Thumb({ item }: { item: WatchlistItem }) {
 
 /** The shared "want to watch" list for one kind. Checking an item off promotes
  *  it into the tier pool (the page owns that action + the add/edit modal). */
-export function Watchlist({ items, kind, onCheck, onUncheck, onEdit, onDelete }: WatchlistProps) {
+export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdit, onDelete }: WatchlistProps) {
   const noun = KIND_NOUN[kind]
 
   if (items.length === 0) {
@@ -79,6 +83,7 @@ export function Watchlist({ items, kind, onCheck, onUncheck, onEdit, onDelete }:
     <Box mt={24} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {items.map((item) => {
         const done = item.tierItemId !== null
+        const watchedOn = item.tierItemId ? watchedDates.get(item.tierItemId) : null
         return (
           <Paper
             key={item.id}
@@ -114,7 +119,9 @@ export function Watchlist({ items, kind, onCheck, onUncheck, onEdit, onDelete }:
                 </Text>
                 {done && (
                   <Text fz={12} c={colors.muted} mt={2} style={{ fontFamily: fonts.sans }}>
-                    On your tier board — go rank it.
+                    {watchedOn
+                      ? `Watched ${formatDate(watchedOn)} — on your tier board, go rank it.`
+                      : 'On your tier board — go rank it.'}
                   </Text>
                 )}
               </Box>

@@ -95,6 +95,8 @@ export interface TierItem {
   title: string
   /** Poster image URL, pasted by hand. '' = none (card shows a fallback). */
   imageUrl: string
+  /** ISO date ("YYYY-MM-DD") we finished watching it; null when unknown (legacy rows). */
+  watchedOn: string | null
   /** auth.users id of the member who added it (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp; orders the unranked shelf. */

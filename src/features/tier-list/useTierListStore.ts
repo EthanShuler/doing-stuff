@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { Profile, Tier, TierItem, TierKind, TierPlacement, WatchlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { today } from '../../lib/format'
 import { renormalizedPositions } from './derive'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
@@ -32,16 +33,16 @@ function seed(): Snapshot {
       { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
     ],
     items: [
-      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
-      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
-      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
-      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
-      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
-      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
-      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
-      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', watchedOn: '2026-06-01', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
+      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', watchedOn: '2026-06-02', createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', watchedOn: null, createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
+      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', watchedOn: '2026-06-14', createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
+      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', watchedOn: null, createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', watchedOn: '2026-06-20', createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
+      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', watchedOn: '2026-06-08', createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
+      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', watchedOn: null, createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
+      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', watchedOn: '2026-06-15', createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
+      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', watchedOn: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few items stay unranked to exercise the shelf.
@@ -74,6 +75,7 @@ type TierItemRow = {
   kind: string
   title: string
   image_url: string | null
+  watched_on: string | null
   created_by: string | null
   created_at: string
 }
@@ -100,6 +102,7 @@ const toTierItem = (r: TierItemRow): TierItem => ({
   kind: r.kind as TierKind,
   title: r.title,
   imageUrl: r.image_url ?? '',
+  watchedOn: r.watched_on,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -121,7 +124,7 @@ const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
   createdAt: r.created_at,
 })
 
-const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,created_by,created_at'
+const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,watched_on,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const WATCHLIST_COLUMNS = 'id,kind,title,image_url,tier_item_id,created_by,created_at'
 
@@ -157,10 +160,11 @@ export interface TierListStore {
   error: string | null
   clearError: () => void
 
-  /** Add to the shared pool. Throws on failure (the modal stays open). */
-  addItem: (kind: TierKind, title: string, imageUrl: string) => Promise<void>
-  /** Edit a pool item's title/poster. Throws on failure. */
-  updateItem: (id: string, title: string, imageUrl: string) => Promise<void>
+  /** Add to the shared pool. `watchedOn` is an ISO date or null (= unknown).
+   *  Throws on failure (the modal stays open). */
+  addItem: (kind: TierKind, title: string, imageUrl: string, watchedOn: string | null) => Promise<void>
+  /** Edit a pool item's title/poster/watched date. Throws on failure. */
+  updateItem: (id: string, title: string, imageUrl: string, watchedOn: string | null) => Promise<void>
   /** Remove from the pool — deletes EVERYONE's placements of it. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
 
@@ -351,7 +355,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // --- Pool actions. These throw on failure so the item modal can stay open. ---
 
   const addItem = useCallback(
-    async (kind: TierKind, title: string, imageUrl: string) => {
+    async (kind: TierKind, title: string, imageUrl: string, watchedOn: string | null) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -359,7 +363,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('tier_items')
-          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image })
+          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, watched_on: watchedOn })
           .select(TIER_ITEM_COLUMNS)
           .single()
         if (err) {
@@ -371,14 +375,14 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       }
       setItems((prev) => [
         ...prev,
-        { id: nextId(), kind, title: trimmed, imageUrl: image, createdBy: selfId, createdAt: new Date().toISOString() },
+        { id: nextId(), kind, title: trimmed, imageUrl: image, watchedOn, createdBy: selfId, createdAt: new Date().toISOString() },
       ])
     },
     [spaceId, selfId],
   )
 
   const updateItem = useCallback(
-    async (id: string, title: string, imageUrl: string) => {
+    async (id: string, title: string, imageUrl: string, watchedOn: string | null) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -386,14 +390,14 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       if (supabase && spaceId) {
         const { error: err } = await supabase
           .from('tier_items')
-          .update({ title: trimmed, image_url: image })
+          .update({ title: trimmed, image_url: image, watched_on: watchedOn })
           .eq('id', id)
         if (err) {
           setError(err.message)
           throw err
         }
       }
-      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, title: trimmed, imageUrl: image } : x)))
+      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, title: trimmed, imageUrl: image, watchedOn } : x)))
     },
     [spaceId],
   )
@@ -573,10 +577,11 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       if (wi.tierItemId) return
       setError(null)
       if (supabase && spaceId) {
-        // 1. Create the tier item in the shared pool (lands on both unranked shelves).
+        // 1. Create the tier item in the shared pool (lands on both unranked
+        //    shelves). Checking off means "we just finished it" → watched today.
         const { data: itemData, error: itemErr } = await supabase
           .from('tier_items')
-          .insert({ space_id: spaceId, kind: wi.kind, title: wi.title, image_url: wi.imageUrl })
+          .insert({ space_id: spaceId, kind: wi.kind, title: wi.title, image_url: wi.imageUrl, watched_on: today() })
           .select(TIER_ITEM_COLUMNS)
           .single()
         if (itemErr) {
@@ -606,6 +611,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         kind: wi.kind,
         title: wi.title,
         imageUrl: wi.imageUrl,
+        watchedOn: today(),
         createdBy: selfId,
         createdAt: new Date().toISOString(),
       }

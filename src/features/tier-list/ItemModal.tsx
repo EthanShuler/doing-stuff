@@ -11,6 +11,9 @@ import { CardVisual } from './TierCard'
 export interface ItemDraft {
   title: string
   imageUrl: string
+  /** ISO date we finished watching it; '' = unknown. Board items only —
+   *  watchlist items aren't watched yet, so the field is hidden there. */
+  watchedOn: string
 }
 
 const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
@@ -100,6 +103,7 @@ export function ItemModal({
     kind,
     title: draft.title.trim() || 'Title…',
     imageUrl: draft.imageUrl.trim(),
+    watchedOn: null,
     createdBy: null,
     createdAt: '',
   }
@@ -198,8 +202,17 @@ export function ItemModal({
             value={draft.imageUrl}
             onChange={(e) => onChange({ imageUrl: e.currentTarget.value })}
             placeholder="Paste an image link (optional)"
-            mb={6}
+            mb={isWatchlist ? 6 : 18}
           />
+          {!isWatchlist && (
+            <TextInput
+              label="Watched on"
+              type="date"
+              value={draft.watchedOn}
+              onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
+              mb={6}
+            />
+          )}
           <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans }}>
             {hint}
             {isTmdbConfigured && ' Title search by TMDB (not endorsed or certified by TMDB).'}

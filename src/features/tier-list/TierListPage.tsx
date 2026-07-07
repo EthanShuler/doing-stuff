@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Box, Button, Center, Group, SegmentedControl, Text } from '@mantine/core'
 import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
 import { colors, fonts } from '../../theme'
+import { today } from '../../lib/format'
 import { useTierListStore } from './useTierListStore'
 import { deriveBoard } from './derive'
 import { TierBoard } from './TierBoard'
@@ -15,7 +16,13 @@ type Mode = 'board' | 'watchlist'
 
 const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
 
-const emptyDraft = (): ItemDraft => ({ title: '', imageUrl: '' })
+// A board add is "we just watched this" → default the date to today. Watchlist
+// items aren't watched yet, so their draft leaves it blank (and hides the field).
+const emptyDraft = (variant: Mode): ItemDraft => ({
+  title: '',
+  imageUrl: '',
+  watchedOn: variant === 'board' ? today() : '',
+})
 
 const segmentedStyles = {
   root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
@@ -52,7 +59,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const [modalOpen, setModalOpen] = useState(false)
   const [modalVariant, setModalVariant] = useState<Mode>('board')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<ItemDraft>(emptyDraft)
+  const [draft, setDraft] = useState<ItemDraft>(() => emptyDraft('board'))
 
   // The watchlist for this kind: open items first, then checked-off ones.
   const watchItems = useMemo(() => {
@@ -62,6 +69,13 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       rank(a) !== rank(b) ? rank(a) - rank(b) : a.createdAt < b.createdAt ? -1 : 1,
     )
   }, [store.watchlist, kind])
+
+  // Watched date per tier item id, for the checked-off watchlist rows (the
+  // wish itself has no date — the tier item it produced carries it).
+  const watchedDates = useMemo(
+    () => new Map(store.items.map((item) => [item.id, item.watchedOn])),
+    [store.items],
+  )
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
@@ -79,21 +93,21 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const openAdd = () => {
     setModalVariant(mode)
     setEditingId(null)
-    setDraft(emptyDraft())
+    setDraft(emptyDraft(mode))
     setModalOpen(true)
   }
 
   const openEdit = (item: TierItem) => {
     setModalVariant('board')
     setEditingId(item.id)
-    setDraft({ title: item.title, imageUrl: item.imageUrl })
+    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: item.watchedOn ?? '' })
     setModalOpen(true)
   }
 
   const openEditWatch = (item: WatchlistItem) => {
     setModalVariant('watchlist')
     setEditingId(item.id)
-    setDraft({ title: item.title, imageUrl: item.imageUrl })
+    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: '' })
     setModalOpen(true)
   }
 
@@ -109,8 +123,9 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl)
         else await store.addWatchlistItem(kind, draft.title, draft.imageUrl)
       } else {
-        if (editingId) await store.updateItem(editingId, draft.title, draft.imageUrl)
-        else await store.addItem(kind, draft.title, draft.imageUrl)
+        const watchedOn = draft.watchedOn || null
+        if (editingId) await store.updateItem(editingId, draft.title, draft.imageUrl, watchedOn)
+        else await store.addItem(kind, draft.title, draft.imageUrl, watchedOn)
       }
       closeModal()
     } catch {
@@ -224,6 +239,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
             <Watchlist
               items={watchItems}
               kind={kind}
+              watchedDates={watchedDates}
               onCheck={(item) => {
                 void store.checkOffWatchlistItem(item)
               }}

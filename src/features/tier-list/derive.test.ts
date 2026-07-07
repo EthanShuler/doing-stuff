@@ -21,6 +21,7 @@ function item(over: Partial<TierItem> = {}): TierItem {
     kind: 'movie',
     title: `Item ${seq}`,
     imageUrl: '',
+    watchedOn: null,
     createdBy: 'u1',
     createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
     ...over,

@@ -164,6 +164,9 @@ create table if not exists public.tier_items (
   title       text not null,
   -- Poster image, pasted as a URL ('' = none; the card shows a fallback).
   image_url   text not null default '',
+  -- The day we finished watching it (shared, like the item itself). Null =
+  -- unknown; the client defaults it to today on add / watchlist check-off.
+  watched_on  date,
   created_by  uuid references auth.users (id) default auth.uid(),
   created_at  timestamptz not null default now()
 );

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DndContext,
@@ -34,15 +34,6 @@ function DroppableRowArea({ container, items, children }: RowAreaProps) {
       </div>
     </SortableContext>
   )
-}
-
-// Tier rows are big targets, so trust the pointer while it's inside one; fall
-// back to closestCorners for keyboard drags and the gaps between rows. Plain
-// rectIntersection misfires here — the floating card often overlaps two
-// stacked rows at once.
-const collisionStrategy: CollisionDetection = (args) => {
-  const within = pointerWithin(args)
-  return within.length > 0 ? within : closestCorners(args)
 }
 
 function findItem(board: Board, id: string): TierItem | undefined {
@@ -82,6 +73,25 @@ export function TierBoard({
   const [activeId, setActiveId] = useState<string | null>(null)
   const board = dragBoard ?? storeBoard
 
+  // Tier rows are big targets, so trust the pointer while it's inside one.
+  // When it's in a gap between rows, STAY on the last row it was inside rather
+  // than guessing geometrically: the floating card usually overlaps two stacked
+  // rows at once, so a rect-based guess (closestCorners/rectIntersection) can
+  // flip between them as each onDragOver move re-wraps the rows — during
+  // viewport auto-scroll that becomes an unbounded setState → reflow →
+  // re-measure loop that hangs the tab (dnd-kit #1678/#1169). Keyboard drags
+  // have no pointer, so they keep the geometric fallback.
+  const lastOverId = useRef<string | null>(null)
+  const collisionStrategy: CollisionDetection = useCallback((args) => {
+    if (!args.pointerCoordinates) return closestCorners(args)
+    const within = pointerWithin(args)
+    if (within.length > 0) {
+      lastOverId.current = String(within[0].id)
+      return within
+    }
+    return lastOverId.current ? [{ id: lastOverId.current }] : []
+  }, [])
+
   const sensors = useSensors(
     // 4px of travel before a drag starts, so a plain click opens the editor.
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
@@ -93,11 +103,13 @@ export function TierBoard({
   const finishDrag = () => {
     setActiveId(null)
     setDragBoard(null)
+    lastOverId.current = null
   }
 
   const handleDragStart = (e: DragStartEvent) => {
     setActiveId(String(e.active.id))
     setDragBoard(storeBoard)
+    lastOverId.current = null
   }
 
   // Cross-container moves happen live, mid-drag, so the target row visibly

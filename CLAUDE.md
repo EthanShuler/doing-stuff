@@ -43,8 +43,10 @@ in modals.
 model splits pool from opinion:
 
 - **Tier item** (`tier_items`) — a movie or show in the space's **shared pool**
-  (a `kind 'movie'|'tv'` column, a title, a hand-pasted poster `image_url`).
-  Any member can add/edit/delete; deleting removes everyone's rankings of it.
+  (a `kind 'movie'|'tv'` column, a title, a hand-pasted poster `image_url`, and
+  a nullable `watched_on` date — when we finished it; defaults to today on a
+  board add or watchlist check-off). Any member can add/edit/delete; deleting
+  removes everyone's rankings of it.
 - **Tier placement** (`tier_placements`) — **one person's** ranking of one item:
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
