@@ -197,7 +197,7 @@ function CardGrid({
   onRepeat: (id: string) => void
 }) {
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={14} mt={20}>
+    <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing={14} mt={20}>
       {rows.map((row) => (
         <Paper
           key={row.id}

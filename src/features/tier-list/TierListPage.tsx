@@ -191,7 +191,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       )}
 
       <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        <Box maw={960} mx="auto">
+        <Box maw={1200} mx="auto">
           {/* Control bar, mirroring the doing-stuff HeaderActions chrome. */}
           <Group
             justify="space-between"

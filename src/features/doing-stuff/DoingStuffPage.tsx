@@ -243,7 +243,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
       <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
         {/* The control bar keeps a constant width so the nav doesn't shift
             between screens; only the content below may widen (the map). */}
-        <Box maw={960} mx="auto">
+        <Box maw={1200} mx="auto">
           <HeaderActions
             screen={screen}
             onScreenChange={setScreen}
@@ -252,7 +252,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
           />
         </Box>
 
-        <Box maw={screen === 'map' ? 1100 : 960} mx="auto">
+        <Box maw={screen === 'map' ? 1600 : 1200} mx="auto">
           {screen === 'wishlist' ? (
             <Wishlist
               items={wishlistItems}

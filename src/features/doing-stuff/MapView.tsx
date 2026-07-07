@@ -126,7 +126,7 @@ export function MapView({ home, categories, markers, onEditEntry }: MapViewProps
       <Box
         mt={20}
         style={{
-          height: 'min(70vh, 680px)',
+          height: 'min(75vh, 950px)',
           border: `1px solid ${colors.cardBorder}`,
           borderRadius: 16,
           overflow: 'hidden',
