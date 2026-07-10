@@ -31,21 +31,25 @@ function PlainRowArea({ children }: RowAreaProps) {
 }
 
 /**
- * The board itself: six tier rows + the unranked shelf. Purely presentational —
- * TierBoard injects sortable cards and droppable row areas for your own board;
- * the partner view renders it with plain cards and no drag wiring at all.
+ * The board itself: six tier rows + the unranked and unwatched shelves. Purely
+ * presentational — TierBoard injects sortable cards and droppable row areas for
+ * your own board; the partner view renders it with plain cards and no drag
+ * wiring at all.
  */
 export function BoardView({
   board,
   renderCard,
   RowArea = PlainRowArea,
   shelfHint,
+  unwatchedHint,
 }: {
   board: Board
   renderCard: (item: TierItem, container: ContainerId) => ReactNode
   RowArea?: ComponentType<RowAreaProps>
   /** Shown in the unranked shelf when it's empty. */
   shelfHint?: string
+  /** Shown in the unwatched shelf when it's empty. */
+  unwatchedHint?: string
 }) {
   return (
     <Box mt={20}>
@@ -85,24 +89,33 @@ export function BoardView({
         })}
       </Box>
 
-      {/* Unranked shelf: everything not yet placed by this viewer. */}
-      <Box
-        mt={16}
-        style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14, background: 'transparent' }}
-      >
-        <Text fz={11} fw={700} c={colors.muted} px={12} pt={10} tt="uppercase" style={{ letterSpacing: '0.08em' }}>
-          Unranked
-        </Text>
-        <RowArea container="unranked" items={board.unranked}>
-          {board.unranked.length === 0 && shelfHint ? (
-            <Text fz={13} c={colors.faint} p="24px 8px" style={{ fontFamily: fonts.sans }}>
-              {shelfHint}
-            </Text>
-          ) : (
-            board.unranked.map((item) => renderCard(item, 'unranked'))
-          )}
-        </RowArea>
-      </Box>
+      {/* The shelves: unranked (watched, not yet placed by this viewer) and
+          unwatched (no watched date on the shared item). */}
+      {(
+        [
+          { container: 'unranked', label: 'Unranked', items: board.unranked, hint: shelfHint },
+          { container: 'unwatched', label: 'Unwatched', items: board.unwatched, hint: unwatchedHint },
+        ] as const
+      ).map(({ container, label, items, hint }) => (
+        <Box
+          key={container}
+          mt={16}
+          style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14, background: 'transparent' }}
+        >
+          <Text fz={11} fw={700} c={colors.muted} px={12} pt={10} tt="uppercase" style={{ letterSpacing: '0.08em' }}>
+            {label}
+          </Text>
+          <RowArea container={container} items={items}>
+            {items.length === 0 && hint ? (
+              <Text fz={13} c={colors.faint} p="24px 8px" style={{ fontFamily: fonts.sans }}>
+                {hint}
+              </Text>
+            ) : (
+              items.map((item) => renderCard(item, container))
+            )}
+          </RowArea>
+        </Box>
+      ))}
     </Box>
   )
 }

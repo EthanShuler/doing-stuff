@@ -21,7 +21,9 @@ function item(over: Partial<TierItem> = {}): TierItem {
     kind: 'movie',
     title: `Item ${seq}`,
     imageUrl: '',
-    watchedOn: null,
+    // Watched by default — a null watchedOn diverts unplaced items to the
+    // unwatched shelf, which the shelf-split tests exercise explicitly.
+    watchedOn: '2026-06-15',
     createdBy: 'u1',
     createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
     ...over,
@@ -85,6 +87,28 @@ describe('deriveBoard', () => {
     expect(board.unranked.map((i) => i.id)).toEqual([older.id, newer.id])
   })
 
+  it('splits unplaced items between the shelves by watched date', () => {
+    const watched = item({ watchedOn: '2026-06-01' })
+    const undated = item({ watchedOn: null })
+    const board = deriveBoard([watched, undated], [], 'u1', 'movie')
+    expect(board.unranked).toEqual([watched])
+    expect(board.unwatched).toEqual([undated])
+  })
+
+  it('a placement wins over a missing watched date', () => {
+    const a = item({ watchedOn: null })
+    const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'B' })], 'u1', 'movie')
+    expect(board.tiers.B).toEqual([a])
+    expect(board.unwatched).toEqual([])
+  })
+
+  it('sorts the unwatched shelf by createdAt (oldest first)', () => {
+    const newer = item({ watchedOn: null, createdAt: '2026-06-02T00:00:00Z' })
+    const older = item({ watchedOn: null, createdAt: '2026-06-01T00:00:00Z' })
+    const board = deriveBoard([newer, older], [], 'u1', 'movie')
+    expect(board.unwatched.map((i) => i.id)).toEqual([older.id, newer.id])
+  })
+
   it('ignores placements whose item is gone', () => {
     const board = deriveBoard([], [placement({ itemId: 'ghost', tier: 'S' })], 'u1', 'movie')
     expect(board.tiers.S).toEqual([])
@@ -102,16 +126,19 @@ describe('deriveBoard', () => {
 describe('findContainer', () => {
   const a = item()
   const b = item()
-  const board = deriveBoard([a, b], [placement({ itemId: a.id, tier: 'C' })], 'u1', 'movie')
+  const c = item({ watchedOn: null })
+  const board = deriveBoard([a, b, c], [placement({ itemId: a.id, tier: 'C' })], 'u1', 'movie')
 
   it('resolves container ids to themselves', () => {
     expect(findContainer(board, 'C')).toBe('C')
     expect(findContainer(board, 'unranked')).toBe('unranked')
+    expect(findContainer(board, 'unwatched')).toBe('unwatched')
   })
 
   it('resolves a card id to its container', () => {
     expect(findContainer(board, a.id)).toBe('C')
     expect(findContainer(board, b.id)).toBe('unranked')
+    expect(findContainer(board, c.id)).toBe('unwatched')
   })
 
   it('returns undefined for unknown ids', () => {
@@ -123,8 +150,9 @@ describe('moveItem', () => {
   const a = item()
   const b = item()
   const c = item()
+  const d = item({ watchedOn: null })
   const board = deriveBoard(
-    [a, b, c],
+    [a, b, c, d],
     [
       placement({ itemId: a.id, tier: 'S', position: 1 }),
       placement({ itemId: b.id, tier: 'S', position: 2 }),
@@ -149,10 +177,23 @@ describe('moveItem', () => {
     expect(next.tiers.S.map((i) => i.id)).toEqual([b.id, a.id])
   })
 
+  it('moves out of the unwatched shelf into a tier', () => {
+    const next = moveItem(board, d.id, 'unwatched', 'S', 0)
+    expect(next.tiers.S.map((i) => i.id)).toEqual([d.id, a.id, b.id])
+    expect(next.unwatched).toEqual([])
+  })
+
+  it('moves onto the unwatched shelf', () => {
+    const next = moveItem(board, a.id, 'S', 'unwatched', 0)
+    expect(next.tiers.S.map((i) => i.id)).toEqual([b.id])
+    expect(next.unwatched.map((i) => i.id)).toEqual([a.id, d.id])
+  })
+
   it('never mutates the input board', () => {
     moveItem(board, a.id, 'S', 'unranked', 0)
     expect(board.tiers.S.map((i) => i.id)).toEqual([a.id, b.id])
     expect(board.unranked.map((i) => i.id)).toEqual([c.id])
+    expect(board.unwatched.map((i) => i.id)).toEqual([d.id])
   })
 })
 

@@ -11,8 +11,9 @@ import { CardVisual } from './TierCard'
 export interface ItemDraft {
   title: string
   imageUrl: string
-  /** ISO date we finished watching it; '' = unknown. Board items only —
-   *  watchlist items aren't watched yet, so the field is hidden there. */
+  /** ISO date we finished watching it; '' = not watched yet (the item sits on
+   *  the unwatched shelf until it's dated or dragged into a tier). Board items
+   *  only — watchlist items aren't watched yet, so the field is hidden there. */
   watchedOn: string
 }
 
@@ -93,7 +94,7 @@ export function ItemModal({
       : `Add a ${noun}`
   const hint = isWatchlist
     ? `Check it off later and it joins both of your unranked shelves.`
-    : `New ${noun}s land on both of your unranked shelves.`
+    : `New ${noun}s land on both of your unranked shelves — or unwatched, with no watched date.`
   const saveLabel = isEditing ? 'Save changes' : isWatchlist ? 'Add to watchlist' : `Add ${noun}`
   const deleteLabel = isWatchlist ? 'Remove from watchlist' : `Delete ${noun}`
 

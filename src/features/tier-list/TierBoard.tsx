@@ -37,7 +37,7 @@ function DroppableRowArea({ container, items, children }: RowAreaProps) {
 }
 
 function findItem(board: Board, id: string): TierItem | undefined {
-  for (const list of [...Object.values(board.tiers), board.unranked]) {
+  for (const list of [...Object.values(board.tiers), board.unranked, board.unwatched]) {
     const hit = list.find((item) => item.id === id)
     if (hit) return hit
   }
@@ -52,8 +52,11 @@ export function TierBoard({
   onPlace,
   onUnrank,
   onRenormalize,
+  onMarkWatched,
+  onMarkUnwatched,
   onCardClick,
   shelfHint,
+  unwatchedHint,
 }: {
   /** The viewer's board as derived from the store (the source of truth). */
   board: Board
@@ -63,8 +66,13 @@ export function TierBoard({
   onUnrank: (itemId: string) => void
   /** Float precision ran out in a tier — rewrite it at integer positions. */
   onRenormalize: (tier: Tier, orderedItemIds: string[]) => void
+  /** A card left the unwatched shelf — stamp the item's watched date. */
+  onMarkWatched: (itemId: string) => void
+  /** A card was dropped on the unwatched shelf — clear the watched date. */
+  onMarkUnwatched: (itemId: string) => void
   onCardClick: (item: TierItem) => void
   shelfHint?: string
+  unwatchedHint?: string
 }) {
   // While dragging, render a frozen local copy: onDragOver mutates it for the
   // cross-row preview, and realtime updates landing in the store can't yank
@@ -163,11 +171,25 @@ export function TierBoard({
       return
     }
 
+    // Shelf drops write no positions — they toggle placement / watched state.
+    // (Unwatched items are never placed, so leaving that shelf needs no unrank.)
+    const wasUnwatched = storeContainer === 'unwatched'
     if (container === 'unranked') {
-      if (storeContainer !== 'unranked') onUnrank(id)
+      if (wasUnwatched) onMarkWatched(id)
+      else if (storeContainer !== 'unranked') onUnrank(id)
       finishDrag()
       return
     }
+    if (container === 'unwatched') {
+      if (!wasUnwatched) {
+        if (storeContainer !== 'unranked') onUnrank(id)
+        onMarkUnwatched(id)
+      }
+      finishDrag()
+      return
+    }
+    // A tier drop out of the unwatched shelf means "we watched it" → today.
+    if (wasUnwatched) onMarkWatched(id)
 
     // Position between the settled neighbors' stored positions. The store's
     // optimistic update lands in the same synchronous handler as finishDrag,
@@ -197,6 +219,7 @@ export function TierBoard({
         board={board}
         RowArea={DroppableRowArea}
         shelfHint={shelfHint}
+        unwatchedHint={unwatchedHint}
         renderCard={(item: TierItem, _container: ContainerId) => (
           <SortableCard key={item.id} item={item} onClick={() => onCardClick(item)} />
         )}

@@ -260,6 +260,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 board={board}
                 renderCard={(item) => <CardVisual key={item.id} item={item} />}
                 shelfHint={`${partnerName} hasn't ranked everything yet.`}
+                unwatchedHint="Nothing waiting to be watched."
               />
             </>
           ) : (
@@ -275,13 +276,23 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               onRenormalize={(tier: Tier, orderedIds: string[]) => {
                 void store.placeTier(tier, orderedIds)
               }}
+              // Dragging out of the unwatched shelf means "we watched it" →
+              // stamp today on the shared item; dragging onto it clears the date.
+              onMarkWatched={(itemId: string) => {
+                void store.setWatchedOn(itemId, today())
+              }}
+              onMarkUnwatched={(itemId: string) => {
+                void store.setWatchedOn(itemId, null)
+              }}
               onCardClick={openEdit}
               shelfHint={
                 board.unranked.length === 0 &&
+                board.unwatched.length === 0 &&
                 Object.values(board.tiers).every((t) => t.length === 0)
                   ? `No ${noun}s yet — add one, or check something off your watchlist.`
                   : 'Everything is ranked. Nice.'
               }
+              unwatchedHint={`Drag a ${noun} here if you haven't actually watched it yet.`}
             />
           )}
         </Box>

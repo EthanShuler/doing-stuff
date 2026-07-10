@@ -51,7 +51,11 @@ model splits pool from opinion:
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
   to integers if float precision ever runs out). "Unranked" is the absence of a
-  placement row. RLS is split: members **read** everyone's placements but
+  placement row; an unplaced item with **no `watched_on` date** lands on a
+  second dashed **Unwatched** shelf instead (a placement wins over a missing
+  date). Dragging out of Unwatched stamps `watched_on` = today on the shared
+  item; dropping onto it unranks the card and clears the date. RLS is split:
+  members **read** everyone's placements but
   **write only their own** — the partner's board is read-only at the security
   boundary, not just in the UI.
 

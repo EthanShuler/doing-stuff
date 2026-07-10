@@ -45,7 +45,8 @@ function seed(): Snapshot {
       { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', watchedOn: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
-    // a few items stay unranked to exercise the shelf.
+    // a few items stay unranked — and some undated → unwatched — to exercise
+    // both shelves.
     placements: [
       { id: 'p1', itemId: 'm1', userId: 'u1', tier: 'S', position: 1 },
       { id: 'p2', itemId: 'm4', userId: 'u1', tier: 'S', position: 2 },
@@ -175,6 +176,9 @@ export interface TierListStore {
   unplaceItem: (itemId: string) => Promise<void>
   /** Rewrite one tier's ordering at integer positions (float-precision rescue). */
   placeTier: (tier: Tier, orderedItemIds: string[]) => Promise<void>
+  /** Set or clear a pool item's shared watched date (drag on/off the unwatched
+   *  shelf). Inline flow — records the error and resyncs instead of throwing. */
+  setWatchedOn: (itemId: string, watchedOn: string | null) => Promise<void>
 
   /** Add a "want to watch" item to the shared watchlist. Throws on failure. */
   addWatchlistItem: (kind: TierKind, title: string, imageUrl: string) => Promise<void>
@@ -505,6 +509,21 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     [spaceId, selfId, resync],
   )
 
+  const setWatchedOn = useCallback(
+    async (itemId: string, watchedOn: string | null) => {
+      setError(null)
+      // Optimistic: the card lands on its new shelf instantly.
+      setItems((prev) => prev.map((x) => (x.id === itemId ? { ...x, watchedOn } : x)))
+      if (!supabase || !spaceId) return
+      const { error: err } = await supabase.from('tier_items').update({ watched_on: watchedOn }).eq('id', itemId)
+      if (err) {
+        setError(err.message)
+        resync()
+      }
+    },
+    [spaceId, resync],
+  )
+
   // --- Watchlist actions. Add/update/delete throw so the modal can stay open;
   //     check-off / uncheck are inline (checkbox) and record the error instead. ---
 
@@ -651,6 +670,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     placeItem,
     unplaceItem,
     placeTier,
+    setWatchedOn,
     addWatchlistItem,
     updateWatchlistItem,
     deleteWatchlistItem,
