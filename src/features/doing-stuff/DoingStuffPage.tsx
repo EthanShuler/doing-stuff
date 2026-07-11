@@ -189,6 +189,12 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
     }
   }
 
+  // The entry behind the open repeat modal, and its display title.
+  const repeatEntry = (repeatEntryId && store.entries.find((e) => e.id === repeatEntryId)) || null
+  const repeatTitle = repeatEntry
+    ? repeatEntry.title || store.activities.find((a) => a.id === repeatEntry.activityId)?.name || 'this outing'
+    : ''
+
   // Gate on the first data load (live mode only; the space resolves in App).
   if (configured && store.loading) {
     return <Splash text="Loading your space…" mih="60vh" />
@@ -281,21 +287,15 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
         onClose={closeModal}
       />
 
-      {(() => {
-        const entry = repeatEntryId ? store.entries.find((e) => e.id === repeatEntryId) : null
-        const title = entry ? entry.title || store.activities.find((a) => a.id === entry.activityId)?.name || 'this outing' : ''
-        return (
-          <RepeatModal
-            opened={modal === 'repeat'}
-            entryTitle={title}
-            firstDate={entry ? entry.date : today()}
-            repeats={entry ? store.repeats.filter((r) => r.entryId === entry.id) : []}
-            onAdd={(date) => entry && store.addRepeat(entry.id, date).catch(() => {})}
-            onRemove={(repeatId) => store.deleteRepeat(repeatId).catch(() => {})}
-            onClose={closeModal}
-          />
-        )
-      })()}
+      <RepeatModal
+        opened={modal === 'repeat'}
+        entryTitle={repeatTitle}
+        firstDate={repeatEntry ? repeatEntry.date : today()}
+        repeats={repeatEntry ? store.repeats.filter((r) => r.entryId === repeatEntry.id) : []}
+        onAdd={(date) => repeatEntry && store.addRepeat(repeatEntry.id, date).catch(() => {})}
+        onRemove={(repeatId) => store.deleteRepeat(repeatId).catch(() => {})}
+        onClose={closeModal}
+      />
 
       <ManageModal
         opened={modal === 'manage'}

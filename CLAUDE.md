@@ -91,16 +91,22 @@ paper), ported from the Claude Design "Compass" direction.
 
 ## Tech stack
 
-- **Vite + React 19 + TypeScript**, SPA.
+- **Vite + React 19 + TypeScript**, SPA. **React Compiler** is enabled (see
+  `vite.config.ts`), so components and hooks are auto-memoized — don't add
+  `useMemo`/`useCallback` for render performance; use them only where a value's
+  identity matters (effect dependencies). Each page renders a `<title>`
+  (React 19 hoists it into `<head>`).
 - **react-router v7 in plain library mode** (`BrowserRouter` + `Routes` from
   `react-router`) — no loaders, no framework mode. Cloudflare Pages serves
   `index.html` as the SPA fallback, so deep links work with no extra config.
-- **Mantine v8** (`@mantine/core`) for UI components. The earthy look lives in
-  two files: `src/theme.ts` (raw palette, fonts, category swatches — the source
-  of truth) and `src/mantineTheme.ts` (translates it into a Mantine theme so
-  components inherit it). Style with Mantine props plus inline style objects
-  referencing `theme.ts`. **No Tailwind, no CSS files** — `index.css` stays
-  empty; Mantine's stylesheet provides the reset.
+- **Mantine v9** (`@mantine/core`) for UI components. The earthy look lives in
+  two files: `src/theme.ts` (raw palette, fonts, category swatches, named color
+  tokens + `warmBorder(alpha)` — the source of truth) and `src/mantineTheme.ts`
+  (translates it into a Mantine theme so components inherit it, including the
+  custom Button variants `secondary` / `chip` and the SegmentedControl chip
+  styling). Style with Mantine props plus inline style objects referencing
+  `theme.ts` — no raw color literals in components. **No Tailwind, no CSS
+  files** — `index.css` stays empty; Mantine's stylesheet provides the reset.
 - **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles).
 - **@dnd-kit** (`core` + `sortable` + `utilities`) for the tier-list drag-n-drop.
   Multi-container pattern: each tier row is a droppable + `SortableContext`;
@@ -190,6 +196,13 @@ special-casing. A dropped-then-rejoined channel refetches the full snapshot
 (`fetchAll`/`applySnapshot`) to cover anything missed while offline. Keyless
 seed mode skips all of this.
 
+This load/realtime plumbing is shared: `src/data/spaceSync.ts` owns
+`useSpaceSync` (initial snapshot + channel + reconnect-refetch), `syncTable`
+(one table's INSERT/UPDATE/DELETE handlers), `upsertById`/`removeById`, the
+profile row mapper, and `idFactory` for seed-mode ids. A new feature's store
+supplies only its row mappers, `fetchAll`, a `wire` callback, actions, and
+seed data — follow `useTierListStore` as the template.
+
 ### Space bootstrap & the sharing model
 
 Sharing model is **"manual / SQL for now"** (chosen deliberately). On first login a
@@ -255,6 +268,7 @@ src/
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     geocode.ts             Nominatim address → lat/lng (on save only)
+    profile.ts             displayNameFor() — profile → short display label
     tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
     openLibrary.ts         Open Library book search (covers) for ItemModal — keyless
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
@@ -262,11 +276,16 @@ src/
   data/                    shared (cross-feature) hooks
     useSession.ts          Supabase auth session hook
     useSpace.ts            resolves/creates the active space after login
+    spaceSync.ts           store plumbing: useSpaceSync, syncTable, upsertById…
   components/              shared UI
     AuthScreen.tsx         login / sign-up (no-op without keys)
+    CategoryPills.tsx      "All" + per-category filter pill row
     ComingSoon.tsx         placeholder page for unbuilt features
+    EmptyCard.tsx          dashed empty-state card
+    FloatingBanner.tsx     fixed dismissible error/notice banner
     ModalShell.tsx         shared Mantine modal chrome
     Pill.tsx               category filter pill
+    Splash.tsx             centered loading/fatal message
     Stars.tsx              read-only rating display
   features/
     doing-stuff/           the activity tracker (landing feature)
