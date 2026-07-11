@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import type { Repeat } from '../../types'
-import { colors, DANGER, fonts } from '../../theme'
+import { colors, DANGER, fieldLabelStyle, fonts } from '../../theme'
 import { formatDate, today } from '../../lib/format'
 import { ModalShell } from '../../components/ModalShell'
 
@@ -16,16 +16,6 @@ interface RepeatModalProps {
   onAdd: (date: string) => void
   onRemove: (repeatId: string) => void
   onClose: () => void
-}
-
-const labelStyle = {
-  display: 'block',
-  fontSize: 12,
-  fontWeight: 600,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.06em',
-  color: colors.muted,
-  marginBottom: 7,
 }
 
 export function RepeatModal({
@@ -72,7 +62,7 @@ export function RepeatModal({
         </Button>
       </Group>
 
-      <Text style={labelStyle}>
+      <Text style={fieldLabelStyle}>
         History · {history.length} total
       </Text>
       <Box>
@@ -108,18 +98,10 @@ export function RepeatModal({
       </Box>
 
       <Group justify="flex-end" mt={24}>
-        <Button variant="default" onClick={onClose} radius={10} styles={secondaryButtonStyles}>
+        <Button variant="secondary" onClick={onClose} radius={10}>
           Done
         </Button>
       </Group>
     </ModalShell>
   )
-}
-
-const secondaryButtonStyles = {
-  root: {
-    background: 'transparent',
-    border: '1px solid rgba(120,100,80,0.3)',
-    color: '#5c574e',
-  },
 }

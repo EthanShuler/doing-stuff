@@ -13,10 +13,11 @@ import {
 } from '@mantine/core'
 import type { Category, SortKey, ViewMode } from '../../types'
 import type { DisplayRow, Stats } from './derive'
-import { ACCENT, colors, fonts, swatchFor } from '../../theme'
+import { ACCENT, colors, fonts } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { Stars } from '../../components/Stars'
-import { Pill } from '../../components/Pill'
+import { CategoryPills } from '../../components/CategoryPills'
+import { EmptyCard } from '../../components/EmptyCard'
 
 interface DashboardProps {
   stats: Stats
@@ -78,23 +79,7 @@ export function Dashboard({
 
       {/* CONTROLS */}
       <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
-        <Group gap={8} wrap="wrap">
-          <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
-          {categories.map((category) => {
-            const swatch = swatchFor(category.colorIndex)
-            const active = filterCategoryId === category.id
-            return (
-              <Pill
-                key={category.id}
-                label={category.name}
-                active={active}
-                activeBg={swatch.color}
-                dotColor={active ? '#fff' : swatch.color}
-                onClick={() => onFilter(category.id)}
-              />
-            )
-          })}
-        </Group>
+        <CategoryPills categories={categories} value={filterCategoryId} onChange={onFilter} />
         <Group align="center" gap={14} wrap="wrap">
           <TextInput
             value={search}
@@ -122,11 +107,6 @@ export function Dashboard({
               { label: 'Cards', value: 'cards' },
               { label: 'Table', value: 'table' },
             ]}
-            radius={9}
-            styles={{
-              root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
-              label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
-            }}
           />
           <Group align="center" gap={9}>
             <Text c={colors.muted} style={monoLabelStyle}>
@@ -392,22 +372,10 @@ function RepeatBadge({ count, since }: { count: number; since: string }) {
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <Box
-      mt={20}
-      ta="center"
-      bg="#fff"
-      p="64px 24px"
-      style={{ border: '1px dashed rgba(120,100,80,0.28)', borderRadius: 16 }}
-    >
-      <Text fz={24} mb={8} style={{ fontFamily: fonts.serif }}>
-        Nothing here yet
-      </Text>
-      <Text fz={14} c={colors.muted} mb={20}>
-        No entries in this view. Log your next outing together.
-      </Text>
+    <EmptyCard title="Nothing here yet" blurb="No entries in this view. Log your next outing together.">
       <Button onClick={onAdd} radius={10} px={20} py={11} style={{ background: ACCENT }}>
         + New entry
       </Button>
-    </Box>
+    </EmptyCard>
   )
 }

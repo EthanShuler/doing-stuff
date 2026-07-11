@@ -11,29 +11,54 @@ import { KIND_COPY } from './copy'
 export const CARD_WIDTH = 76
 const POSTER_HEIGHT = 100
 
-/** Poster image with a graceful fallback for '' or broken URLs. Keyed on the
- *  URL by the parent, so fixing a bad link clears the broken state. */
-function Poster({ item }: { item: TierItem }) {
-  const [broken, setBroken] = useState(false)
-  if (!item.imageUrl || broken) {
+/** A poster/cover image with a graceful emoji fallback for '' or broken URLs —
+ *  shared by the board cards (full-width) and the watchlist rows (thumbnail).
+ *  The broken state is remembered per URL, so pasting a new link retries. */
+export function MediaImage({
+  imageUrl,
+  title,
+  emoji,
+  width,
+  height,
+  radius = 0,
+  emojiSize = 26,
+}: {
+  imageUrl: string
+  title: string
+  /** Kind emoji shown when there's no usable image (see KIND_COPY). */
+  emoji: string
+  width: number | string
+  height: number
+  radius?: number
+  emojiSize?: number
+}) {
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
+  if (!imageUrl || brokenUrl === imageUrl) {
     return (
       <Box
-        w="100%"
-        h={POSTER_HEIGHT}
+        w={width}
+        h={height}
         bg={colors.chip}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          borderRadius: radius,
+          fontSize: emojiSize,
+        }}
       >
-        {KIND_COPY[item.kind].emoji}
+        {emoji}
       </Box>
     )
   }
   return (
     <img
-      src={item.imageUrl}
-      alt={item.title}
-      onError={() => setBroken(true)}
+      src={imageUrl}
+      alt={title}
+      onError={() => setBrokenUrl(imageUrl)}
       draggable={false}
-      style={{ width: '100%', height: POSTER_HEIGHT, objectFit: 'cover', display: 'block' }}
+      style={{ width, height, objectFit: 'cover', borderRadius: radius, flexShrink: 0, display: 'block' }}
     />
   )
 }
@@ -65,7 +90,13 @@ export function CardVisual({
         userSelect: 'none',
       }}
     >
-      <Poster key={item.imageUrl} item={item} />
+      <MediaImage
+        imageUrl={item.imageUrl}
+        title={item.title}
+        emoji={KIND_COPY[item.kind].emoji}
+        width="100%"
+        height={POSTER_HEIGHT}
+      />
       <Text
         fz={10.5}
         lh={1.25}

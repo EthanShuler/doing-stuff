@@ -2,6 +2,7 @@ import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem 
 import type { YearMonth } from '../../lib/format'
 import { ACCENT, FALLBACK_COLOR, swatchFor } from '../../theme'
 import { currentMonthPrefix, isoDate, today } from '../../lib/format'
+import { displayNameFor } from '../../lib/profile'
 
 /** An entry joined with its activity + category, ready for display. */
 export interface DisplayRow {
@@ -32,9 +33,7 @@ function creatorLabel(
 ): string {
   if (!createdBy) return ''
   if (currentUserId && createdBy === currentUserId) return 'You'
-  const profile = profilesById.get(createdBy)
-  if (!profile) return ''
-  return profile.displayName || (profile.email ? profile.email.split('@')[0] : '')
+  return displayNameFor(profilesById.get(createdBy))
 }
 
 export interface Stats {

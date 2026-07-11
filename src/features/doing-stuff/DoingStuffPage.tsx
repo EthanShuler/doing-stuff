@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Box, Center } from '@mantine/core'
+import { Box } from '@mantine/core'
 import { useNavigate } from 'react-router'
 import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../types'
 import { useActivityStore } from './useActivityStore'
@@ -7,6 +7,8 @@ import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWi
 import { currentYearMonth, today } from '../../lib/format'
 import type { YearMonth } from '../../lib/format'
 import { colors, fonts } from '../../theme'
+import { FloatingBanner } from '../../components/FloatingBanner'
+import { Splash } from '../../components/Splash'
 import { Dashboard } from './Dashboard'
 import { EntryModal } from './EntryModal'
 import { RepeatModal } from './RepeatModal'
@@ -175,70 +177,18 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
 
   // Gate on the first data load (live mode only; the space resolves in App).
   if (configured && store.loading) {
-    return (
-      <Center mih="60vh" c={colors.muted} p={24} ta="center" style={{ fontFamily: fonts.sans }}>
-        Loading your space…
-      </Center>
-    )
+    return <Splash text="Loading your space…" mih="60vh" />
   }
 
   return (
     <>
-      {store.error && (
-        <Box
-          c="oklch(0.45 0.14 25)"
-          px={14}
-          py={9}
-          onClick={store.clearError}
-          style={{
-            position: 'fixed',
-            top: 68,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 60,
-            maxWidth: 'min(92vw, 520px)',
-            border: `1px solid ${colors.cardBorder}`,
-            borderRadius: 9,
-            background: 'oklch(0.96 0.04 25)',
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: fonts.sans,
-            boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
-            cursor: 'pointer',
-          }}
-        >
-          {store.error}
-          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
-        </Box>
-      )}
-
-      {store.notice && (
-        <Box
-          c="oklch(0.42 0.07 75)"
-          px={14}
-          py={9}
-          onClick={store.clearNotice}
-          style={{
-            position: 'fixed',
-            top: store.error ? 116 : 68,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 60,
-            maxWidth: 'min(92vw, 520px)',
-            border: '1px solid rgba(160,120,40,0.35)',
-            borderRadius: 9,
-            background: 'oklch(0.96 0.05 85)',
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: fonts.sans,
-            boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
-            cursor: 'pointer',
-          }}
-        >
-          {store.notice}
-          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
-        </Box>
-      )}
+      <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
+      <FloatingBanner
+        message={store.notice}
+        tone="notice"
+        top={store.error ? 116 : 68}
+        onDismiss={store.clearNotice}
+      />
 
       <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
         {/* The control bar keeps a constant width so the nav doesn't shift

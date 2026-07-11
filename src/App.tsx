@@ -1,24 +1,14 @@
 import type { Session } from '@supabase/supabase-js'
-import { Center } from '@mantine/core'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import type { Screen, TierKind } from './types'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
-import { colors, fonts } from './theme'
 import { AppLayout } from './layout/AppLayout'
 import { AuthScreen } from './components/AuthScreen'
 import { ComingSoon } from './components/ComingSoon'
+import { Splash } from './components/Splash'
 import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
 import { TierListPage } from './features/tier-list/TierListPage'
-
-/** Full-screen centered message — used for loading and fatal errors. */
-function Splash({ text }: { text: string }) {
-  return (
-    <Center mih="100vh" bg={colors.pageBg} c={colors.muted} p={24} ta="center" style={{ fontFamily: fonts.sans }}>
-      {text}
-    </Center>
-  )
-}
 
 export default function App() {
   const { session, loading, configured } = useSession()

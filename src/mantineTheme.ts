@@ -4,8 +4,8 @@
 // the brand accent + fonts into the shape Mantine expects so its components inherit
 // the same look without per-component overrides.
 
-import { createTheme, Input, InputWrapper, type MantineColorsTuple } from '@mantine/core'
-import { colors, fonts } from './theme'
+import { Button, createTheme, Input, InputWrapper, SegmentedControl, type MantineColorsTuple } from '@mantine/core'
+import { colors, fieldLabelStyle, fonts } from './theme'
 
 // Terracotta "clay" accent scale. Index 6 is the brand ACCENT (oklch 0.62 0.13 45)
 // and index 7 the hover shade (0.56 0.13 45), matching theme.ts so Mantine's default
@@ -35,18 +35,49 @@ export const mantineTheme = createTheme({
     fontWeight: '500',
   },
   components: {
-    // Uppercase, muted, mono-spaced field labels — ported from the old
-    // `labelStyle` so every form across the app reads the same.
+    // Uppercase, muted field labels — the shared style also used directly on
+    // non-Mantine fields (see fieldLabelStyle in theme.ts).
     InputWrapper: InputWrapper.extend({
       styles: {
-        label: {
-          fontSize: 12,
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          color: colors.muted,
-          marginBottom: 7,
-        },
+        label: fieldLabelStyle,
+      },
+    }),
+    // App-wide custom button variants:
+    //   • "secondary" — the transparent hairline-bordered action next to a
+    //     primary button (Cancel, Manage, Today).
+    //   • "chip" — the chip-toned inline add/save buttons in ManageModal.
+    Button: Button.extend({
+      vars: (_theme, props) => {
+        if (props.variant === 'secondary') {
+          return {
+            root: {
+              '--button-bg': 'transparent',
+              '--button-hover': 'rgba(120,100,80,0.06)',
+              '--button-color': '#5c574e',
+              '--button-bd': '1px solid rgba(120,100,80,0.3)',
+            },
+          }
+        }
+        if (props.variant === 'chip') {
+          return {
+            root: {
+              '--button-bg': colors.chip,
+              '--button-hover': '#ece8df',
+              '--button-color': '#5c574e',
+              '--button-bd': '1px solid rgba(120,100,80,0.18)',
+              '--button-fz': '13px',
+            },
+          }
+        }
+        return { root: {} }
+      },
+    }),
+    // The chip-toned toggle used for every screen/mode switcher.
+    SegmentedControl: SegmentedControl.extend({
+      defaultProps: { radius: 9 },
+      styles: {
+        root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
+        label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
       },
     }),
     // Field chrome: warm hairline border + the design's 9px radius.

@@ -278,7 +278,7 @@ export function ItemModal({
           </UnstyledButton>
         )}
         <Group gap={10} ml="auto">
-          <Button variant="default" onClick={onClose} radius={10} styles={secondaryButtonStyles}>
+          <Button variant="secondary" onClick={onClose} radius={10}>
             Cancel
           </Button>
           <Button onClick={onSave} disabled={!canSave} radius={10}>
@@ -288,12 +288,4 @@ export function ItemModal({
       </Group>
     </ModalShell>
   )
-}
-
-const secondaryButtonStyles = {
-  root: {
-    background: 'transparent',
-    border: '1px solid rgba(120,100,80,0.3)',
-    color: '#5c574e',
-  },
 }

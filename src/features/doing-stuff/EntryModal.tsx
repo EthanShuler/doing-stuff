@@ -12,7 +12,7 @@ import {
   UnstyledButton,
 } from '@mantine/core'
 import type { Activity, Category, EntryDraft } from '../../types'
-import { ACCENT, colors, DANGER, fonts } from '../../theme'
+import { ACCENT, colors, DANGER, fieldLabelStyle, fonts } from '../../theme'
 import { ModalShell } from '../../components/ModalShell'
 
 interface EntryModalProps {
@@ -25,18 +25,6 @@ interface EntryModalProps {
   onSave: () => void
   onDelete: () => void
   onClose: () => void
-}
-
-// Matches the Mantine InputWrapper label styling (see mantineTheme.ts) for the
-// rating field, which isn't a Mantine input and so doesn't inherit it.
-const labelStyle = {
-  display: 'block',
-  fontSize: 12,
-  fontWeight: 600,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.06em',
-  color: colors.muted,
-  marginBottom: 7,
 }
 
 export function EntryModal({
@@ -126,7 +114,7 @@ export function EntryModal({
       )}
 
       <Box mb={18}>
-        <Text component="label" style={labelStyle}>
+        <Text component="label" style={fieldLabelStyle}>
           How was it?
         </Text>
         <Rating
@@ -159,7 +147,7 @@ export function EntryModal({
           </UnstyledButton>
         )}
         <Group gap={10} ml="auto">
-          <Button variant="default" onClick={onClose} radius={10} styles={secondaryButtonStyles}>
+          <Button variant="secondary" onClick={onClose} radius={10}>
             Cancel
           </Button>
           <Button onClick={onSave} disabled={!canSave} radius={10}>
@@ -169,12 +157,4 @@ export function EntryModal({
       </Group>
     </ModalShell>
   )
-}
-
-const secondaryButtonStyles = {
-  root: {
-    background: 'transparent',
-    border: '1px solid rgba(120,100,80,0.3)',
-    color: '#5c574e',
-  },
 }

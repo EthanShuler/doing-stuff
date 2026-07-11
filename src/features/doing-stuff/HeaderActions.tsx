@@ -27,7 +27,7 @@ export function HeaderActions({
     >
       <ScreenToggle screen={screen} onChange={onScreenChange} />
       <Group gap={10}>
-        <Button variant="default" onClick={onManage} radius={10} styles={secondaryButtonStyles}>
+        <Button variant="secondary" onClick={onManage} radius={10}>
           Manage
         </Button>
         <Button onClick={onAdd} radius={10}>
@@ -36,12 +36,4 @@ export function HeaderActions({
       </Group>
     </Group>
   )
-}
-
-const secondaryButtonStyles = {
-  root: {
-    background: 'transparent',
-    border: '1px solid rgba(120,100,80,0.3)',
-    color: '#5c574e',
-  },
 }

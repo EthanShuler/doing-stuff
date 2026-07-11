@@ -44,6 +44,19 @@ export const colors = {
 /** Safe fallback color for entries whose category was deleted. */
 export const FALLBACK_COLOR = '#ccc'
 
+/** Uppercase muted field label — what Mantine inputs get via mantineTheme's
+ *  InputWrapper override; use this directly on non-Mantine fields (the rating
+ *  row, the repeat history heading) so every label reads the same. */
+export const fieldLabelStyle = {
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  color: colors.muted,
+  marginBottom: 7,
+} as const
+
 export function swatchFor(colorIndex: number): PaletteSwatch {
   return palette[colorIndex] ?? palette[0]
 }

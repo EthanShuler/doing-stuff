@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, Button, Center, Group, SegmentedControl, Text } from '@mantine/core'
+import { Box, Button, Group, SegmentedControl, Text } from '@mantine/core'
 import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
 import { today } from '../../lib/format'
+import { displayNameFor } from '../../lib/profile'
 import { Pill } from '../../components/Pill'
+import { FloatingBanner } from '../../components/FloatingBanner'
+import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
 import { datesArePersonal, deriveBoard, distinctTags, filterByTags } from './derive'
 import { KIND_COPY } from './copy'
@@ -25,11 +28,6 @@ const emptyDraft = (variant: Mode): ItemDraft => ({
   watchedOn: variant === 'board' ? today() : '',
   tags: [],
 })
-
-const segmentedStyles = {
-  root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
-  label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
-} as const
 
 interface TierListPageProps {
   kind: TierKind
@@ -57,7 +55,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   // same layout read-only (their placements are also read-only under RLS).
   const [viewer, setViewer] = useState<'you' | 'partner'>('you')
   const partner = store.profiles.find((p) => p.id !== store.selfId && p.id !== null) ?? null
-  const partnerName = partner?.displayName || (partner?.email ? partner.email.split('@')[0] : 'Partner')
+  const partnerName = displayNameFor(partner) || 'Partner'
   const showingPartner = viewer === 'partner' && partner !== null
 
   // Modal state. `variant` selects the save path: a board add/edit writes to the
@@ -180,42 +178,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
 
   // Gate on the first data load (live mode only; the space resolves in App).
   if (configured && store.loading) {
-    return (
-      <Center mih="60vh" c={colors.muted} p={24} ta="center" style={{ fontFamily: fonts.sans }}>
-        Loading your space…
-      </Center>
-    )
+    return <Splash text="Loading your space…" mih="60vh" />
   }
 
   return (
     <>
-      {store.error && (
-        <Box
-          c="oklch(0.45 0.14 25)"
-          px={14}
-          py={9}
-          onClick={store.clearError}
-          style={{
-            position: 'fixed',
-            top: 68,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 60,
-            maxWidth: 'min(92vw, 520px)',
-            border: `1px solid ${colors.cardBorder}`,
-            borderRadius: 9,
-            background: 'oklch(0.96 0.04 25)',
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: fonts.sans,
-            boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
-            cursor: 'pointer',
-          }}
-        >
-          {store.error}
-          <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
-        </Box>
-      )}
+      <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
 
       <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
         <Box maw={1200} mx="auto">
@@ -236,8 +204,6 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                   { label: 'Board', value: 'board' },
                   { label: copy.listLabel, value: 'watchlist' },
                 ]}
-                radius={9}
-                styles={segmentedStyles}
               />
               {mode === 'board' &&
                 (partner ? (
@@ -248,8 +214,6 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                       { label: 'You', value: 'you' },
                       { label: partnerName, value: 'partner' },
                     ]}
-                    radius={9}
-                    styles={segmentedStyles}
                   />
                 ) : (
                   <Text fz={13} c={colors.muted} style={{ fontFamily: fonts.sans }}>

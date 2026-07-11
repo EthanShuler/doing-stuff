@@ -3,9 +3,9 @@ import { Box, Button, Group, Text, UnstyledButton } from '@mantine/core'
 import type { Category } from '../../types'
 import type { CalendarDay, CalendarMark } from './derive'
 import type { YearMonth } from '../../lib/format'
-import { ACCENT, colors, fonts, swatchFor } from '../../theme'
+import { ACCENT, colors, fonts } from '../../theme'
 import { monthLabel, shiftMonth } from '../../lib/format'
-import { Pill } from '../../components/Pill'
+import { CategoryPills } from '../../components/CategoryPills'
 
 interface CalendarViewProps {
   categories: Category[]
@@ -63,43 +63,16 @@ export function CalendarView({
           <NavArrow label="Next month" onClick={() => onMonthChange(shiftMonth(month, 1))}>
             ›
           </NavArrow>
-          <Button
-            variant="default"
-            onClick={onToday}
-            radius={9}
-            ml={6}
-            styles={{ root: { background: 'transparent', border: '1px solid rgba(120,100,80,0.3)', color: '#5c574e' } }}
-          >
+          <Button variant="secondary" onClick={onToday} radius={9} ml={6}>
             Today
           </Button>
           {expanded.size > 0 && (
-            <Button
-              variant="default"
-              onClick={() => setExpanded(new Set())}
-              radius={9}
-              styles={{ root: { background: 'transparent', border: '1px solid rgba(120,100,80,0.3)', color: '#5c574e' } }}
-            >
+            <Button variant="secondary" onClick={() => setExpanded(new Set())} radius={9}>
               Reset view
             </Button>
           )}
         </Group>
-        <Group gap={8} wrap="wrap">
-          <Pill label="All" active={filterCategoryId === 'all'} activeBg="#3a352e" onClick={() => onFilter('all')} />
-          {categories.map((category) => {
-            const swatch = swatchFor(category.colorIndex)
-            const active = filterCategoryId === category.id
-            return (
-              <Pill
-                key={category.id}
-                label={category.name}
-                active={active}
-                activeBg={swatch.color}
-                dotColor={active ? '#fff' : swatch.color}
-                onClick={() => onFilter(category.id)}
-              />
-            )
-          })}
-        </Group>
+        <CategoryPills categories={categories} value={filterCategoryId} onChange={onFilter} />
       </Group>
 
       {/* GRID */}

@@ -1,9 +1,10 @@
-import { useState } from 'react'
 import { ActionIcon, Box, Checkbox, Group, Paper, Text } from '@mantine/core'
 import type { TierKind, WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
 import { formatDate } from '../../lib/format'
+import { EmptyCard } from '../../components/EmptyCard'
 import { KIND_COPY } from './copy'
+import { MediaImage } from './TierCard'
 
 interface WatchlistProps {
   items: WatchlistItem[]
@@ -22,40 +23,6 @@ interface WatchlistProps {
   onDelete: (id: string) => void
 }
 
-/** A small poster/cover thumbnail with the same graceful fallback the board cards use. */
-function Thumb({ item }: { item: WatchlistItem }) {
-  const [broken, setBroken] = useState(false)
-  const emoji = KIND_COPY[item.kind].emoji
-  if (!item.imageUrl || broken) {
-    return (
-      <Box
-        w={38}
-        h={54}
-        bg={colors.chip}
-        style={{
-          flexShrink: 0,
-          borderRadius: 5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 18,
-        }}
-      >
-        {emoji}
-      </Box>
-    )
-  }
-  return (
-    <img
-      key={item.imageUrl}
-      src={item.imageUrl}
-      alt={item.title}
-      onError={() => setBroken(true)}
-      style={{ width: 38, height: 54, objectFit: 'cover', borderRadius: 5, flexShrink: 0, display: 'block' }}
-    />
-  )
-}
-
 /** The shared "want to watch/read" list for one kind. Checking an item off
  *  promotes it into the tier pool (the page owns that action + the add/edit
  *  modal). */
@@ -63,22 +30,7 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
   const copy = KIND_COPY[kind]
 
   if (items.length === 0) {
-    return (
-      <Box
-        mt={24}
-        ta="center"
-        bg="#fff"
-        p="56px 24px"
-        style={{ border: '1px dashed rgba(120,100,80,0.28)', borderRadius: 16 }}
-      >
-        <Text fz={22} mb={6} style={{ fontFamily: fonts.serif }}>
-          {copy.listEmptyTitle}
-        </Text>
-        <Text fz={14} c={colors.muted}>
-          {copy.listEmptyBlurb}
-        </Text>
-      </Box>
-    )
+    return <EmptyCard mt={24} title={copy.listEmptyTitle} blurb={copy.listEmptyBlurb} />
   }
 
   return (
@@ -104,7 +56,15 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
                 aria-label={done ? `Move back to ${copy.listLabel.toLowerCase()}` : `Mark ${copy.past} — add to board`}
                 styles={{ input: { cursor: 'pointer' } }}
               />
-              <Thumb item={item} />
+              <MediaImage
+                imageUrl={item.imageUrl}
+                title={item.title}
+                emoji={copy.emoji}
+                width={38}
+                height={54}
+                radius={5}
+                emojiSize={18}
+              />
               <Box flex={1} miw={0}>
                 <Text
                   onClick={done ? undefined : () => onEdit(item)}

@@ -1,13 +1,14 @@
-import { Box, Button, Group, Text } from '@mantine/core'
+import { Box, Button, Text } from '@mantine/core'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo, useState } from 'react'
 import type { Category, Home } from '../../types'
 import type { MapMarker } from './derive'
-import { ACCENT, colors, fonts, swatchFor } from '../../theme'
+import { ACCENT, colors, fonts } from '../../theme'
 import { formatDate, stars } from '../../lib/format'
 import { Pill } from '../../components/Pill'
+import { CategoryPills } from '../../components/CategoryPills'
 
 interface MapViewProps {
   home: Home
@@ -94,22 +95,7 @@ export function MapView({ home, categories, markers, onEditEntry }: MapViewProps
 
       {/* CATEGORY / WISHLIST FILTER */}
       {(shownCategories.length > 0 || hasWishes) && (
-        <Group gap={8} wrap="wrap" mt={20}>
-          <Pill label="All" active={filter === 'all'} activeBg="#3a352e" onClick={() => setFilter('all')} />
-          {shownCategories.map((category) => {
-            const swatch = swatchFor(category.colorIndex)
-            const active = filter === category.id
-            return (
-              <Pill
-                key={category.id}
-                label={category.name}
-                active={active}
-                activeBg={swatch.color}
-                dotColor={active ? '#fff' : swatch.color}
-                onClick={() => setFilter(category.id)}
-              />
-            )
-          })}
+        <CategoryPills categories={shownCategories} value={filter} onChange={setFilter} mt={20}>
           {hasWishes && (
             <Pill
               label="Wishlist"
@@ -119,7 +105,7 @@ export function MapView({ home, categories, markers, onEditEntry }: MapViewProps
               onClick={() => setFilter('wishlist')}
             />
           )}
-        </Group>
+        </CategoryPills>
       )}
 
       {/* MAP */}

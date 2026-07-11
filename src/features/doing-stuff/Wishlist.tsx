@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ActionIcon, Box, Checkbox, Group, Paper, Text, TextInput } from '@mantine/core'
 import type { WishlistItem } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
+import { EmptyCard } from '../../components/EmptyCard'
 
 interface WishlistProps {
   items: WishlistItem[]
@@ -90,20 +91,10 @@ export function Wishlist({
 
       {/* LIST */}
       {items.length === 0 ? (
-        <Box
-          mt={20}
-          ta="center"
-          bg="#fff"
-          p="56px 24px"
-          style={{ border: '1px dashed rgba(120,100,80,0.28)', borderRadius: 16 }}
-        >
-          <Text fz={22} mb={6} style={{ fontFamily: fonts.serif }}>
-            No wishes yet
-          </Text>
-          <Text fz={14} c={colors.muted}>
-            Add something you'd like to do together. Check it off and it becomes a logged entry.
-          </Text>
-        </Box>
+        <EmptyCard
+          title="No wishes yet"
+          blurb="Add something you'd like to do together. Check it off and it becomes a logged entry."
+        />
       ) : (
         <Box mt={20} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map((item) => {

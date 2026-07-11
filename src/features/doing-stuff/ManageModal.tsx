@@ -111,7 +111,7 @@ export function ManageModal({
             placeholder="Your address — the center of the map"
             styles={{ input: { fontSize: 13 } }}
           />
-          <Button variant="default" onClick={commitHome} radius={9} styles={addButtonStyles}>
+          <Button variant="chip" onClick={commitHome} radius={9}>
             Save
           </Button>
         </Group>
@@ -224,12 +224,7 @@ export function ManageModal({
                 placeholder="Add an activity…"
                 styles={{ input: { fontSize: 13 } }}
               />
-              <Button
-                variant="default"
-                onClick={() => submitActivity(category.id)}
-                radius={9}
-                styles={addButtonStyles}
-              >
+              <Button variant="chip" onClick={() => submitActivity(category.id)} radius={9}>
                 Add
               </Button>
             </Group>
@@ -282,13 +277,4 @@ export function ManageModal({
       </Box>
     </ModalShell>
   )
-}
-
-const addButtonStyles = {
-  root: {
-    background: colors.chip,
-    border: '1px solid rgba(120,100,80,0.18)',
-    color: '#5c574e',
-    fontSize: 13,
-  },
 }
