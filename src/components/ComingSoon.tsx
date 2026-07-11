@@ -5,6 +5,7 @@ import { colors, fonts } from '../theme'
 export function ComingSoon({ title, blurb }: { title: string; blurb: string }) {
   return (
     <Box pt={72} pb={80} px={24} ta="center" c={colors.ink} style={{ fontFamily: fonts.sans }}>
+      <title>{`${title} · cajubinile.com`}</title>
       <Box
         maw={520}
         mx="auto"

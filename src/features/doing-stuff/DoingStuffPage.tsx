@@ -28,6 +28,14 @@ const SCREEN_PATHS: Record<Screen, string> = {
   calendar: '/calendar',
 }
 
+/** Browser-tab titles (React 19 hoists a rendered <title> into <head>). */
+const SCREEN_TITLES: Record<Screen, string> = {
+  log: 'Doing Stuff',
+  wishlist: 'Wishlist',
+  map: 'Map',
+  calendar: 'Calendar',
+}
+
 function emptyDraft(): EntryDraft {
   return { categoryId: '', activityId: '', title: '', date: today(), description: '', rating: 0, address: '', hideFromMap: false }
 }
@@ -182,6 +190,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
 
   return (
     <>
+      <title>{`${SCREEN_TITLES[screen]} · cajubinile.com`}</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
       <FloatingBanner
         message={store.notice}

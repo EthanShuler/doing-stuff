@@ -8,6 +8,8 @@ import type { TierKind } from '../../types'
  * switch — this file is just the words.
  */
 export interface KindCopy {
+  /** Browser-tab / nav title for the kind's route. */
+  pageTitle: string
   /** Lowercase noun used inline in sentences: "Add a book". */
   noun: string
   /** Card / thumbnail fallback when there's no image. */
@@ -42,6 +44,7 @@ export interface KindCopy {
 
 export const KIND_COPY: Record<TierKind, KindCopy> = {
   movie: {
+    pageTitle: 'Movies',
     noun: 'movie',
     emoji: '🎬',
     example: 'Paddington 2',
@@ -60,6 +63,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
   },
   tv: {
+    pageTitle: 'TV',
     noun: 'show',
     emoji: '📺',
     example: 'Severance',
@@ -78,6 +82,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
   },
   book: {
+    pageTitle: 'Books',
     noun: 'book',
     emoji: '📖',
     example: 'Piranesi',

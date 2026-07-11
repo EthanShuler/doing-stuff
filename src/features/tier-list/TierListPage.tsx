@@ -183,6 +183,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
 
   return (
     <>
+      <title>{`${copy.pageTitle} · cajubinile.com`}</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
 
       <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
