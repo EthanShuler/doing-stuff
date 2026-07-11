@@ -1,4 +1,4 @@
-import type { Tier, TierItem, TierKind, TierPlacement } from '../../types'
+import type { Tier, TierItem, TierKind, TierPlacement, TierRead } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 
@@ -6,14 +6,67 @@ import { swatchFor } from '../../theme'
 export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
 
 /** A droppable container on the board: a tier row, the unranked shelf, or the
- *  unwatched shelf. */
+ *  unwatched (for books: unread) shelf. */
 export type ContainerId = Tier | 'unranked' | 'unwatched'
+
+/**
+ * Whether a kind's watched/read dates belong to one person rather than the
+ * shared item. Movies and TV are watched together, so `watchedOn` lives on the
+ * pool item; books are read separately, so each member's date is their own
+ * TierRead row and the shared date is ignored.
+ */
+export const datesArePersonal = (kind: TierKind): boolean => kind === 'book'
 
 /** Palette index per tier — a classic hot→cool ramp through the theme swatches. */
 const TIER_COLOR_INDEX: Record<Tier, number> = { S: 5, A: 1, B: 3, C: 0, D: 4, F: 2 }
 
 export function tierSwatch(tier: Tier): PaletteSwatch {
   return swatchFor(TIER_COLOR_INDEX[tier])
+}
+
+// --- Tags -------------------------------------------------------------------
+// Tags are free text shared on the pool item ("disney", "fantasy"). All tag
+// comparisons here are case-insensitive so "Disney" and "disney" behave as one
+// tag even if both spellings were saved.
+
+const tagKey = (tag: string) => tag.trim().toLowerCase()
+
+/** Clean a tag list for saving: trim, drop blanks, dedupe case-insensitively
+ *  (first spelling wins). */
+export function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const tag of tags) {
+    const trimmed = tag.trim()
+    const key = tagKey(trimmed)
+    if (!trimmed || seen.has(key)) continue
+    seen.add(key)
+    out.push(trimmed)
+  }
+  return out
+}
+
+/** Every tag in use on one kind's items, deduped case-insensitively (first
+ *  spelling seen wins) and sorted alphabetically. Drives the filter pills and
+ *  the item modal's suggestions. */
+export function distinctTags(items: TierItem[], kind: TierKind): string[] {
+  const byKey = new Map<string, string>()
+  for (const item of items) {
+    if (item.kind !== kind) continue
+    for (const tag of item.tags) {
+      const key = tagKey(tag)
+      if (key && !byKey.has(key)) byKey.set(key, tag.trim())
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+}
+
+/** Keep the items carrying at least one selected tag (OR semantics — the
+ *  filter pills widen, not narrow). An empty selection filters nothing. */
+export function filterByTags(items: TierItem[], selected: string[]): TierItem[] {
+  if (selected.length === 0) return items
+  const wanted = new Set(selected.map(tagKey))
+  return items.filter((item) => item.tags.some((tag) => wanted.has(tagKey(tag))))
 }
 
 /** One viewer's board: items per tier (in ranked order) + the two shelves. */
@@ -25,21 +78,31 @@ export interface Board {
 
 /**
  * Build one person's board for one kind. Items the viewer hasn't placed land
- * on a shelf — the unwatched shelf when they have no watched date, otherwise
+ * on a shelf — the unwatched/unread shelf when they have no date, otherwise
  * the unranked shelf (both oldest first, so new additions appear at the end).
- * A placement always wins: a ranked item stays in its tier even if its watched
- * date is cleared. Placements referencing missing items — or belonging to
- * other viewers — are ignored.
+ * "Have a date" is per kind: movies/TV read the shared `watchedOn`; books look
+ * for the VIEWER's own read row, so the same book can be ranked on one board
+ * and unread on the other. A placement always wins: a ranked item stays in its
+ * tier even if its date is cleared. Placements and reads referencing missing
+ * items — or belonging to other viewers — are ignored.
  */
 export function deriveBoard(
   items: TierItem[],
   placements: TierPlacement[],
+  reads: TierRead[],
   viewerId: string | null,
   kind: TierKind,
 ): Board {
   const placementByItem = new Map<string, TierPlacement>()
   for (const p of placements) {
     if (p.userId === viewerId) placementByItem.set(p.itemId, p)
+  }
+  const personal = datesArePersonal(kind)
+  const readItems = new Set<string>()
+  if (personal) {
+    for (const r of reads) {
+      if (r.userId === viewerId) readItems.add(r.itemId)
+    }
   }
 
   const tiers: Record<Tier, { item: TierItem; placement: TierPlacement }[]> = {
@@ -51,8 +114,9 @@ export function deriveBoard(
   for (const item of items) {
     if (item.kind !== kind) continue
     const placement = placementByItem.get(item.id)
+    const dated = personal ? readItems.has(item.id) : item.watchedOn !== null
     if (placement) tiers[placement.tier].push({ item, placement })
-    else if (item.watchedOn === null) unwatched.push(item)
+    else if (!dated) unwatched.push(item)
     else unranked.push(item)
   }
 

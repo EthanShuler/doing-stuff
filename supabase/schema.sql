@@ -149,24 +149,32 @@ create index if not exists entry_repeats_space_idx on public.entry_repeats (spac
 create index if not exists entry_repeats_entry_idx on public.entry_repeats (entry_id);
 
 -- ---------------------------------------------------------------------------
--- Tier lists (movies + TV): a SHARED pool of items, PER-PERSON rankings.
--- `tier_items` is the pool — any space member can add/edit. `tier_placements`
--- holds one member's ranking of one item (tier + fractional position within
--- the tier); "unranked" is simply the absence of a placement row. Placements
--- are opinion data, so RLS below lets members READ each other's but WRITE
--- only their own — the partner's board is read-only at the security boundary.
+-- Tier lists (movies + TV + books): a SHARED pool of items, PER-PERSON
+-- rankings. `tier_items` is the pool — any space member can add/edit.
+-- `tier_placements` holds one member's ranking of one item (tier + fractional
+-- position within the tier); "unranked" is simply the absence of a placement
+-- row. Placements are opinion data, so RLS below lets members READ each
+-- other's but WRITE only their own — the partner's board is read-only at the
+-- security boundary.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.tier_items (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
-  kind        text not null check (kind in ('movie', 'tv')),
+  kind        text not null check (kind in ('movie', 'tv', 'book')),
   title       text not null,
-  -- Poster image, pasted as a URL ('' = none; the card shows a fallback).
+  -- Poster/cover image, pasted as a URL ('' = none; the card shows a fallback).
   image_url   text not null default '',
   -- The day we finished watching it (shared, like the item itself). Null =
   -- unknown; the client defaults it to today on add / watchlist check-off.
+  -- Movies/TV only — books are read separately, so their dates are per person
+  -- in `tier_item_reads` and this column stays null.
   watched_on  date,
+  -- Free-text labels ("disney", "fantasy", "childhood reads") for filtering
+  -- the boards. Shared like the item itself — they describe it, not an
+  -- opinion of it. On an existing DB, apply with:
+  --   alter table public.tier_items add column tags text[] not null default '{}';
+  tags        text[] not null default '{}',
   created_by  uuid references auth.users (id) default auth.uid(),
   created_at  timestamptz not null default now()
 );
@@ -185,24 +193,45 @@ create table if not exists public.tier_placements (
   unique (item_id, user_id)
 );
 
+-- Per-person read state for BOOK items. Movies/TV are watched together, so
+-- their date is the shared `watched_on` above; books are read separately, so
+-- each member records their own finish date here. Absence of a row = that
+-- member hasn't read it (the book sits on their Unread shelf). Opinion data
+-- like placements → same split RLS below (members read all, write only their
+-- own rows).
+create table if not exists public.tier_item_reads (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  item_id     uuid not null references public.tier_items (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) default auth.uid(),
+  -- The day this member finished it.
+  read_on     date not null,
+  created_at  timestamptz not null default now(),
+  -- One read record per person per item — also the upsert conflict target.
+  unique (item_id, user_id)
+);
+
 create index if not exists tier_items_space_idx      on public.tier_items (space_id);
 create index if not exists tier_placements_space_idx on public.tier_placements (space_id);
 create index if not exists tier_placements_item_idx  on public.tier_placements (item_id);
+create index if not exists tier_item_reads_space_idx on public.tier_item_reads (space_id);
+create index if not exists tier_item_reads_item_idx  on public.tier_item_reads (item_id);
 
 -- ---------------------------------------------------------------------------
--- Watchlist (movies + TV): a SHARED list of things we want to watch, per kind.
--- Mirrors the wishlist → entry pattern: checking one off creates a `tier_items`
--- row in the shared pool (so it lands on both members' unranked shelves) and
--- links to it via `tier_item_id` (null = still "want to watch", set = added to
--- the board). ON DELETE SET NULL means removing that tier item later reopens the
--- watchlist item rather than orphaning it. Unlike placements, the whole list is
--- shared — any member can add/edit/check off — so it uses the "all" policy.
+-- Watchlist (movies + TV + books): a SHARED list of things we want to watch or
+-- read, per kind. Mirrors the wishlist → entry pattern: checking one off
+-- creates a `tier_items` row in the shared pool (so it lands on both members'
+-- shelves) and links to it via `tier_item_id` (null = still "want to", set =
+-- added to the board). ON DELETE SET NULL means removing that tier item later
+-- reopens the watchlist item rather than orphaning it. Unlike placements, the
+-- whole list is shared — any member can add/edit/check off — so it uses the
+-- "all" policy.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.watchlist_items (
   id           uuid primary key default gen_random_uuid(),
   space_id     uuid not null references public.spaces (id) on delete cascade,
-  kind         text not null check (kind in ('movie', 'tv')),
+  kind         text not null check (kind in ('movie', 'tv', 'book')),
   title        text not null,
   -- Optional poster, pasted as a URL; carried onto the tier card when checked off.
   image_url    text not null default '',
@@ -324,6 +353,7 @@ alter table public.wishlist_items enable row level security;
 alter table public.entry_repeats enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
+alter table public.tier_item_reads  enable row level security;
 alter table public.watchlist_items  enable row level security;
 
 -- spaces ---------------------------------------------------------------------
@@ -419,6 +449,25 @@ drop policy if exists "delete own placements" on public.tier_placements;
 create policy "delete own placements" on public.tier_placements
   for delete using (user_id = auth.uid());
 
+-- Read records are per-person like placements: members read everyone's (the
+-- partner's Unread shelf renders from theirs), but write only their own.
+drop policy if exists "members read reads" on public.tier_item_reads;
+create policy "members read reads" on public.tier_item_reads
+  for select using (public.is_space_member(space_id));
+
+drop policy if exists "insert own reads" on public.tier_item_reads;
+create policy "insert own reads" on public.tier_item_reads
+  for insert with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "update own reads" on public.tier_item_reads;
+create policy "update own reads" on public.tier_item_reads
+  for update using (user_id = auth.uid())
+  with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "delete own reads" on public.tier_item_reads;
+create policy "delete own reads" on public.tier_item_reads
+  for delete using (user_id = auth.uid());
+
 -- The watchlist is shared like the pool: full access iff you belong to the space.
 drop policy if exists "space members all" on public.watchlist_items;
 create policy "space members all" on public.watchlist_items
@@ -434,7 +483,7 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
-  public.watchlist_items
+  public.tier_item_reads, public.watchlist_items
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -454,7 +503,7 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_items', 'tier_placements', 'watchlist_items']
+          'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items']
   loop
     if not exists (
       select 1 from pg_publication_tables

@@ -10,12 +10,12 @@ const FEATURES = [
   { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
   { label: 'Movies', path: '/movies', matches: ['/movies'] },
   { label: 'TV', path: '/tv', matches: ['/tv'] },
+  { label: 'Books', path: '/books', matches: ['/books'] },
   { label: 'French Toast', path: '/french-toast', matches: ['/french-toast'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
   { label: 'Board Games', path: '/board-games', matches: ['/board-games'] },
   { label: 'Ice Cream', path: '/ice-cream', matches: ['/ice-cream'] },
-  { label: 'Books', path: '/books', matches: ['/books'] },
   { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
   { label: 'Cats', path: '/cats', matches: ['/cats'] },
 ]
@@ -46,7 +46,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <AppShell.Header>
         <Group h="100%" px={20} justify="space-between" wrap="nowrap">
           <Group gap={20} wrap="nowrap">
-            <Burger opened={navOpened} onClick={toggle} hiddenFrom="sm" size="sm" color={colors.muted} />
+            <Burger
+              opened={navOpened}
+              onClick={toggle}
+              hiddenFrom="sm"
+              size="sm"
+              color={colors.muted}
+              aria-label="Toggle navigation"
+            />
             <Text
               fz={19}
               fw={500}

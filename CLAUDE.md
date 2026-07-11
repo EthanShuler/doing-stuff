@@ -7,8 +7,8 @@ Guidance for working in this repo. Read this before making changes.
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
-`/calendar` are the Doing Stuff feature's screens; `/movies` and `/tv` are the
-**Tier Lists** feature; `/french-toast`, `/parks`, and `/spoons` are placeholder
+`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, and
+`/books` are the **Tier Lists** feature; `/french-toast`, `/parks`, and `/spoons` are placeholder
 pages for features not built yet (a french toast ranking, a 63-national-parks
 visit tracker, a souvenir-spoon collection map). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
@@ -39,32 +39,52 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`) — drag-n-drop S/A/B/C/D/F boards. The domain
-model splits pool from opinion:
+**Tier Lists** (`/movies`, `/tv`, `/books`) — drag-n-drop S/A/B/C/D/F boards.
+The domain model splits pool from opinion:
 
-- **Tier item** (`tier_items`) — a movie or show in the space's **shared pool**
-  (a `kind 'movie'|'tv'` column, a title, a hand-pasted poster `image_url`, and
-  a nullable `watched_on` date — when we finished it; defaults to today on a
-  board add or watchlist check-off). Any member can add/edit/delete; deleting
-  removes everyone's rankings of it.
+- **Tier item** (`tier_items`) — a movie, show, or book in the space's **shared
+  pool** (a `kind 'movie'|'tv'|'book'` column, a title, a hand-pasted
+  poster/cover `image_url`, a nullable `watched_on` date — when we finished
+  it; defaults to today on a board add or watchlist check-off. Movies/TV only —
+  books leave it null and use per-person read records instead — and free-text
+  **`tags`** (`text[]`, e.g. "disney", "fantasy") shared like the item; the
+  board page filters by them with multi-select pills (OR semantics, matched
+  case-insensitively). A filtered board is **read-only** — hidden cards make
+  drop positions ambiguous — so it renders `BoardView` with clickable cards.
+  Any member can add/edit/delete; deleting removes everyone's rankings of it.
 - **Tier placement** (`tier_placements`) — **one person's** ranking of one item:
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
   to integers if float precision ever runs out). "Unranked" is the absence of a
-  placement row; an unplaced item with **no `watched_on` date** lands on a
-  second dashed **Unwatched** shelf instead (a placement wins over a missing
-  date). Dragging out of Unwatched stamps `watched_on` = today on the shared
-  item; dropping onto it unranks the card and clears the date. RLS is split:
+  placement row; an unplaced item with **no date for the viewer** lands on a
+  second dashed **Unwatched** (books: **Unread**) shelf instead (a placement
+  wins over a missing date). Dragging out of that shelf stamps today's date;
+  dropping onto it unranks the card and clears the date. RLS is split:
   members **read** everyone's placements but
   **write only their own** — the partner's board is read-only at the security
   boundary, not just in the UI.
+- **Read record** (`tier_item_reads`) — **one person's** "I've read this" for a
+  BOOK item (a `read_on` date, upsert on `unique (item_id, user_id)`). Movies/TV
+  are watched together so their date is shared on the item; books are read
+  separately, so each member marks their own — the same book can be ranked on
+  one board and Unread on the other. `datesArePersonal()` in the tier-list
+  `derive.ts` is the behavior switch: for books, shelf drags and the modal's
+  date field write the viewer's own read row and never touch `watched_on`.
+  Same split RLS as placements (read everyone's, write only your own).
+- **Watchlist item** (`watchlist_items`) — a shared "want to watch/read" entry
+  per kind (UI label: Watchlist, or Reading list for books). Checking one off
+  creates the tier item — dated today: the shared `watched_on` for movies/TV,
+  the *checker's own read record* for books — and links via `tier_item_id`
+  (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
-Both routes render the same `TierListPage` (kind prop), so the store — holding
-both kinds and all users' placements — survives Movies ↔ TV switches. A
+All three routes render the same `TierListPage` (kind prop), so the store —
+holding every kind plus all users' placements and read records — survives
+Movies ↔ TV ↔ Books switches. A
 You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
 (`TierBoard`), the partner's is the same layout with no drag wiring
 (`BoardView`). Drops are optimistic: on write failure the store records the
-error and refetches, so the card snaps back.
+error and refetches, so the card snaps back. Per-kind wording (watch/read,
+shelf labels, emoji, hints) lives in the tier-list `copy.ts`.
 
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
 paper), ported from the Claude Design "Compass" direction.
@@ -97,6 +117,10 @@ paper), ported from the Claude Design "Compass" direction.
   Debounced autocomplete; picking a suggestion just fills the title and poster
   URL fields, so the stored rows stay plain text/URLs with no TMDB coupling.
   Missing key = no suggestions, hand-entry still works.
+- **Open Library** for book title + cover lookup in the same modal
+  (`src/lib/openLibrary.ts`) — no API key at all, so it's always on. Covers are
+  plain `covers.openlibrary.org` URLs. Polite-use API like Nominatim: only the
+  debounced modal autocomplete may call it, never render-time code.
 - **Supabase** (`@supabase/supabase-js`) — Postgres + Auth, called directly from
   the browser. Protected by Row Level Security, not by a server. **Realtime**
   (`postgres_changes`) streams the partner's edits into an open tab; the space
@@ -112,12 +136,25 @@ npm run dev        # http://localhost:5173
 npm run build      # tsc -b && vite build  (this is the typecheck-on-build gate)
 npm run typecheck  # tsc -b --noEmit
 npm test           # vitest run — covers the pure logic in src/data/derive.ts
+npm run test:e2e   # Playwright suite in e2e/ — keyless seed mode, port 5199
 npm run preview    # serve the production build
 ```
 
 **Vitest** covers `src/data/derive.ts` (see `derive.test.ts` — new derive logic
 should get a test there). There is **no linter configured.** After code changes,
 run `npm run build` (or `npm run typecheck`) and `npm test`.
+
+**Playwright** (`e2e/`, config in `playwright.config.ts`) covers the browser
+flows: every route hard-loads, nav/back, store survival across screen
+switches, entry-modal gating, tier-board derivation, and the mobile drawer.
+It boots its own Vite server on a dedicated port with the Supabase keys
+blanked, so it always runs against the deterministic in-memory seed — safe to
+run anytime, no backend touched. Mantine interaction helpers (Select combobox,
+SegmentedControl's hidden radios, Rating) live in `e2e/helpers.ts`; the
+`verify` skill has the details. Deliberately **no drag-and-drop specs** —
+dnd-kit drags are flaky under automation; drag logic is covered by the
+tier-list `derive.test.ts` instead. Run the suite after changing UI flows it
+covers; add a spec when you add a flow worth keeping.
 
 ## Current state: backend is live
 
@@ -180,12 +217,13 @@ schema in `supabase/schema.sql` is already applied to the current project.
 `supabase/schema.sql` is the source of truth for the database. Key points:
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
-  `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`.
-- Most tables use the uniform "space members all" `for all` policy. The two
+  `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
+  `tier_item_reads`, `watchlist_items`.
+- Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self) and
-  **`tier_placements`** (members read all, but insert/update/delete require
-  `user_id = auth.uid()` — rankings are personal). Follow the placement pattern
-  for any future per-person opinion data.
+  **`tier_placements` / `tier_item_reads`** (members read all, but
+  insert/update/delete require `user_id = auth.uid()` — rankings and book read
+  state are personal). Follow that pattern for any future per-person opinion data.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via
@@ -218,6 +256,7 @@ src/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     geocode.ts             Nominatim address → lat/lng (on save only)
     tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
+    openLibrary.ts         Open Library book search (covers) for ItemModal — keyless
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
     database.types.ts      typed schema (regenerate with supabase gen types)
   data/                    shared (cross-feature) hooks
@@ -244,15 +283,21 @@ src/
       ManageModal.tsx      categories & activities editor + home base
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
-    tier-list/             movie + TV tier boards (/movies + /tv, kind prop)
+    tier-list/             movie/TV/book tier boards (/movies, /tv, /books; kind prop)
       TierListPage.tsx     owns the store, You/Partner toggle, item modal state
-      useTierListStore.ts  data seam: pool + placements CRUD (or seed fallback)
-      derive.ts            pure board building, moveItem, fractional positions
+      useTierListStore.ts  data seam: pool + placements + reads CRUD (or seed fallback)
+      derive.ts            pure board building, moveItem, positions, datesArePersonal
       derive.test.ts       vitest coverage for derive.ts
+      copy.ts              per-kind wording: watch/read, Watchlist/Reading list, emoji
       TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
-      BoardView.tsx        pure board layout (tier rows + unranked shelf)
+      BoardView.tsx        pure board layout (tier rows + unranked/unread shelves)
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
-      ItemModal.tsx        add/edit pool item with live card preview
+      ItemModal.tsx        add/edit pool item, TMDB/Open Library suggestions
+      Watchlist.tsx        shared watch/reading list (check off → pool item)
+e2e/
+  helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
+  *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
+                           tier-list, mobile) — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants
 ```

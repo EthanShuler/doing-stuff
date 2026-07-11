@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Center, Group, SegmentedControl, Text } from '@mantine/core'
 import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
-import { colors, fonts } from '../../theme'
+import { ACCENT, colors, fonts } from '../../theme'
 import { today } from '../../lib/format'
+import { Pill } from '../../components/Pill'
 import { useTierListStore } from './useTierListStore'
-import { deriveBoard } from './derive'
+import { datesArePersonal, deriveBoard, distinctTags, filterByTags } from './derive'
+import { KIND_COPY } from './copy'
 import { TierBoard } from './TierBoard'
 import { BoardView } from './BoardView'
 import { CardVisual } from './TierCard'
@@ -14,14 +16,14 @@ import type { ItemDraft } from './ItemModal'
 
 type Mode = 'board' | 'watchlist'
 
-const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
-
-// A board add is "we just watched this" → default the date to today. Watchlist
-// items aren't watched yet, so their draft leaves it blank (and hides the field).
+// A board add is "just finished this" → default the date to today (the shared
+// watched date, or your own read date for books). Watchlist items aren't
+// started yet, so their draft leaves it blank (and hides the field).
 const emptyDraft = (variant: Mode): ItemDraft => ({
   title: '',
   imageUrl: '',
   watchedOn: variant === 'board' ? today() : '',
+  tags: [],
 })
 
 const segmentedStyles = {
@@ -36,15 +38,19 @@ interface TierListPageProps {
   configured: boolean
 }
 
-/** The movie/TV tier lists. Both routes render this same component (same tree
- *  position), so the store — and its realtime channel — survives switching
- *  between Movies and TV; only the `kind` prop changes and the board re-derives. */
+/** The movie/TV/book tier lists. All three routes render this same component
+ *  (same tree position), so the store — and its realtime channel — survives
+ *  switching kinds; only the `kind` prop changes and the board re-derives. */
 export function TierListPage({ kind, spaceId, userId, configured }: TierListPageProps) {
   const store = useTierListStore(spaceId, userId)
-  const noun = KIND_NOUN[kind]
+  const copy = KIND_COPY[kind]
+  const noun = copy.noun
+  // Books track "have I read it" per person; movies/TV share one watched date.
+  const personal = datesArePersonal(kind)
 
-  // Board (tier ranking) vs. Watchlist (things we want to watch). Both live in
-  // the same tab; the store survives the switch just like Movies ↔ TV.
+  // Board (tier ranking) vs. Watchlist/Reading list (things we want to get
+  // to). Both live in the same tab; the store survives the switch just like
+  // kind switches.
   const [mode, setMode] = useState<Mode>('board')
 
   // Whose board is showing. Yours is drag-and-drop; the partner's renders the
@@ -70,17 +76,33 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     )
   }, [store.watchlist, kind])
 
-  // Watched date per tier item id, for the checked-off watchlist rows (the
-  // wish itself has no date — the tier item it produced carries it).
-  const watchedDates = useMemo(
-    () => new Map(store.items.map((item) => [item.id, item.watchedOn])),
-    [store.items],
+  // Date per tier item id, for the checked-off watchlist rows (the wish itself
+  // has no date — it's looked up via the tier item it produced). Movies/TV:
+  // the shared watched date. Books: YOUR read date — a book the partner
+  // checked off shows dateless until you read it too.
+  const watchedDates = useMemo<Map<string, string | null>>(
+    () =>
+      personal
+        ? new Map(store.reads.filter((r) => r.userId === store.selfId).map((r) => [r.itemId, r.readOn]))
+        : new Map(store.items.map((item) => [item.id, item.watchedOn])),
+    [personal, store.reads, store.selfId, store.items],
   )
+
+  // Tag filter: multi-select pills over the tags in use on this kind. While
+  // any are selected the board shows only matching items — read-only, because
+  // drops between visible neighbors would land at arbitrary positions relative
+  // to the hidden cards.
+  const [tagFilter, setTagFilter] = useState<string[]>([])
+  useEffect(() => setTagFilter([]), [kind])
+  const kindTags = useMemo(() => distinctTags(store.items, kind), [store.items, kind])
+  const filterActive = tagFilter.length > 0
+  const toggleTag = (tag: string) =>
+    setTagFilter((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
-    () => deriveBoard(store.items, store.placements, viewerId, kind),
-    [store.items, store.placements, viewerId, kind],
+    () => deriveBoard(filterByTags(store.items, tagFilter), store.placements, store.reads, viewerId, kind),
+    [store.items, tagFilter, store.placements, store.reads, viewerId, kind],
   )
 
   // Your placement position per item — neighbor lookup when a drop lands.
@@ -100,14 +122,19 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const openEdit = (item: TierItem) => {
     setModalVariant('board')
     setEditingId(item.id)
-    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: item.watchedOn ?? '' })
+    // The date field edits the shared watched date — or, for books, YOUR own
+    // read date (blank = you haven't read it, whatever the partner has done).
+    const dateOn = personal
+      ? store.reads.find((r) => r.itemId === item.id && r.userId === store.selfId)?.readOn ?? ''
+      : item.watchedOn ?? ''
+    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: dateOn, tags: item.tags })
     setModalOpen(true)
   }
 
   const openEditWatch = (item: WatchlistItem) => {
     setModalVariant('watchlist')
     setEditingId(item.id)
-    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: '' })
+    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: '', tags: [] })
     setModalOpen(true)
   }
 
@@ -123,9 +150,9 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl)
         else await store.addWatchlistItem(kind, draft.title, draft.imageUrl)
       } else {
-        const watchedOn = draft.watchedOn || null
-        if (editingId) await store.updateItem(editingId, draft.title, draft.imageUrl, watchedOn)
-        else await store.addItem(kind, draft.title, draft.imageUrl, watchedOn)
+        const dateOn = draft.watchedOn || null
+        if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, dateOn, draft.tags)
+        else await store.addItem(kind, draft.title, draft.imageUrl, dateOn, draft.tags)
       }
       closeModal()
     } catch {
@@ -207,7 +234,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 onChange={(value) => setMode(value as Mode)}
                 data={[
                   { label: 'Board', value: 'board' },
-                  { label: 'Watchlist', value: 'watchlist' },
+                  { label: copy.listLabel, value: 'watchlist' },
                 ]}
                 radius={9}
                 styles={segmentedStyles}
@@ -235,6 +262,23 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
             </Button>
           </Group>
 
+          {/* Tag filter pills — only once something on this kind is tagged.
+              Multi-select widens the filter (any selected tag matches). */}
+          {mode === 'board' && kindTags.length > 0 && (
+            <Group gap={8} mt={16} wrap="wrap">
+              <Pill label={`All ${noun}s`} active={!filterActive} activeBg={ACCENT} onClick={() => setTagFilter([])} />
+              {kindTags.map((tag) => (
+                <Pill
+                  key={tag.toLowerCase()}
+                  label={tag}
+                  active={tagFilter.includes(tag)}
+                  activeBg={ACCENT}
+                  onClick={() => toggleTag(tag)}
+                />
+              ))}
+            </Group>
+          )}
+
           {mode === 'watchlist' ? (
             <Watchlist
               items={watchItems}
@@ -260,7 +304,23 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 board={board}
                 renderCard={(item) => <CardVisual key={item.id} item={item} />}
                 shelfHint={`${partnerName} hasn't ranked everything yet.`}
-                unwatchedHint="Nothing waiting to be watched."
+                unwatchedHint={`Nothing waiting to be ${copy.past}.`}
+                unwatchedLabel={copy.shelfLabel}
+              />
+            </>
+          ) : filterActive ? (
+            // Your board, filtered: hidden cards make drop positions ambiguous,
+            // so this is the same read-only layout — cards still open the editor.
+            <>
+              <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+                Filtered by tag — clear the filter to rearrange.
+              </Text>
+              <BoardView
+                board={board}
+                renderCard={(item) => <CardVisual key={item.id} item={item} onClick={() => openEdit(item)} />}
+                shelfHint={`No unranked ${noun}s match this tag.`}
+                unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this tag.`}
+                unwatchedLabel={copy.shelfLabel}
               />
             </>
           ) : (
@@ -276,23 +336,25 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               onRenormalize={(tier: Tier, orderedIds: string[]) => {
                 void store.placeTier(tier, orderedIds)
               }}
-              // Dragging out of the unwatched shelf means "we watched it" →
-              // stamp today on the shared item; dragging onto it clears the date.
+              // Dragging out of the unwatched/unread shelf means "finished it"
+              // → stamp today; dragging onto it clears the date. Movies/TV
+              // write the shared watched date; books write YOUR read record.
               onMarkWatched={(itemId: string) => {
-                void store.setWatchedOn(itemId, today())
+                void (personal ? store.setReadOn(itemId, today()) : store.setWatchedOn(itemId, today()))
               }}
               onMarkUnwatched={(itemId: string) => {
-                void store.setWatchedOn(itemId, null)
+                void (personal ? store.setReadOn(itemId, null) : store.setWatchedOn(itemId, null))
               }}
               onCardClick={openEdit}
               shelfHint={
                 board.unranked.length === 0 &&
                 board.unwatched.length === 0 &&
                 Object.values(board.tiers).every((t) => t.length === 0)
-                  ? `No ${noun}s yet — add one, or check something off your watchlist.`
+                  ? `No ${noun}s yet — add one, or check something off your ${copy.listLabel.toLowerCase()}.`
                   : 'Everything is ranked. Nice.'
               }
-              unwatchedHint={`Drag a ${noun} here if you haven't actually watched it yet.`}
+              unwatchedHint={`Drag a ${noun} here if you haven't actually ${copy.past} it yet.`}
+              unwatchedLabel={copy.shelfLabel}
             />
           )}
         </Box>
@@ -304,6 +366,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         draft={draft}
         isEditing={editingId !== null}
         variant={modalVariant}
+        tagSuggestions={kindTags}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
         onSave={saveItem}
         onDelete={deleteEditingItem}

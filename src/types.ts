@@ -81,26 +81,44 @@ export interface WishlistItem {
   lng: number | null
 }
 
-// --- Tier lists (movies + TV) ------------------------------------------------
+// --- Tier lists (movies + TV + books) -----------------------------------------
 
-export type TierKind = 'movie' | 'tv'
+export type TierKind = 'movie' | 'tv' | 'book'
 
 /** The fixed tier ladder — not user-editable. */
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
 
-/** A movie or show in the space's SHARED pool — one row in `tier_items`. */
+/** A movie, show, or book in the space's SHARED pool — one row in `tier_items`. */
 export interface TierItem {
   id: string
   kind: TierKind
   title: string
-  /** Poster image URL, pasted by hand. '' = none (card shows a fallback). */
+  /** Poster/cover image URL, pasted by hand. '' = none (card shows a fallback). */
   imageUrl: string
-  /** ISO date ("YYYY-MM-DD") we finished watching it; null when unknown (legacy rows). */
+  /** ISO date ("YYYY-MM-DD") we finished watching it; null when unknown (legacy
+   *  rows). Movies/TV only — books are read separately, so their dates live
+   *  per person in TierRead and this stays null. */
   watchedOn: string | null
+  /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
+  tags: string[]
   /** auth.users id of the member who added it (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp; orders the unranked shelf. */
   createdAt: string
+}
+
+/**
+ * One person's "I've read this" record for a BOOK pool item — one row in
+ * `tier_item_reads`. The pool is shared but reading isn't: each member marks
+ * their own copy read, so a book can sit ranked on one board and on the Unread
+ * shelf of the other. Absence of a row = that member hasn't read it.
+ */
+export interface TierRead {
+  id: string
+  itemId: string
+  userId: string
+  /** ISO date this member finished it. */
+  readOn: string
 }
 
 /**
@@ -118,16 +136,16 @@ export interface TierPlacement {
 }
 
 /**
- * A "want to watch" item in the space's SHARED watchlist — one row in
- * `watchlist_items`. Checking it off creates a `tier_items` row in the pool and
- * links to it via `tierItemId` (null = still open). The whole list is shared,
- * so any member can add / edit / check off.
+ * A "want to watch" (or, for books, "want to read") item in the space's SHARED
+ * watchlist — one row in `watchlist_items`. Checking it off creates a
+ * `tier_items` row in the pool and links to it via `tierItemId` (null = still
+ * open). The whole list is shared, so any member can add / edit / check off.
  */
 export interface WatchlistItem {
   id: string
   kind: TierKind
   title: string
-  /** Optional poster URL; carried onto the tier card when checked off. '' = none. */
+  /** Optional poster/cover URL; carried onto the tier card when checked off. '' = none. */
   imageUrl: string
   /** The tier item this produced when checked off; null while still "want to watch". */
   tierItemId: string | null

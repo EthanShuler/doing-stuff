@@ -1,23 +1,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { Profile, Tier, TierItem, TierKind, TierPlacement, WatchlistItem } from '../../types'
+import type { Profile, Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
-import { renormalizedPositions } from './derive'
+import { datesArePersonal, normalizeTags, renormalizedPositions } from './derive'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
 //   • Supabase keys present → live: reads/writes `tier_items` + `tier_placements`
-//     scoped to the space. The pool is shared; placements are per-person (RLS
-//     lets members read each other's placements but write only their own).
+//     (+ `tier_item_reads` for books) scoped to the space. The pool is shared;
+//     placements and read records are per-person (RLS lets members read each
+//     other's but write only their own).
 //   • No keys → in-memory seed so the boards can be developed offline.
 //
-// The store holds items of BOTH kinds and placements of ALL users; the page
-// derives one (kind, viewer) board at a time, so switching Movies ↔ TV or
-// You ↔ Partner never refetches.
+// The store holds items of ALL kinds and placements/reads of ALL users; the
+// page derives one (kind, viewer) board at a time, so switching Movies ↔ TV ↔
+// Books or You ↔ Partner never refetches.
+//
+// Watched/read dates split by kind (see datesArePersonal in derive.ts):
+// movies/TV carry one shared `watched_on` on the item; books ignore it and
+// track each member's own date in `tier_item_reads`.
 
 interface Snapshot {
   items: TierItem[]
   placements: TierPlacement[]
+  reads: TierRead[]
   profiles: Profile[]
   watchlist: WatchlistItem[]
 }
@@ -32,17 +38,24 @@ function seed(): Snapshot {
       { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
       { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
     ],
+    // A few items carry tags so the filter pills are demoable offline.
     items: [
-      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', watchedOn: '2026-06-01', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
-      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', watchedOn: '2026-06-02', createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', watchedOn: null, createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
-      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', watchedOn: '2026-06-14', createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
-      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', watchedOn: null, createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', watchedOn: '2026-06-20', createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
-      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', watchedOn: '2026-06-08', createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
-      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', watchedOn: null, createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
-      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', watchedOn: '2026-06-15', createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
-      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', watchedOn: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', watchedOn: '2026-06-01', tags: ['fantasy', 'ghibli'], createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
+      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', watchedOn: '2026-06-02', tags: ['fantasy'], createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', watchedOn: null, tags: ['sci-fi'], createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
+      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', watchedOn: '2026-06-14', tags: [], createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
+      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', watchedOn: '2026-06-20', tags: ['sci-fi'], createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
+      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', watchedOn: '2026-06-08', tags: ['sci-fi'], createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
+      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
+      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', watchedOn: '2026-06-15', tags: ['fantasy'], createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
+      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      // Books keep watchedOn null — read state is per person, in `reads` below.
+      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', watchedOn: null, tags: ['fantasy'], createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
+      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', watchedOn: null, tags: ['sci-fi'], createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
+      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
+      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', watchedOn: null, tags: ['fantasy', 'childhood reads'], createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
+      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few items stay unranked — and some undated → unwatched — to exercise
@@ -59,12 +72,26 @@ function seed(): Snapshot {
       { id: 'p9', itemId: 't4', userId: 'u1', tier: 'D', position: 1 },
       { id: 'p10', itemId: 't1', userId: 'u2', tier: 'B', position: 1 },
       { id: 'p11', itemId: 't4', userId: 'u2', tier: 'S', position: 1 },
+      { id: 'p12', itemId: 'b1', userId: 'u1', tier: 'S', position: 1 },
+      { id: 'p13', itemId: 'b1', userId: 'u2', tier: 'A', position: 1 },
+      { id: 'p14', itemId: 'b2', userId: 'u1', tier: 'A', position: 1 },
+      { id: 'p15', itemId: 'b3', userId: 'u2', tier: 'S', position: 1 },
+    ],
+    // Book read records: b1 read by both, b2/b4 only by u1, b3 only by u2, b5
+    // by neither — so each seed board shows a different Unread shelf.
+    reads: [
+      { id: 'r1', itemId: 'b1', userId: 'u1', readOn: '2026-06-05' },
+      { id: 'r2', itemId: 'b1', userId: 'u2', readOn: '2026-06-12' },
+      { id: 'r3', itemId: 'b2', userId: 'u1', readOn: '2026-06-18' },
+      { id: 'r4', itemId: 'b3', userId: 'u2', readOn: '2026-06-20' },
+      { id: 'r5', itemId: 'b4', userId: 'u1', readOn: '2026-06-25' },
     ],
     // A couple open wishes per kind so the watchlist is demoable offline.
     watchlist: [
       { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
       { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
       { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-10T11:00:00Z' },
     ],
   }
 }
@@ -77,6 +104,7 @@ type TierItemRow = {
   title: string
   image_url: string | null
   watched_on: string | null
+  tags: string[] | null
   created_by: string | null
   created_at: string
 }
@@ -86,6 +114,12 @@ type TierPlacementRow = {
   user_id: string
   tier: string
   position: number
+}
+type TierReadRow = {
+  id: string
+  item_id: string
+  user_id: string
+  read_on: string
 }
 type ProfileRow = { id: string; email: string | null; display_name: string | null }
 type WatchlistItemRow = {
@@ -104,6 +138,7 @@ const toTierItem = (r: TierItemRow): TierItem => ({
   title: r.title,
   imageUrl: r.image_url ?? '',
   watchedOn: r.watched_on,
+  tags: r.tags ?? [],
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -113,6 +148,12 @@ const toTierPlacement = (r: TierPlacementRow): TierPlacement => ({
   userId: r.user_id,
   tier: r.tier as Tier,
   position: r.position,
+})
+const toTierRead = (r: TierReadRow): TierRead => ({
+  id: r.id,
+  itemId: r.item_id,
+  userId: r.user_id,
+  readOn: r.read_on,
 })
 const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
 const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
@@ -125,8 +166,9 @@ const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
   createdAt: r.created_at,
 })
 
-const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,watched_on,created_by,created_at'
+const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,watched_on,tags,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
+const TIER_READ_COLUMNS = 'id,item_id,user_id,read_on'
 const WATCHLIST_COLUMNS = 'id,kind,title,image_url,tier_item_id,created_by,created_at'
 
 const message = (err: unknown): string =>
@@ -146,12 +188,18 @@ function nextId(): string {
 const upsertPlacement = (set: Dispatch<SetStateAction<TierPlacement[]>>, p: TierPlacement) =>
   set((prev) => [...prev.filter((x) => !(x.itemId === p.itemId && x.userId === p.userId)), p])
 
+// Same story for a book's read record: unique per (itemId, userId).
+const upsertRead = (set: Dispatch<SetStateAction<TierRead[]>>, r: TierRead) =>
+  set((prev) => [...prev.filter((x) => !(x.itemId === r.itemId && x.userId === r.userId)), r])
+
 export interface TierListStore {
-  /** The shared pool — both kinds; filter with deriveBoard. */
+  /** The shared pool — all kinds; filter with deriveBoard. */
   items: TierItem[]
   /** All members' placements; deriveBoard picks one viewer's. */
   placements: TierPlacement[]
-  /** The shared watchlist — both kinds; filter by kind in the UI. */
+  /** All members' book read records; deriveBoard picks one viewer's. */
+  reads: TierRead[]
+  /** The shared watchlist — all kinds; filter by kind in the UI. */
   watchlist: WatchlistItem[]
   profiles: Profile[]
   /** Whose board "You" is: the auth user, or the seed self in keyless mode. */
@@ -161,12 +209,16 @@ export interface TierListStore {
   error: string | null
   clearError: () => void
 
-  /** Add to the shared pool. `watchedOn` is an ISO date or null (= unknown).
-   *  Throws on failure (the modal stays open). */
-  addItem: (kind: TierKind, title: string, imageUrl: string, watchedOn: string | null) => Promise<void>
-  /** Edit a pool item's title/poster/watched date. Throws on failure. */
-  updateItem: (id: string, title: string, imageUrl: string, watchedOn: string | null) => Promise<void>
-  /** Remove from the pool — deletes EVERYONE's placements of it. Throws on failure. */
+  /** Add to the shared pool. `dateOn` is an ISO date or null (= none yet):
+   *  the shared watched date for movies/TV, YOUR OWN read date for books.
+   *  `tags` are shared filter labels (normalized before saving).
+   *  Throws only when the item itself fails (the modal stays open). */
+  addItem: (kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => Promise<void>
+  /** Edit a pool item's title/image/tags + its date (same per-kind date
+   *  semantics as addItem). Throws only when the item write fails. */
+  updateItem: (id: string, kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => Promise<void>
+  /** Remove from the pool — deletes EVERYONE's placements (and, for books,
+   *  read records) of it. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
 
   /** Rank (or re-rank) an item on the caller's own board. Inline flow: records
@@ -177,8 +229,13 @@ export interface TierListStore {
   /** Rewrite one tier's ordering at integer positions (float-precision rescue). */
   placeTier: (tier: Tier, orderedItemIds: string[]) => Promise<void>
   /** Set or clear a pool item's shared watched date (drag on/off the unwatched
-   *  shelf). Inline flow — records the error and resyncs instead of throwing. */
+   *  shelf). Movies/TV only. Inline flow — records the error and resyncs
+   *  instead of throwing. */
   setWatchedOn: (itemId: string, watchedOn: string | null) => Promise<void>
+  /** Set or clear YOUR OWN read record for a book (drag on/off the Unread
+   *  shelf, or the date field in the edit modal). null deletes the record —
+   *  "I haven't read this". Inline flow — records the error and resyncs. */
+  setReadOn: (itemId: string, readOn: string | null) => Promise<void>
 
   /** Add a "want to watch" item to the shared watchlist. Throws on failure. */
   addWatchlistItem: (kind: TierKind, title: string, imageUrl: string) => Promise<void>
@@ -197,6 +254,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
   const [items, setItems] = useState<TierItem[]>(() => (supabase ? [] : seed().items))
   const [placements, setPlacements] = useState<TierPlacement[]>(() => (supabase ? [] : seed().placements))
+  const [reads, setReads] = useState<TierRead[]>(() => (supabase ? [] : seed().reads))
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => (supabase ? [] : seed().watchlist))
   const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
@@ -210,20 +268,23 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // optimistic drop. Throws on the first failed query.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [its, places, profs, watches] = await Promise.all([
+    const [its, places, reads_, profs, watches] = await Promise.all([
       supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
+      supabase.from('tier_item_reads').select(TIER_READ_COLUMNS).eq('space_id', spaceId).order('created_at'),
       // RLS scopes this to the current user + anyone they share a space with.
       supabase.from('profiles').select('id,email,display_name'),
       supabase.from('watchlist_items').select(WATCHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
     ])
     if (its.error) throw its.error
     if (places.error) throw places.error
+    if (reads_.error) throw reads_.error
     if (profs.error) throw profs.error
     if (watches.error) throw watches.error
     return {
       items: (its.data as TierItemRow[]).map(toTierItem),
       placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
+      reads: (reads_.data as TierReadRow[]).map(toTierRead),
       profiles: (profs.data as ProfileRow[]).map(toProfile),
       watchlist: (watches.data as WatchlistItemRow[]).map(toWatchlistItem),
     }
@@ -232,6 +293,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   const applySnapshot = useCallback((snap: Snapshot) => {
     setItems(snap.items)
     setPlacements(snap.placements)
+    setReads(snap.reads)
     setProfiles(snap.profiles)
     setWatchlist(snap.watchlist)
   }, [])
@@ -318,6 +380,17 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         const id = (p.old as { id: string }).id
         setPlacements((prev) => prev.filter((x) => x.id !== id))
       })
+      // Book read records: per-person like placements, same event shape.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tier_item_reads', filter: spaceFilter }, (p) =>
+        upsertRead(setReads, toTierRead(p.new as TierReadRow)),
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tier_item_reads', filter: spaceFilter }, (p) =>
+        upsertRead(setReads, toTierRead(p.new as TierReadRow)),
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tier_item_reads' }, (p) => {
+        const id = (p.old as { id: string }).id
+        setReads((prev) => prev.filter((x) => x.id !== id))
+      })
       // Watchlist: shared, so INSERT/UPDATE (incl. the tier_item_id set-null that
       // a cascaded tier-item delete produces) stream in filtered to the space.
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'watchlist_items', filter: spaceFilter }, (p) =>
@@ -356,54 +429,126 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     }
   }, [spaceId, fetchAll, applySnapshot])
 
+  // Your own read record for a book: null deletes it ("I haven't read this"),
+  // a date upserts it. Only ever touches rows with your user_id — the
+  // partner's read state is theirs (and RLS enforces it). Declared ahead of
+  // the pool actions because addItem/updateItem/checkOff compose it.
+  const setReadOn = useCallback(
+    async (itemId: string, readOn: string | null) => {
+      if (!selfId) return
+      setError(null)
+      if (readOn === null) {
+        // Optimistic: the card lands on the Unread shelf instantly.
+        setReads((prev) => prev.filter((r) => !(r.itemId === itemId && r.userId === selfId)))
+        if (!supabase || !spaceId) return
+        const { error: err } = await supabase
+          .from('tier_item_reads')
+          .delete()
+          .eq('item_id', itemId)
+          .eq('user_id', selfId)
+        if (err) {
+          setError(err.message)
+          resync()
+        }
+        return
+      }
+      // Optimistic with a temp id — reconciliation upserts by (itemId, userId).
+      upsertRead(setReads, { id: nextId(), itemId, userId: selfId, readOn })
+      if (!supabase || !spaceId) return
+      const { data, error: err } = await supabase
+        .from('tier_item_reads')
+        .upsert(
+          { space_id: spaceId, item_id: itemId, user_id: selfId, read_on: readOn },
+          { onConflict: 'item_id,user_id' },
+        )
+        .select(TIER_READ_COLUMNS)
+        .single()
+      if (err) {
+        setError(err.message)
+        resync()
+        return
+      }
+      upsertRead(setReads, toTierRead(data as TierReadRow))
+    },
+    [spaceId, selfId, resync],
+  )
+
   // --- Pool actions. These throw on failure so the item modal can stay open. ---
 
   const addItem = useCallback(
-    async (kind: TierKind, title: string, imageUrl: string, watchedOn: string | null) => {
+    async (kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
       const image = imageUrl.trim()
+      const cleanTags = normalizeTags(tags)
+      // Books: the date is YOUR read record, not the shared item's.
+      const personal = datesArePersonal(kind)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('tier_items')
-          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, watched_on: watchedOn })
+          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, watched_on: personal ? null : dateOn, tags: cleanTags })
           .select(TIER_ITEM_COLUMNS)
           .single()
         if (err) {
           setError(err.message)
           throw err
         }
-        setItems((prev) => [...prev, toTierItem(data as TierItemRow)])
+        const created = toTierItem(data as TierItemRow)
+        setItems((prev) => [...prev, created])
+        // The item exists either way now, so a failed read-record write only
+        // surfaces the error banner (setReadOn resyncs) — no throw.
+        if (personal && dateOn) await setReadOn(created.id, dateOn)
         return
       }
-      setItems((prev) => [
-        ...prev,
-        { id: nextId(), kind, title: trimmed, imageUrl: image, watchedOn, createdBy: selfId, createdAt: new Date().toISOString() },
-      ])
+      const created: TierItem = {
+        id: nextId(),
+        kind,
+        title: trimmed,
+        imageUrl: image,
+        watchedOn: personal ? null : dateOn,
+        tags: cleanTags,
+        createdBy: selfId,
+        createdAt: new Date().toISOString(),
+      }
+      setItems((prev) => [...prev, created])
+      if (personal && dateOn) await setReadOn(created.id, dateOn)
     },
-    [spaceId, selfId],
+    [spaceId, selfId, setReadOn],
   )
 
   const updateItem = useCallback(
-    async (id: string, title: string, imageUrl: string, watchedOn: string | null) => {
+    async (id: string, kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
       const image = imageUrl.trim()
+      const cleanTags = normalizeTags(tags)
+      const personal = datesArePersonal(kind)
       if (supabase && spaceId) {
-        const { error: err } = await supabase
-          .from('tier_items')
-          .update({ title: trimmed, image_url: image, watched_on: watchedOn })
-          .eq('id', id)
+        // For books, leave the shared watched_on alone — the date belongs to
+        // the caller's own read record instead.
+        const patch = personal
+          ? { title: trimmed, image_url: image, tags: cleanTags }
+          : { title: trimmed, image_url: image, tags: cleanTags, watched_on: dateOn }
+        const { error: err } = await supabase.from('tier_items').update(patch).eq('id', id)
         if (err) {
           setError(err.message)
           throw err
         }
       }
-      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, title: trimmed, imageUrl: image, watchedOn } : x)))
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === id
+            ? { ...x, title: trimmed, imageUrl: image, tags: cleanTags, ...(personal ? {} : { watchedOn: dateOn }) }
+            : x,
+        ),
+      )
+      // Sync your read record to the field: a date upserts, blank deletes.
+      // Inline flow (no throw) — the item edit above already landed.
+      if (personal) await setReadOn(id, dateOn)
     },
-    [spaceId],
+    [spaceId, setReadOn],
   )
 
   const deleteItem = useCallback(
@@ -416,9 +561,11 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           throw err
         }
       }
-      // DB cascades every member's placements of the item; mirror it locally.
+      // DB cascades every member's placements (and read records) of the item;
+      // mirror it locally.
       setItems((prev) => prev.filter((x) => x.id !== id))
       setPlacements((prev) => prev.filter((p) => p.itemId !== id))
+      setReads((prev) => prev.filter((r) => r.itemId !== id))
       // The FK is ON DELETE SET NULL, so any watchlist item that produced this
       // tier item reopens. Mirror that locally too.
       setWatchlist((prev) => prev.map((w) => (w.tierItemId === id ? { ...w, tierItemId: null } : w)))
@@ -595,12 +742,21 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       // Already checked off — nothing to do.
       if (wi.tierItemId) return
       setError(null)
+      // Checking off means "just finished it" → dated today. For movies/TV
+      // that's the shared watched date; for books it's the CHECKER's own read
+      // record — the partner's copy lands on their Unread shelf.
+      const personal = datesArePersonal(wi.kind)
       if (supabase && spaceId) {
-        // 1. Create the tier item in the shared pool (lands on both unranked
-        //    shelves). Checking off means "we just finished it" → watched today.
+        // 1. Create the tier item in the shared pool.
         const { data: itemData, error: itemErr } = await supabase
           .from('tier_items')
-          .insert({ space_id: spaceId, kind: wi.kind, title: wi.title, image_url: wi.imageUrl, watched_on: today() })
+          .insert({
+            space_id: spaceId,
+            kind: wi.kind,
+            title: wi.title,
+            image_url: wi.imageUrl,
+            watched_on: personal ? null : today(),
+          })
           .select(TIER_ITEM_COLUMNS)
           .single()
         if (itemErr) {
@@ -609,7 +765,10 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         }
         const created = toTierItem(itemData as TierItemRow)
         setItems((prev) => (prev.some((x) => x.id === created.id) ? prev : [...prev, created]))
-        // 2. Link the watchlist item to it (marks it done).
+        // 2. Your read record (books). A failure surfaces the banner and
+        //    resyncs inside setReadOn; the item is on the board regardless.
+        if (personal) await setReadOn(created.id, today())
+        // 3. Link the watchlist item to it (marks it done).
         const { error: linkErr } = await supabase
           .from('watchlist_items')
           .update({ tier_item_id: created.id })
@@ -630,14 +789,16 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         kind: wi.kind,
         title: wi.title,
         imageUrl: wi.imageUrl,
-        watchedOn: today(),
+        watchedOn: personal ? null : today(),
+        tags: [],
         createdBy: selfId,
         createdAt: new Date().toISOString(),
       }
       setItems((prev) => [...prev, created])
+      if (personal) await setReadOn(created.id, today())
       setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
     },
-    [spaceId, selfId, resync],
+    [spaceId, selfId, resync, setReadOn],
   )
 
   const uncheckWatchlistItem = useCallback(
@@ -658,6 +819,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   return {
     items,
     placements,
+    reads,
     watchlist,
     profiles,
     selfId,
@@ -671,6 +833,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     unplaceItem,
     placeTier,
     setWatchedOn,
+    setReadOn,
     addWatchlistItem,
     updateWatchlistItem,
     deleteWatchlistItem,

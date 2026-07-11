@@ -42,6 +42,7 @@ export function BoardView({
   RowArea = PlainRowArea,
   shelfHint,
   unwatchedHint,
+  unwatchedLabel = 'Unwatched',
 }: {
   board: Board
   renderCard: (item: TierItem, container: ContainerId) => ReactNode
@@ -50,6 +51,8 @@ export function BoardView({
   shelfHint?: string
   /** Shown in the unwatched shelf when it's empty. */
   unwatchedHint?: string
+  /** The second shelf's heading — 'Unread' on the books board. */
+  unwatchedLabel?: string
 }) {
   return (
     <Box mt={20}>
@@ -60,6 +63,7 @@ export function BoardView({
           return (
             <Box
               key={tier}
+              data-board-row={tier}
               style={{
                 display: 'flex',
                 alignItems: 'stretch',
@@ -89,16 +93,18 @@ export function BoardView({
         })}
       </Box>
 
-      {/* The shelves: unranked (watched, not yet placed by this viewer) and
-          unwatched (no watched date on the shared item). */}
+      {/* The shelves: unranked (dated, not yet placed by this viewer) and
+          unwatched/unread (no date for this viewer — shared for movies/TV,
+          the viewer's own read record for books). */}
       {(
         [
           { container: 'unranked', label: 'Unranked', items: board.unranked, hint: shelfHint },
-          { container: 'unwatched', label: 'Unwatched', items: board.unwatched, hint: unwatchedHint },
+          { container: 'unwatched', label: unwatchedLabel, items: board.unwatched, hint: unwatchedHint },
         ] as const
       ).map(({ container, label, items, hint }) => (
         <Box
           key={container}
+          data-board-shelf={container}
           mt={16}
           style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14, background: 'transparent' }}
         >

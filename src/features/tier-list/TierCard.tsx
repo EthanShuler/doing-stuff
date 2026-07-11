@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
 import { colors, fonts } from '../../theme'
+import { KIND_COPY } from './copy'
 
 /** Card footprint — constant so tier rows pack densely and wrap cleanly. */
 export const CARD_WIDTH = 76
@@ -22,7 +23,7 @@ function Poster({ item }: { item: TierItem }) {
         bg={colors.chip}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}
       >
-        {item.kind === 'tv' ? '📺' : '🎬'}
+        {KIND_COPY[item.kind].emoji}
       </Box>
     )
   }

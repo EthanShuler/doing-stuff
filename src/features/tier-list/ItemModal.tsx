@@ -1,23 +1,35 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
+import { Box, Button, Group, TagsInput, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import type { TierItem, TierKind } from '../../types'
 import { colors, DANGER, fonts } from '../../theme'
 import { ModalShell } from '../../components/ModalShell'
 import { isTmdbConfigured, searchTmdb } from '../../lib/tmdb'
-import type { TmdbResult } from '../../lib/tmdb'
+import { searchOpenLibrary } from '../../lib/openLibrary'
+import { KIND_COPY } from './copy'
 import { CardVisual } from './TierCard'
 
 /** The draft backing the add/edit item modal. */
 export interface ItemDraft {
   title: string
   imageUrl: string
-  /** ISO date we finished watching it; '' = not watched yet (the item sits on
-   *  the unwatched shelf until it's dated or dragged into a tier). Board items
-   *  only — watchlist items aren't watched yet, so the field is hidden there. */
+  /** ISO date it was finished; '' = not yet (the item sits on the unwatched/
+   *  unread shelf until it's dated or dragged into a tier). For movies/TV this
+   *  is the shared watched date; for books it's the EDITOR's own read date.
+   *  Board items only — list items aren't started yet, so the field is hidden. */
   watchedOn: string
+  /** Shared filter labels ("disney", "fantasy"). Board items only. */
+  tags: string[]
 }
 
-const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
+/** One dropdown row, whichever provider it came from (TMDB or Open Library). */
+interface Suggestion {
+  key: string
+  title: string
+  /** Secondary line — release year for TMDB, "author · year" for books. */
+  meta: string
+  imageUrl: string
+  thumbUrl: string
+}
 
 export function ItemModal({
   opened,
@@ -25,6 +37,7 @@ export function ItemModal({
   draft,
   isEditing,
   variant = 'board',
+  tagSuggestions = [],
   onChange,
   onSave,
   onDelete,
@@ -37,20 +50,26 @@ export function ItemModal({
   /** 'board' adds straight to the tier pool; 'watchlist' adds a "want to watch"
    *  item that only reaches the board once it's checked off. Just tweaks copy. */
   variant?: 'board' | 'watchlist'
+  /** Tags already used on this kind's items, offered as autocomplete options
+   *  so spellings converge instead of forking ("Disney" vs "disney"). */
+  tagSuggestions?: string[]
   onChange: (patch: Partial<ItemDraft>) => void
   onSave: () => void
   onDelete: () => void
   onClose: () => void
 }) {
-  const noun = KIND_NOUN[kind]
+  const copy = KIND_COPY[kind]
+  const noun = copy.noun
   const canSave = Boolean(draft.title.trim())
   const isWatchlist = variant === 'watchlist'
 
-  // TMDB title suggestions. Only shown after the user actually types (so an
-  // edit modal opening with a full title doesn't pop the dropdown), and hidden
-  // again on blur or pick. Lookup is a convenience — hand-typed titles and
-  // pasted URLs work exactly as before, and without a key none of this runs.
-  const [suggestions, setSuggestions] = useState<TmdbResult[]>([])
+  // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
+  // books (keyless, so always on). Only shown after the user actually types
+  // (so an edit modal opening with a full title doesn't pop the dropdown), and
+  // hidden again on blur or pick. Lookup is a convenience — hand-typed titles
+  // and pasted URLs work exactly as before.
+  const searchEnabled = kind === 'book' || isTmdbConfigured
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
@@ -61,7 +80,7 @@ export function ItemModal({
   }, [opened])
 
   useEffect(() => {
-    if (!opened || !showSuggestions || !isTmdbConfigured) return
+    if (!opened || !showSuggestions || !searchEnabled) return
     const query = draft.title.trim()
     if (query.length < 2) {
       setSuggestions([])
@@ -70,33 +89,46 @@ export function ItemModal({
     // Debounce, and drop responses that land after the query changed again.
     let cancelled = false
     const timer = setTimeout(async () => {
-      const results = await searchTmdb(kind, query)
+      const results: Suggestion[] =
+        kind === 'book'
+          ? (await searchOpenLibrary(query)).map((b) => ({
+              key: b.id,
+              title: b.title,
+              meta: [b.author, b.year].filter(Boolean).join(' · '),
+              imageUrl: b.coverUrl,
+              thumbUrl: b.thumbUrl,
+            }))
+          : (await searchTmdb(kind, query)).map((r) => ({
+              key: String(r.id),
+              title: r.title,
+              meta: r.year,
+              imageUrl: r.posterUrl,
+              thumbUrl: r.thumbUrl,
+            }))
       if (!cancelled) setSuggestions(results)
     }, 300)
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [draft.title, kind, opened, showSuggestions])
+  }, [draft.title, kind, opened, showSuggestions, searchEnabled])
 
-  const pickSuggestion = (result: TmdbResult) => {
-    onChange({ title: result.title, imageUrl: result.posterUrl })
+  const pickSuggestion = (result: Suggestion) => {
+    onChange({ title: result.title, imageUrl: result.imageUrl })
     setSuggestions([])
     setShowSuggestions(false)
   }
 
   const heading = isWatchlist
     ? isEditing
-      ? 'Edit watchlist item'
-      : `Add a ${noun} to watch`
+      ? `Edit ${copy.listLabel.toLowerCase()} item`
+      : `Add a ${noun} to ${copy.verb}`
     : isEditing
       ? `Edit ${noun}`
       : `Add a ${noun}`
-  const hint = isWatchlist
-    ? `Check it off later and it joins both of your unranked shelves.`
-    : `New ${noun}s land on both of your unranked shelves — or unwatched, with no watched date.`
-  const saveLabel = isEditing ? 'Save changes' : isWatchlist ? 'Add to watchlist' : `Add ${noun}`
-  const deleteLabel = isWatchlist ? 'Remove from watchlist' : `Delete ${noun}`
+  const hint = isWatchlist ? copy.listHint : copy.boardHint
+  const saveLabel = isEditing ? 'Save changes' : isWatchlist ? `Add to ${copy.listLabel.toLowerCase()}` : `Add ${noun}`
+  const deleteLabel = isWatchlist ? `Remove from ${copy.listLabel.toLowerCase()}` : `Delete ${noun}`
 
   // Live preview of the card exactly as it will render on the board.
   const previewItem: TierItem = {
@@ -105,6 +137,7 @@ export function ItemModal({
     title: draft.title.trim() || 'Title…',
     imageUrl: draft.imageUrl.trim(),
     watchedOn: null,
+    tags: [],
     createdBy: null,
     createdAt: '',
   }
@@ -126,7 +159,7 @@ export function ItemModal({
                 setShowSuggestions(true)
               }}
               onBlur={() => setShowSuggestions(false)}
-              placeholder={kind === 'tv' ? 'e.g. Severance' : 'e.g. Paddington 2'}
+              placeholder={`e.g. ${copy.example}`}
               data-autofocus
               autoComplete="off"
             />
@@ -148,7 +181,7 @@ export function ItemModal({
               >
                 {suggestions.map((result) => (
                   <UnstyledButton
-                    key={result.id}
+                    key={result.key}
                     // onMouseDown (with preventDefault) so the pick lands
                     // before the input's blur hides the dropdown.
                     onMouseDown={(e) => {
@@ -180,16 +213,16 @@ export function ItemModal({
                           fontSize: 15,
                         }}
                       >
-                        {kind === 'tv' ? '📺' : '🎬'}
+                        {copy.emoji}
                       </Box>
                     )}
                     <Box>
                       <Text fz={13} fw={600} c={colors.ink} lh={1.3}>
                         {result.title}
                       </Text>
-                      {result.year && (
+                      {result.meta && (
                         <Text fz={11.5} c={colors.faint}>
-                          {result.year}
+                          {result.meta}
                         </Text>
                       )}
                     </Box>
@@ -199,24 +232,34 @@ export function ItemModal({
             )}
           </Box>
           <TextInput
-            label="Poster image URL"
+            label={copy.imageLabel}
             value={draft.imageUrl}
             onChange={(e) => onChange({ imageUrl: e.currentTarget.value })}
             placeholder="Paste an image link (optional)"
             mb={isWatchlist ? 6 : 18}
           />
           {!isWatchlist && (
-            <TextInput
-              label="Watched on"
-              type="date"
-              value={draft.watchedOn}
-              onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
-              mb={6}
-            />
+            <>
+              <TextInput
+                label={copy.dateLabel}
+                type="date"
+                value={draft.watchedOn}
+                onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
+                mb={18}
+              />
+              <TagsInput
+                label="Tags"
+                value={draft.tags}
+                onChange={(tags) => onChange({ tags })}
+                data={tagSuggestions}
+                placeholder={draft.tags.length === 0 ? 'e.g. fantasy, disney (optional)' : undefined}
+                mb={6}
+              />
+            </>
           )}
           <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans }}>
             {hint}
-            {isTmdbConfigured && ' Title search by TMDB (not endorsed or certified by TMDB).'}
+            {searchEnabled && ` ${copy.attribution}`}
           </Text>
         </Box>
         {/* Keyed on the URL so pasting a new link retries a broken image. */}

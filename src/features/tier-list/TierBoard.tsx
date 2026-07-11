@@ -57,6 +57,7 @@ export function TierBoard({
   onCardClick,
   shelfHint,
   unwatchedHint,
+  unwatchedLabel,
 }: {
   /** The viewer's board as derived from the store (the source of truth). */
   board: Board
@@ -66,13 +67,15 @@ export function TierBoard({
   onUnrank: (itemId: string) => void
   /** Float precision ran out in a tier — rewrite it at integer positions. */
   onRenormalize: (tier: Tier, orderedItemIds: string[]) => void
-  /** A card left the unwatched shelf — stamp the item's watched date. */
+  /** A card left the unwatched/unread shelf — stamp the date (the shared
+   *  watched date for movies/TV, the viewer's own read record for books). */
   onMarkWatched: (itemId: string) => void
-  /** A card was dropped on the unwatched shelf — clear the watched date. */
+  /** A card was dropped on the unwatched/unread shelf — clear that date. */
   onMarkUnwatched: (itemId: string) => void
   onCardClick: (item: TierItem) => void
   shelfHint?: string
   unwatchedHint?: string
+  unwatchedLabel?: string
 }) {
   // While dragging, render a frozen local copy: onDragOver mutates it for the
   // cross-row preview, and realtime updates landing in the store can't yank
@@ -220,6 +223,7 @@ export function TierBoard({
         RowArea={DroppableRowArea}
         shelfHint={shelfHint}
         unwatchedHint={unwatchedHint}
+        unwatchedLabel={unwatchedLabel}
         renderCard={(item: TierItem, _container: ContainerId) => (
           <SortableCard key={item.id} item={item} onClick={() => onCardClick(item)} />
         )}

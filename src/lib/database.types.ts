@@ -148,6 +148,7 @@ export interface Database {
           title: string
           image_url: string
           watched_on: string | null
+          tags: string[]
           created_by: string | null
           created_at: string
         }
@@ -158,6 +159,7 @@ export interface Database {
           title: string
           image_url?: string
           watched_on?: string | null
+          tags?: string[]
           created_by?: string | null
           created_at?: string
         }
@@ -168,6 +170,7 @@ export interface Database {
           title?: string
           image_url?: string
           watched_on?: string | null
+          tags?: string[]
           created_by?: string | null
           created_at?: string
         }
@@ -199,6 +202,33 @@ export interface Database {
           user_id?: string
           tier?: string
           position?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tier_item_reads: {
+        Row: {
+          id: string
+          space_id: string
+          item_id: string
+          user_id: string
+          read_on: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          item_id: string
+          user_id?: string
+          read_on: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          item_id?: string
+          user_id?: string
+          read_on?: string
           created_at?: string
         }
         Relationships: []

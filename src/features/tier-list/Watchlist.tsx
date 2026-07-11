@@ -3,14 +3,15 @@ import { ActionIcon, Box, Checkbox, Group, Paper, Text } from '@mantine/core'
 import type { TierKind, WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
 import { formatDate } from '../../lib/format'
-
-const KIND_NOUN: Record<TierKind, string> = { movie: 'movie', tv: 'show' }
+import { KIND_COPY } from './copy'
 
 interface WatchlistProps {
   items: WatchlistItem[]
   kind: TierKind
-  /** Watched date per TIER item id — a checked wish looks its own up via
-   *  `tierItemId` (the wish row has no date; the tier item carries it). */
+  /** Date per TIER item id — a checked wish looks its own up via `tierItemId`
+   *  (the wish row has no date). For movies/TV that's the shared watched date;
+   *  for books the page passes the VIEWER's own read dates, so a book the
+   *  partner checked off shows dateless here until you read it too. */
   watchedDates: ReadonlyMap<string, string | null>
   /** Check off an open item — creates the tier item and drops it on the board. */
   onCheck: (item: WatchlistItem) => void
@@ -21,10 +22,10 @@ interface WatchlistProps {
   onDelete: (id: string) => void
 }
 
-/** A small poster thumbnail with the same graceful fallback the board cards use. */
+/** A small poster/cover thumbnail with the same graceful fallback the board cards use. */
 function Thumb({ item }: { item: WatchlistItem }) {
   const [broken, setBroken] = useState(false)
-  const emoji = item.kind === 'tv' ? '📺' : '🎬'
+  const emoji = KIND_COPY[item.kind].emoji
   if (!item.imageUrl || broken) {
     return (
       <Box
@@ -55,10 +56,11 @@ function Thumb({ item }: { item: WatchlistItem }) {
   )
 }
 
-/** The shared "want to watch" list for one kind. Checking an item off promotes
- *  it into the tier pool (the page owns that action + the add/edit modal). */
+/** The shared "want to watch/read" list for one kind. Checking an item off
+ *  promotes it into the tier pool (the page owns that action + the add/edit
+ *  modal). */
 export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdit, onDelete }: WatchlistProps) {
-  const noun = KIND_NOUN[kind]
+  const copy = KIND_COPY[kind]
 
   if (items.length === 0) {
     return (
@@ -70,10 +72,10 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
         style={{ border: '1px dashed rgba(120,100,80,0.28)', borderRadius: 16 }}
       >
         <Text fz={22} mb={6} style={{ fontFamily: fonts.serif }}>
-          Nothing to watch yet
+          {copy.listEmptyTitle}
         </Text>
         <Text fz={14} c={colors.muted}>
-          Add a {noun} you both want to see. Check it off and it lands on your tier board, ready to rank.
+          {copy.listEmptyBlurb}
         </Text>
       </Box>
     )
@@ -99,7 +101,7 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
                 radius="xl"
                 size="md"
                 color={ACCENT}
-                aria-label={done ? 'Move back to watchlist' : 'Mark watched — add to board'}
+                aria-label={done ? `Move back to ${copy.listLabel.toLowerCase()}` : `Mark ${copy.past} — add to board`}
                 styles={{ input: { cursor: 'pointer' } }}
               />
               <Thumb item={item} />
@@ -120,8 +122,8 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
                 {done && (
                   <Text fz={12} c={colors.muted} mt={2} style={{ fontFamily: fonts.sans }}>
                     {watchedOn
-                      ? `Watched ${formatDate(watchedOn)} — on your tier board, go rank it.`
-                      : 'On your tier board — go rank it.'}
+                      ? `${copy.pastCap} ${formatDate(watchedOn)} — on your tier board, go rank it.`
+                      : copy.onBoardNote}
                   </Text>
                 )}
               </Box>
@@ -129,7 +131,7 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
                 variant="subtle"
                 onClick={() => onDelete(item.id)}
                 c={colors.faint}
-                aria-label="Remove from watchlist"
+                aria-label={`Remove from ${copy.listLabel.toLowerCase()}`}
               >
                 <span style={{ fontSize: 18, lineHeight: 1 }}>×</span>
               </ActionIcon>

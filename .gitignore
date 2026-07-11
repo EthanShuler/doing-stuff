@@ -25,3 +25,7 @@ dist-ssr
 *.tsbuildinfo
 
 tmp/
+
+# Playwright output
+test-results/
+playwright-report/
