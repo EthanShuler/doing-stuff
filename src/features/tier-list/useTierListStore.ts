@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { datesArePersonal, normalizeTags, renormalizedPositions } from './derive'
+import { PROFILE_COLUMNS, errorMessage, idFactory, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import type { ProfileRow } from '../../data/spaceSync'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
 //   • Supabase keys present → live: reads/writes `tier_items` + `tier_placements`
@@ -121,7 +124,6 @@ type TierReadRow = {
   user_id: string
   read_on: string
 }
-type ProfileRow = { id: string; email: string | null; display_name: string | null }
 type WatchlistItemRow = {
   id: string
   kind: string
@@ -155,7 +157,6 @@ const toTierRead = (r: TierReadRow): TierRead => ({
   userId: r.user_id,
   readOn: r.read_on,
 })
-const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
 const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
   id: r.id,
   kind: r.kind as TierKind,
@@ -171,15 +172,8 @@ const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_READ_COLUMNS = 'id,item_id,user_id,read_on'
 const WATCHLIST_COLUMNS = 'id,kind,title,image_url,tier_item_id,created_by,created_at'
 
-const message = (err: unknown): string =>
-  err instanceof Error ? err.message : 'Something went wrong.'
-
 // In-memory fallback only: stable client ids for seed-mode edits.
-let idCounter = 500
-function nextId(): string {
-  idCounter += 1
-  return `tx${idCounter}`
-}
+const nextId = idFactory('tx', 500)
 
 // A placement's logical identity is (itemId, userId) — the DB enforces it
 // unique. Upserting by that pair (rather than row id) keeps local state
@@ -273,7 +267,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
       supabase.from('tier_item_reads').select(TIER_READ_COLUMNS).eq('space_id', spaceId).order('created_at'),
       // RLS scopes this to the current user + anyone they share a space with.
-      supabase.from('profiles').select('id,email,display_name'),
+      supabase.from('profiles').select(PROFILE_COLUMNS),
       supabase.from('watchlist_items').select(WATCHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
     ])
     if (its.error) throw its.error
@@ -305,129 +299,30 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       .then((snap) => {
         if (snap) applySnapshot(snap)
       })
-      .catch((err) => setError(message(err)))
+      .catch((err) => setError(errorMessage(err)))
   }, [fetchAll, applySnapshot])
 
-  // Initial load (live mode only; waits for the space to resolve).
-  useEffect(() => {
-    if (!supabase || !spaceId) return
-    let cancelled = false
+  // Wire this store's tables onto the realtime channel (see useSpaceSync).
+  // Placements and read records pass their (itemId, userId)-keyed upserts;
+  // a cascaded tier-item delete needs no special-casing — the DB emits the
+  // dependent deletes (and the watchlist set-null UPDATE) as their own events.
+  const wire = useCallback((channel: RealtimeChannel, spaceFilter: string) => {
+    channel = syncTable(channel, spaceFilter, 'tier_items', toTierItem, setItems)
+    channel = syncTable(channel, spaceFilter, 'tier_placements', toTierPlacement, setPlacements, upsertPlacement)
+    channel = syncTable(channel, spaceFilter, 'tier_item_reads', toTierRead, setReads, upsertRead)
+    channel = syncTable(channel, spaceFilter, 'watchlist_items', toWatchlistItem, setWatchlist)
+    return channel
+  }, [])
 
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const snap = await fetchAll()
-        if (!cancelled && snap) applySnapshot(snap)
-      } catch (err) {
-        if (!cancelled) setError(message(err))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [spaceId, fetchAll, applySnapshot])
-
-  // Realtime: stream the partner's pool additions and placement changes in
-  // live. Same shape as useActivityStore's channel, but its own channel name —
-  // both stores can be mounted in one session and names must not collide.
-  useEffect(() => {
-    if (!supabase || !spaceId) return
-    const client = supabase
-    let cancelled = false
-
-    const spaceFilter = `space_id=eq.${spaceId}`
-    let channel = client.channel(`tier:${spaceId}`)
-
-    const upsertItem = (item: TierItem) =>
-      setItems((prev) =>
-        prev.some((x) => x.id === item.id)
-          ? prev.map((x) => (x.id === item.id ? item : x))
-          : [...prev, item],
-      )
-
-    const upsertWatch = (w: WatchlistItem) =>
-      setWatchlist((prev) =>
-        prev.some((x) => x.id === w.id) ? prev.map((x) => (x.id === w.id ? w : x)) : [...prev, w],
-      )
-
-    // INSERT/UPDATE are filtered to this space server-side. DELETE can't be —
-    // Postgres puts only the primary key in the replicated old record — so we
-    // listen unfiltered and drop the id if we happen to hold it.
-    channel = channel
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tier_items', filter: spaceFilter }, (p) =>
-        upsertItem(toTierItem(p.new as TierItemRow)),
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tier_items', filter: spaceFilter }, (p) =>
-        upsertItem(toTierItem(p.new as TierItemRow)),
-      )
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tier_items' }, (p) => {
-        const id = (p.old as { id: string }).id
-        setItems((prev) => prev.filter((x) => x.id !== id))
-        // The DB cascades the item's placements; those arrive as their own
-        // DELETE events, so no local mirroring is needed here.
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tier_placements', filter: spaceFilter }, (p) =>
-        upsertPlacement(setPlacements, toTierPlacement(p.new as TierPlacementRow)),
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tier_placements', filter: spaceFilter }, (p) =>
-        upsertPlacement(setPlacements, toTierPlacement(p.new as TierPlacementRow)),
-      )
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tier_placements' }, (p) => {
-        const id = (p.old as { id: string }).id
-        setPlacements((prev) => prev.filter((x) => x.id !== id))
-      })
-      // Book read records: per-person like placements, same event shape.
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tier_item_reads', filter: spaceFilter }, (p) =>
-        upsertRead(setReads, toTierRead(p.new as TierReadRow)),
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tier_item_reads', filter: spaceFilter }, (p) =>
-        upsertRead(setReads, toTierRead(p.new as TierReadRow)),
-      )
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tier_item_reads' }, (p) => {
-        const id = (p.old as { id: string }).id
-        setReads((prev) => prev.filter((x) => x.id !== id))
-      })
-      // Watchlist: shared, so INSERT/UPDATE (incl. the tier_item_id set-null that
-      // a cascaded tier-item delete produces) stream in filtered to the space.
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'watchlist_items', filter: spaceFilter }, (p) =>
-        upsertWatch(toWatchlistItem(p.new as WatchlistItemRow)),
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'watchlist_items', filter: spaceFilter }, (p) =>
-        upsertWatch(toWatchlistItem(p.new as WatchlistItemRow)),
-      )
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'watchlist_items' }, (p) => {
-        const id = (p.old as { id: string }).id
-        setWatchlist((prev) => prev.filter((x) => x.id !== id))
-      })
-
-    let subscribedOnce = false
-    channel.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return
-      // The first subscribe races the initial load, which already covers it.
-      // Later ones mean the socket dropped and rejoined — refetch to pick up
-      // anything missed while disconnected.
-      if (!subscribedOnce) {
-        subscribedOnce = true
-        return
-      }
-      fetchAll()
-        .then((snap) => {
-          if (!cancelled && snap) applySnapshot(snap)
-        })
-        .catch((err) => {
-          if (!cancelled) setError(message(err))
-        })
-    })
-
-    return () => {
-      cancelled = true
-      client.removeChannel(channel)
-    }
-  }, [spaceId, fetchAll, applySnapshot])
+  useSpaceSync({
+    spaceId,
+    channelPrefix: 'tier',
+    fetchAll,
+    applySnapshot,
+    setLoading,
+    setError,
+    wire,
+  })
 
   // Your own read record for a book: null deletes it ("I haven't read this"),
   // a date upserts it. Only ever touches rows with your user_id — the

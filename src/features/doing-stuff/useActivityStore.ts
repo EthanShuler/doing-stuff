@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { geocode } from '../../lib/geocode'
+import { PROFILE_COLUMNS, idFactory, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import type { ProfileRow } from '../../data/spaceSync'
 
 // The app's single source of domain data (categories / activities / entries).
 //
@@ -95,7 +97,6 @@ type EntryRow = {
   hide_from_map: boolean | null
 }
 type SpaceHomeRow = { home_address: string | null; home_lat: number | null; home_lng: number | null }
-type ProfileRow = { id: string; email: string | null; display_name: string | null }
 type WishlistRow = {
   id: string
   text: string
@@ -135,7 +136,6 @@ const toEntry = (r: EntryRow): Entry => ({
 })
 const toHome = (r: SpaceHomeRow | null): Home =>
   r ? { address: r.home_address ?? '', lat: r.home_lat, lng: r.home_lng } : EMPTY_HOME
-const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
 const toWishlistItem = (r: WishlistRow): WishlistItem => ({
   id: r.id,
   text: r.text,
@@ -159,15 +159,8 @@ const WISHLIST_COLUMNS = 'id,text,entry_id,created_by,created_at,address,lat,lng
 const REPEAT_COLUMNS = 'id,entry_id,repeat_date,created_by'
 const SPACE_HOME_COLUMNS = 'home_address,home_lat,home_lng'
 
-const message = (err: unknown): string =>
-  err instanceof Error ? err.message : 'Something went wrong.'
-
 // In-memory fallback only: stable client ids for seed-mode edits.
-let idCounter = 100
-function nextId(): string {
-  idCounter += 1
-  return `x${idCounter}`
-}
+const nextId = idFactory('x', 100)
 
 // Keep just the first grapheme so a pin shows one icon — grapheme-aware so it
 // doesn't split emoji ZWJ sequences (e.g. 👨‍👩‍👧) or surrogate pairs.
@@ -279,7 +272,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
       supabase.from('entry_repeats').select(REPEAT_COLUMNS).eq('space_id', spaceId).order('repeat_date'),
       // RLS scopes this to the current user + anyone they share a space with.
-      supabase.from('profiles').select('id,email,display_name'),
+      supabase.from('profiles').select(PROFILE_COLUMNS),
       supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('spaces').select(SPACE_HOME_COLUMNS).eq('id', spaceId).single(),
     ])
@@ -311,109 +304,33 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     setHomeState(snap.home)
   }, [])
 
-  // Initial load (live mode only; waits for the space to resolve).
-  useEffect(() => {
-    if (!supabase || !spaceId) return
-    let cancelled = false
-
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const snap = await fetchAll()
-        if (!cancelled && snap) applySnapshot(snap)
-      } catch (err) {
-        if (!cancelled) setError(message(err))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [spaceId, fetchAll, applySnapshot])
-
-  // Realtime: stream the partner's changes into local state so their edits
-  // appear without a reload. Requires the tables to be in the
-  // `supabase_realtime` publication (see schema.sql). Events apply as
-  // upsert/remove-by-id, so echoes of this client's own writes are idempotent —
-  // and cascades need no special-casing, because the DB emits the cascaded
-  // deletes (and the wish-reopen UPDATE) as their own events.
-  useEffect(() => {
-    if (!supabase || !spaceId) return
-    const client = supabase
-    let cancelled = false
-
-    const upsertBy = <T extends { id: string }>(set: Dispatch<SetStateAction<T[]>>, item: T) =>
-      set((prev) =>
-        prev.some((x) => x.id === item.id)
-          ? prev.map((x) => (x.id === item.id ? item : x))
-          : [...prev, item],
+  // Wire this store's tables onto the realtime channel (see useSpaceSync).
+  const wire = useCallback(
+    (channel: RealtimeChannel, spaceFilter: string) => {
+      channel = syncTable(channel, spaceFilter, 'categories', toCategory, setCategories)
+      channel = syncTable(channel, spaceFilter, 'activities', toActivity, setActivities)
+      channel = syncTable(channel, spaceFilter, 'entries', toEntry, setEntries)
+      channel = syncTable(channel, spaceFilter, 'entry_repeats', toRepeat, setRepeats)
+      channel = syncTable(channel, spaceFilter, 'wishlist_items', toWishlistItem, setWishlist)
+      // Home lives on the space row itself; only updates matter.
+      return channel.on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'spaces', filter: `id=eq.${spaceId}` },
+        (p) => setHomeState(toHome(p.new as SpaceHomeRow)),
       )
-    const removeBy = <T extends { id: string }>(set: Dispatch<SetStateAction<T[]>>, id: string) =>
-      set((prev) => (prev.some((x) => x.id === id) ? prev.filter((x) => x.id !== id) : prev))
+    },
+    [spaceId],
+  )
 
-    const spaceFilter = `space_id=eq.${spaceId}`
-    let channel = client.channel(`space:${spaceId}`)
-
-    // INSERT/UPDATE are filtered to this space server-side. DELETE can't be —
-    // Postgres puts only the primary key in the replicated old record — so we
-    // listen unfiltered and drop the id if we happen to hold it.
-    const sync = <Row extends object, T extends { id: string }>(
-      table: string,
-      map: (row: Row) => T,
-      set: Dispatch<SetStateAction<T[]>>,
-    ) => {
-      channel = channel
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter: spaceFilter }, (p) =>
-          upsertBy(set, map(p.new as Row)),
-        )
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter: spaceFilter }, (p) =>
-          upsertBy(set, map(p.new as Row)),
-        )
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, (p) =>
-          removeBy(set, (p.old as { id: string }).id),
-        )
-    }
-
-    sync('categories', toCategory, setCategories)
-    sync('activities', toActivity, setActivities)
-    sync('entries', toEntry, setEntries)
-    sync('entry_repeats', toRepeat, setRepeats)
-    sync('wishlist_items', toWishlistItem, setWishlist)
-
-    // Home lives on the space row itself; only updates matter.
-    channel = channel.on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'spaces', filter: `id=eq.${spaceId}` },
-      (p) => setHomeState(toHome(p.new as SpaceHomeRow)),
-    )
-
-    let subscribedOnce = false
-    channel.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return
-      // The first subscribe races the initial load, which already covers it.
-      // Later ones mean the socket dropped and rejoined (laptop sleep, network
-      // blip) — refetch to pick up anything missed while disconnected.
-      if (!subscribedOnce) {
-        subscribedOnce = true
-        return
-      }
-      fetchAll()
-        .then((snap) => {
-          if (!cancelled && snap) applySnapshot(snap)
-        })
-        .catch((err) => {
-          if (!cancelled) setError(message(err))
-        })
-    })
-
-    return () => {
-      cancelled = true
-      client.removeChannel(channel)
-    }
-  }, [spaceId, fetchAll, applySnapshot])
+  useSpaceSync({
+    spaceId,
+    channelPrefix: 'space',
+    fetchAll,
+    applySnapshot,
+    setLoading,
+    setError,
+    wire,
+  })
 
   // --- Entry actions. These throw on failure so the modal can stay open. ---
 
