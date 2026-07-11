@@ -226,13 +226,15 @@ export interface ActivityStore {
 
 export function useActivityStore(spaceId: string | null, userId: string | null = null): ActivityStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
-  const [categories, setCategories] = useState<Category[]>(() => (supabase ? [] : seed().categories))
-  const [activities, setActivities] = useState<Activity[]>(() => (supabase ? [] : seed().activities))
-  const [entries, setEntries] = useState<Entry[]>(() => (supabase ? [] : seed().entries))
-  const [repeats, setRepeats] = useState<Repeat[]>(() => (supabase ? [] : seed().repeats))
-  const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
-  const [wishlist, setWishlist] = useState<WishlistItem[]>(() => (supabase ? [] : seed().wishlist))
-  const [home, setHomeState] = useState<Home>(() => (supabase ? EMPTY_HOME : seed().home))
+  // Built once — every list below initializes from the same snapshot.
+  const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed()))
+  const [categories, setCategories] = useState<Category[]>(initial?.categories ?? [])
+  const [activities, setActivities] = useState<Activity[]>(initial?.activities ?? [])
+  const [entries, setEntries] = useState<Entry[]>(initial?.entries ?? [])
+  const [repeats, setRepeats] = useState<Repeat[]>(initial?.repeats ?? [])
+  const [profiles, setProfiles] = useState<Profile[]>(initial?.profiles ?? [])
+  const [wishlist, setWishlist] = useState<WishlistItem[]>(initial?.wishlist ?? [])
+  const [home, setHomeState] = useState<Home>(initial?.home ?? EMPTY_HOME)
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -248,6 +250,12 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   // whether to re-geocode, without re-creating its callback on every change.
   const wishlistRef = useRef(wishlist)
   wishlistRef.current = wishlist
+
+  // And for activities: deleteCategory reads them to find which entries the
+  // DB's cascade will remove (state updaters must stay pure, so it can't
+  // compute this inside another setter).
+  const activitiesRef = useRef(activities)
+  activitiesRef.current = activities
 
   // Geocode an address for a save: returns coords (or null) and posts a
   // non-blocking notice when a non-empty address can't be located.
@@ -436,7 +444,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
                 ...entry,
                 activityId: draft.activityId,
                 title: draft.title,
-                date: draft.date,
+                date: draft.date || today(),
                 description: draft.description,
                 rating: draft.rating,
                 address,
@@ -602,17 +610,12 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           return
         }
       }
-      // DB cascades activities + their entries; mirror it locally. The nested
-      // updates read fresh state to find which activities/entries to drop.
-      setActivities((prevActivities) => {
-        const removedActivityIds = new Set(
-          prevActivities.filter((a) => a.categoryId === id).map((a) => a.id),
-        )
-        setEntries((prevEntries) =>
-          prevEntries.filter((entry) => !removedActivityIds.has(entry.activityId)),
-        )
-        return prevActivities.filter((a) => a.categoryId !== id)
-      })
+      // DB cascades activities + their entries; mirror it locally.
+      const removedActivityIds = new Set(
+        activitiesRef.current.filter((a) => a.categoryId === id).map((a) => a.id),
+      )
+      setActivities((prev) => prev.filter((a) => a.categoryId !== id))
+      setEntries((prev) => prev.filter((entry) => !removedActivityIds.has(entry.activityId)))
       setCategories((prev) => prev.filter((category) => category.id !== id))
     },
     [spaceId],
@@ -666,7 +669,9 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       }
       setWishlist((prev) => [
         ...prev,
-        { id: nextId(), text: trimmed, entryId: null, createdBy: userId, createdAt: today(), address: '', lat: null, lng: null },
+        // createdAt is an ISO timestamp (matching the DB column), not a bare
+        // date — sortWishlist compares the strings lexicographically.
+        { id: nextId(), text: trimmed, entryId: null, createdBy: userId, createdAt: new Date().toISOString(), address: '', lat: null, lng: null },
       ])
     },
     [spaceId, userId],

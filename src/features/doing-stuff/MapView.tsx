@@ -35,15 +35,23 @@ const eyebrowStyle = {
 }
 
 /** A Leaflet marker drawn as a plain emoji (avoids Leaflet's default image
- *  assets, which break under bundlers, and gives us the activity's icon). */
+ *  assets, which break under bundlers, and gives us the activity's icon).
+ *  Icons are cached per emoji — they're immutable, and this avoids allocating
+ *  a fresh DivIcon for every marker on every render. */
+const iconCache = new Map<string, L.DivIcon>()
 function emojiIcon(emoji: string): L.DivIcon {
-  return L.divIcon({
-    html: `<div style="font-size:26px;line-height:1;text-align:center;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35))">${emoji}</div>`,
-    className: '',
-    iconSize: [34, 34],
-    iconAnchor: [17, 30],
-    popupAnchor: [0, -28],
-  })
+  let icon = iconCache.get(emoji)
+  if (!icon) {
+    icon = L.divIcon({
+      html: `<div style="font-size:26px;line-height:1;text-align:center;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35))">${emoji}</div>`,
+      className: '',
+      iconSize: [34, 34],
+      iconAnchor: [17, 30],
+      popupAnchor: [0, -28],
+    })
+    iconCache.set(emoji, icon)
+  }
+  return icon
 }
 
 const HOME_ICON = emojiIcon('🏠')
@@ -60,8 +68,13 @@ function Recenter({ center, zoom }: { center: [number, number]; zoom: number }) 
 
 export function MapView({ home, categories, markers, onEditEntry }: MapViewProps) {
   // Map-local filter: 'all', a category id, or 'wishlist'. Kept here (not in the
-  // shared dashboard filter) because 'wishlist' is map-specific.
-  const [filter, setFilter] = useState<MapFilter>('all')
+  // shared dashboard filter) because 'wishlist' is map-specific. A deleted
+  // category can leave it pointing at nothing — fall back to 'all'.
+  const [rawFilter, setFilter] = useState<MapFilter>('all')
+  const filter =
+    rawFilter === 'all' || rawFilter === 'wishlist' || categories.some((c) => c.id === rawFilter)
+      ? rawFilter
+      : 'all'
 
   // Only show categories that actually have pins on the map, so the filter row
   // doesn't list empty categories.

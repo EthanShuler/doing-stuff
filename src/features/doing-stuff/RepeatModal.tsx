@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import type { Repeat } from '../../types'
 import { colors, DANGER, fieldLabelStyle, fonts, warmBorder } from '../../theme'
@@ -29,6 +29,12 @@ export function RepeatModal({
 }: RepeatModalProps) {
   const [date, setDate] = useState(today())
 
+  // The modal stays mounted between opens, so refresh the default date each
+  // time it opens (a tab left overnight would otherwise offer yesterday).
+  useEffect(() => {
+    if (opened) setDate(today())
+  }, [opened])
+
   const add = () => {
     onAdd(date || today())
     setDate(today())
@@ -37,7 +43,7 @@ export function RepeatModal({
   // First entry + repeats, newest first, for the history list.
   const history = [
     { id: '__first__', date: firstDate, first: true },
-    ...[...repeats].sort((a, b) => b.date.localeCompare(a.date)).map((r) => ({ id: r.id, date: r.date, first: false })),
+    ...repeats.map((r) => ({ id: r.id, date: r.date, first: false })),
   ].sort((a, b) => b.date.localeCompare(a.date))
 
   return (

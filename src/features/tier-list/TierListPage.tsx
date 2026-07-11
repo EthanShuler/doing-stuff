@@ -54,7 +54,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   // Whose board is showing. Yours is drag-and-drop; the partner's renders the
   // same layout read-only (their placements are also read-only under RLS).
   const [viewer, setViewer] = useState<'you' | 'partner'>('you')
-  const partner = store.profiles.find((p) => p.id !== store.selfId && p.id !== null) ?? null
+  const partner = store.profiles.find((p) => p.id !== store.selfId) ?? null
   const partnerName = displayNameFor(partner) || 'Partner'
   const showingPartner = viewer === 'partner' && partner !== null
 
@@ -82,8 +82,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     () =>
       personal
         ? new Map(store.reads.filter((r) => r.userId === store.selfId).map((r) => [r.itemId, r.readOn]))
-        : new Map(store.items.map((item) => [item.id, item.watchedOn])),
-    [personal, store.reads, store.selfId, store.items],
+        : new Map(store.items.filter((item) => item.kind === kind).map((item) => [item.id, item.watchedOn])),
+    [personal, store.reads, store.selfId, store.items, kind],
   )
 
   // Tag filter: multi-select pills over the tags in use on this kind. While

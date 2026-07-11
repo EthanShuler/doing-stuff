@@ -246,11 +246,13 @@ export interface TierListStore {
 
 export function useTierListStore(spaceId: string | null, userId: string | null = null): TierListStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
-  const [items, setItems] = useState<TierItem[]>(() => (supabase ? [] : seed().items))
-  const [placements, setPlacements] = useState<TierPlacement[]>(() => (supabase ? [] : seed().placements))
-  const [reads, setReads] = useState<TierRead[]>(() => (supabase ? [] : seed().reads))
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => (supabase ? [] : seed().watchlist))
-  const [profiles, setProfiles] = useState<Profile[]>(() => (supabase ? [] : seed().profiles))
+  // Built once — every list below initializes from the same snapshot.
+  const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed()))
+  const [items, setItems] = useState<TierItem[]>(initial?.items ?? [])
+  const [placements, setPlacements] = useState<TierPlacement[]>(initial?.placements ?? [])
+  const [reads, setReads] = useState<TierRead[]>(initial?.reads ?? [])
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(initial?.watchlist ?? [])
+  const [profiles, setProfiles] = useState<Profile[]>(initial?.profiles ?? [])
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])

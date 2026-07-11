@@ -57,7 +57,13 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   const setScreen = (next: Screen) => navigate(SCREEN_PATHS[next])
 
   // View state (not persisted).
-  const [filterCategoryId, setFilterCategoryId] = useState('all')
+  const [rawFilterCategoryId, setFilterCategoryId] = useState('all')
+  // Deleting a category (locally or via a partner's realtime delete) can leave
+  // the filter pointing at nothing — fall back to 'all', not an empty view.
+  const filterCategoryId =
+    rawFilterCategoryId === 'all' || store.categories.some((c) => c.id === rawFilterCategoryId)
+      ? rawFilterCategoryId
+      : 'all'
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
   const [view, setView] = useState<ViewMode>('cards')
