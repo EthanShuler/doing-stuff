@@ -5,7 +5,7 @@
 // the same look without per-component overrides.
 
 import { Button, createTheme, Input, InputWrapper, SegmentedControl, type MantineColorsTuple } from '@mantine/core'
-import { colors, fieldLabelStyle, fonts } from './theme'
+import { colors, fieldLabelStyle, fonts, warmBorder } from './theme'
 
 // Terracotta "clay" accent scale. Index 6 is the brand ACCENT (oklch 0.62 0.13 45)
 // and index 7 the hover shade (0.56 0.13 45), matching theme.ts so Mantine's default
@@ -52,9 +52,9 @@ export const mantineTheme = createTheme({
           return {
             root: {
               '--button-bg': 'transparent',
-              '--button-hover': 'rgba(120,100,80,0.06)',
-              '--button-color': '#5c574e',
-              '--button-bd': '1px solid rgba(120,100,80,0.3)',
+              '--button-hover': warmBorder(0.06),
+              '--button-color': colors.inkSoft,
+              '--button-bd': `1px solid ${colors.dotted}`,
             },
           }
         }
@@ -63,8 +63,8 @@ export const mantineTheme = createTheme({
             root: {
               '--button-bg': colors.chip,
               '--button-hover': '#ece8df',
-              '--button-color': '#5c574e',
-              '--button-bd': '1px solid rgba(120,100,80,0.18)',
+              '--button-color': colors.inkSoft,
+              '--button-bd': `1px solid ${warmBorder(0.18)}`,
               '--button-fz': '13px',
             },
           }
@@ -76,7 +76,7 @@ export const mantineTheme = createTheme({
     SegmentedControl: SegmentedControl.extend({
       defaultProps: { radius: 9 },
       styles: {
-        root: { background: colors.chip, border: '1px solid rgba(120,100,80,0.12)', padding: 3 },
+        root: { background: colors.chip, border: `1px solid ${colors.borderFaint}`, padding: 3 },
         label: { fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted },
       },
     }),
@@ -84,7 +84,7 @@ export const mantineTheme = createTheme({
     Input: Input.extend({
       styles: {
         input: {
-          borderColor: 'rgba(120,100,80,0.25)',
+          borderColor: warmBorder(0.25),
           borderRadius: 9,
           color: colors.ink,
         },

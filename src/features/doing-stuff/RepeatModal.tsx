@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import type { Repeat } from '../../types'
-import { colors, DANGER, fieldLabelStyle, fonts } from '../../theme'
+import { colors, DANGER, fieldLabelStyle, fonts, warmBorder } from '../../theme'
 import { formatDate, today } from '../../lib/format'
 import { ModalShell } from '../../components/ModalShell'
 
@@ -72,7 +72,7 @@ export function RepeatModal({
             justify="space-between"
             align="center"
             py={9}
-            style={{ borderTop: '1px dotted rgba(120,100,80,0.22)' }}
+            style={{ borderTop: `1px dotted ${warmBorder(0.22)}` }}
           >
             <Group gap={9} align="center">
               <Text fz={14} style={{ fontFamily: fonts.serif }}>

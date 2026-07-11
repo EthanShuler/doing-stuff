@@ -29,8 +29,8 @@ export function Pill({
         borderRadius: 30,
         fontWeight: active ? 600 : 500,
         background: active ? activeBg : colors.chip,
-        color: active ? '#fff' : '#6b665e',
-        border: active ? `1px solid ${activeBg}` : '1px solid rgba(120,100,80,0.12)',
+        color: active ? '#fff' : colors.inkFaded,
+        border: active ? `1px solid ${activeBg}` : `1px solid ${colors.borderFaint}`,
       }}
     >
       {dotColor && <Box w={7} h={7} style={{ borderRadius: '50%', background: dotColor }} />}

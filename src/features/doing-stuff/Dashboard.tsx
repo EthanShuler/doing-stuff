@@ -13,7 +13,7 @@ import {
 } from '@mantine/core'
 import type { Category, SortKey, ViewMode } from '../../types'
 import type { DisplayRow, Stats } from './derive'
-import { ACCENT, colors, fonts } from '../../theme'
+import { ACCENT, colors, fonts, warmBorder } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { Stars } from '../../components/Stars'
 import { CategoryPills } from '../../components/CategoryPills'
@@ -207,7 +207,7 @@ function CardGrid({
             <Stars rating={row.rating} />
             {row.totalCount > 1 && <RepeatBadge count={row.totalCount} since={row.firstDate} />}
           </Group>
-          <Text fz={14} lh={1.5} c="#6b665e" flex={1} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
+          <Text fz={14} lh={1.5} c={colors.inkFaded} flex={1} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
             {row.description}
           </Text>
           <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} bordered />
@@ -249,7 +249,7 @@ function Table({
             style={{
               gridTemplateColumns: TABLE_COLUMNS,
               gap: 12,
-              borderBottom: '1px dotted rgba(120,100,80,0.3)',
+              borderBottom: `1px dotted ${colors.dotted}`,
               fontFamily: fonts.mono,
               fontSize: 10,
               letterSpacing: '0.1em',
@@ -273,7 +273,7 @@ function Table({
               style={{
                 gridTemplateColumns: TABLE_COLUMNS,
                 gap: 12,
-                borderTop: '1px dotted rgba(120,100,80,0.16)',
+                borderTop: `1px dotted ${warmBorder(0.16)}`,
                 alignItems: 'center',
               }}
             >
@@ -287,11 +287,11 @@ function Table({
                   </Text>
                 )}
               </Group>
-              <Group component="span" gap={7} align="center" fz={13} c="#5c574e">
+              <Group component="span" gap={7} align="center" fz={13} c={colors.inkSoft}>
                 <Box component="span" display="block" w={8} h={8} style={{ borderRadius: '50%', background: row.categoryColor, flexShrink: 0 }} />
                 {row.categoryName}
               </Group>
-              <Text fz={13} c="#6b665e">
+              <Text fz={13} c={colors.inkFaded}>
                 {row.activityName}
               </Text>
               <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 12 }}>
@@ -300,7 +300,7 @@ function Table({
               <Box fz={13}>
                 <Stars rating={row.rating} fontSize={13} />
               </Box>
-              <Text fz={13} c="#6b665e">
+              <Text fz={13} c={colors.inkFaded}>
                 {row.createdBy || '—'}
               </Text>
               <RowActions id={row.id} onEdit={onEdit} onDelete={onDelete} onRepeat={onRepeat} align="flex-end" />
@@ -333,7 +333,7 @@ function RowActions({
       justify={align}
       mt={bordered ? 14 : 0}
       pt={bordered ? 12 : 0}
-      style={bordered ? { borderTop: '1px dotted rgba(120,100,80,0.3)' } : undefined}
+      style={bordered ? { borderTop: `1px dotted ${colors.dotted}` } : undefined}
     >
       <Anchor component="button" onClick={() => onRepeat(id)} fz={12} fw={600} c={ACCENT} underline="never">
         + Repeat
@@ -357,7 +357,7 @@ function RepeatBadge({ count, since }: { count: number; since: string }) {
       style={{
         borderRadius: 30,
         background: colors.chip,
-        border: '1px solid rgba(120,100,80,0.14)',
+        border: `1px solid ${warmBorder(0.14)}`,
         fontFamily: fonts.mono,
         fontSize: 10,
         letterSpacing: '0.06em',

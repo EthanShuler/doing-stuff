@@ -1,6 +1,6 @@
 import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem } from '../../types'
 import type { YearMonth } from '../../lib/format'
-import { ACCENT, FALLBACK_COLOR, swatchFor } from '../../theme'
+import { ACCENT, FALLBACK_COLOR, colors, swatchFor } from '../../theme'
 import { currentMonthPrefix, isoDate, today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 
@@ -295,8 +295,8 @@ export function calendarDays(
       emoji: activity ? activity.emoji : '',
       categoryColor: swatch ? swatch.color : FALLBACK_COLOR,
       // Deleted-category fallback: neutral chip tint + muted ink.
-      categoryTint: swatch ? swatch.tint : '#f3f0ea',
-      categoryInk: swatch ? swatch.ink : '#5c574e',
+      categoryTint: swatch ? swatch.tint : colors.chip,
+      categoryInk: swatch ? swatch.ink : colors.inkSoft,
       categoryId,
     }
   }

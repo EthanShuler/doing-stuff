@@ -30,13 +30,28 @@ export const fonts = {
   mono: "'Spline Sans Mono', monospace",
 }
 
+/** The app's single border/tint hue (warm brown) at a given opacity. Use the
+ *  named tokens in `colors` for the recurring weights; reach for this directly
+ *  only for one-off decorative alphas. */
+export const warmBorder = (alpha: number) => `rgba(120,100,80,${alpha})`
+
 export const colors = {
   pageBg: 'oklch(0.972 0.013 78)',
   ink: '#3a352e',
+  /** Softer ink — secondary button labels, list metadata. */
+  inkSoft: '#5c574e',
+  /** Faded ink — descriptions and table body text. */
+  inkFaded: '#6b665e',
   muted: '#8a857c',
   faint: '#a8a298',
-  cardBorder: 'rgba(120,100,80,0.13)',
-  dotted: 'rgba(120,100,80,0.3)',
+  cardBorder: warmBorder(0.13),
+  dotted: warmBorder(0.3),
+  /** Hairline on chips, pills, and segmented controls. */
+  borderFaint: warmBorder(0.12),
+  /** Dashed empty-state / placeholder borders. */
+  dashedBorder: warmBorder(0.28),
+  /** The heavier dotted rule under each page's control bar. */
+  rule: warmBorder(0.4),
   chip: '#f3f0ea',
   starEmpty: '#ddd6c9',
 }

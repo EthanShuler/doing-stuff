@@ -167,7 +167,7 @@ export function ManageModal({
                     fontSize: 13,
                     fontWeight: 500,
                     background: colors.chip,
-                    color: '#5c574e',
+                    color: colors.inkSoft,
                     padding: '4px 6px 4px 6px',
                     borderRadius: 20,
                   }}
@@ -236,7 +236,7 @@ export function ManageModal({
         bg="oklch(0.96 0.018 78)"
         p="16px 18px"
         mt={18}
-        style={{ border: '1px dashed rgba(120,100,80,0.3)', borderRadius: 14 }}
+        style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14 }}
       >
         <Text fz={12} fw={600} tt="uppercase" c={colors.muted} mb={11} style={{ letterSpacing: '0.06em' }}>
           New category

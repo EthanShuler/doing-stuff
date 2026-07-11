@@ -194,7 +194,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
             gap={12}
             wrap="wrap"
             pb={18}
-            style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
+            style={{ borderBottom: `1px dotted ${colors.rule}` }}
           >
             <Group gap={12} align="center" wrap="wrap">
               <SegmentedControl

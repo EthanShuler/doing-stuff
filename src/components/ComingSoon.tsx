@@ -10,7 +10,7 @@ export function ComingSoon({ title, blurb }: { title: string; blurb: string }) {
         mx="auto"
         bg="#fff"
         p="64px 32px"
-        style={{ border: '1px dashed rgba(120,100,80,0.28)', borderRadius: 16 }}
+        style={{ border: `1px dashed ${colors.dashedBorder}`, borderRadius: 16 }}
       >
         <Text fz={28} mb={10} style={{ fontFamily: fonts.serif }}>
           {title}

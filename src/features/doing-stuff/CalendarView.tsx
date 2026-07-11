@@ -3,7 +3,7 @@ import { Box, Button, Group, Text, UnstyledButton } from '@mantine/core'
 import type { Category } from '../../types'
 import type { CalendarDay, CalendarMark } from './derive'
 import type { YearMonth } from '../../lib/format'
-import { ACCENT, colors, fonts } from '../../theme'
+import { ACCENT, colors, fonts, warmBorder } from '../../theme'
 import { monthLabel, shiftMonth } from '../../lib/format'
 import { CategoryPills } from '../../components/CategoryPills'
 
@@ -98,7 +98,7 @@ export function CalendarView({
                     fontSize: 10,
                     letterSpacing: '0.1em',
                     textTransform: 'uppercase',
-                    borderBottom: '1px dotted rgba(120,100,80,0.3)',
+                    borderBottom: `1px dotted ${colors.dotted}`,
                   }}
                 >
                   {label}
@@ -156,9 +156,9 @@ function DayCell({
       p={6}
       style={{
         minHeight: 96,
-        borderTop: topBorder ? '1px dotted rgba(120,100,80,0.18)' : undefined,
-        borderLeft: '1px dotted rgba(120,100,80,0.18)',
-        background: day.inMonth ? 'transparent' : 'rgba(120,100,80,0.035)',
+        borderTop: topBorder ? `1px dotted ${warmBorder(0.18)}` : undefined,
+        borderLeft: `1px dotted ${warmBorder(0.18)}`,
+        background: day.inMonth ? 'transparent' : warmBorder(0.035),
         cursor: clickableEmpty ? 'pointer' : 'default',
         display: 'flex',
         flexDirection: 'column',
@@ -261,9 +261,9 @@ function NavArrow({ label, onClick, children }: { label: string; onClick: () => 
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 9,
-        border: '1px solid rgba(120,100,80,0.3)',
+        border: `1px solid ${colors.dotted}`,
         background: 'transparent',
-        color: '#5c574e',
+        color: colors.inkSoft,
         fontSize: 20,
         lineHeight: 1,
       }}

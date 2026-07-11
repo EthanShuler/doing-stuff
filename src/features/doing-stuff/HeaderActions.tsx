@@ -1,5 +1,6 @@
 import { Button, Group } from '@mantine/core'
 import type { Screen } from '../../types'
+import { colors } from '../../theme'
 import { ScreenToggle } from './ScreenToggle'
 
 /** The doing-stuff control bar, rendered once above every screen: the
@@ -23,7 +24,7 @@ export function HeaderActions({
       gap={12}
       wrap="wrap"
       pb={18}
-      style={{ borderBottom: '1px dotted rgba(120,100,80,0.4)' }}
+      style={{ borderBottom: `1px dotted ${colors.rule}` }}
     >
       <ScreenToggle screen={screen} onChange={onScreenChange} />
       <Group gap={10}>
