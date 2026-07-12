@@ -158,6 +158,32 @@ export interface WatchlistItem {
   createdAt: string
 }
 
+// --- Spoons (the souvenir spoon collection) ----------------------------------
+
+/** One physical souvenir spoon — one row in `spoons`. Shared space data. */
+export interface Spoon {
+  id: string
+  name: string
+  /** Public URL of the uploaded photo (spoons storage bucket). '' = none —
+   *  cards and map pins show a 🥄 fallback. */
+  imageUrl: string
+  /** Free-text place the spoon came from ("Paris", "Yellowstone gift shop").
+   *  '' = unknown. */
+  place: string
+  /** Geocoded from `place` on save (Nominatim). null when absent or
+   *  unlocatable — the spoon stays in the list but off the map. */
+  lat: number | null
+  lng: number | null
+  /** ISO date Squabby got it; null = unknown (sorts after dated spoons). */
+  acquiredOn: string | null
+  /** The story behind the spoon. */
+  notes: string
+  /** auth.users id of the member who logged it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; tiebreak ordering for undated spoons. */
+  createdAt: string
+}
+
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
 export type Screen = 'log' | 'wishlist' | 'map' | 'calendar'

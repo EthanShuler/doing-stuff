@@ -9,6 +9,7 @@ import { ComingSoon } from './components/ComingSoon'
 import { Splash } from './components/Splash'
 import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
 import { TierListPage } from './features/tier-list/TierListPage'
+import { SpoonsPage } from './features/spoons/SpoonsPage'
 
 export default function App() {
   const { session, loading, configured } = useSession()
@@ -74,10 +75,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/parks"
             element={<ComingSoon title="National parks" blurb="Tracking the 63 together, coming soon." />}
           />
-          <Route
-            path="/spoons"
-            element={<ComingSoon title="Spoon map" blurb="The souvenir spoon collection, mapped. Coming soon." />}
-          />
+          <Route path="/spoons" element={<SpoonsPage spaceId={spaceId} configured={configured} />} />
           <Route
             path="/board-games"
             element={<ComingSoon title="Board games" blurb="The board game collection and rankings, coming soon." />}

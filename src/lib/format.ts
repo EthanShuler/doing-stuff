@@ -11,6 +11,12 @@ export function formatDate(iso: string): string {
   return `${MONTHS[Number(month) - 1]} ${Number(day)}`
 }
 
+/** "2026-06-12" -> "Jun 12, 2026" — for collections that span years (spoons). */
+export function formatDateWithYear(iso: string): string {
+  const [year] = iso.split('-')
+  return `${formatDate(iso)}, ${year}`
+}
+
 /** A year/month pair (month is 1-based, e.g. 6 = June) identifying a calendar page. */
 export interface YearMonth {
   year: number

@@ -252,6 +252,36 @@ create table if not exists public.watchlist_items (
 create index if not exists watchlist_items_space_idx on public.watchlist_items (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Spoons: the souvenir spoon collection. Each row is one physical spoon —
+-- shared space data (uniform "space members all" policy below; either member
+-- can log or fix up a spoon). The photo is uploaded to the public `spoons`
+-- storage bucket (see the storage section at the end) and stored here as its
+-- public URL ('' = none; the UI shows a 🥄 fallback). `place` is free text
+-- ("Paris", "Yellowstone gift shop") geocoded client-side (Nominatim) on save,
+-- like entry addresses; lat/lng stay null when blank or unlocatable, and such
+-- spoons appear in the list but not on the map.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.spoons (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  name        text not null,
+  image_url   text not null default '',
+  -- Where the spoon came from (free text; '' = unknown/forgotten).
+  place       text not null default '',
+  lat         double precision,
+  lng         double precision,
+  -- When Squabby got it. Null = unknown; sorts after dated spoons.
+  acquired_on date,
+  -- The story behind the spoon ("from the honeymoon").
+  notes       text not null default '',
+  created_by  uuid references auth.users (id) default auth.uid(),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists spoons_space_idx on public.spoons (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -359,6 +389,7 @@ alter table public.entries       enable row level security;
 alter table public.profiles      enable row level security;
 alter table public.wishlist_items enable row level security;
 alter table public.entry_repeats enable row level security;
+alter table public.spoons        enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_reads  enable row level security;
@@ -429,6 +460,10 @@ create policy "space members all" on public.wishlist_items
 
 drop policy if exists "space members all" on public.entry_repeats;
 create policy "space members all" on public.entry_repeats
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.spoons;
+create policy "space members all" on public.spoons
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -520,7 +555,7 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
-  public.tier_item_reads, public.watchlist_items
+  public.tier_item_reads, public.watchlist_items, public.spoons
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -540,7 +575,7 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items']
+          'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items', 'spoons']
   loop
     if not exists (
       select 1 from pg_publication_tables
@@ -550,6 +585,47 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Storage: the `spoons` bucket holds spoon photos, uploaded from the browser
+-- (downscaled client-side to ~1200px JPEG first — see src/lib/image.ts).
+-- PUBLIC bucket: photos render via plain public URLs in <img> tags and map
+-- pins with no signed-URL plumbing; the URLs are unguessable (uuid filenames)
+-- and it's souvenir spoons. Writes are still locked down: objects live under
+-- a `<space_id>/` prefix and the policies below only let members of that
+-- space write there. RLS on storage.objects is enabled by Supabase already.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('spoons', 'spoons', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "members upload spoon photos" on storage.objects;
+create policy "members upload spoon photos" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'spoons'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "members update spoon photos" on storage.objects;
+create policy "members update spoon photos" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'spoons'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "members delete spoon photos" on storage.objects;
+create policy "members delete spoon photos" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'spoons'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
 
 -- ============================================================================
 -- Optional: seed your own space with the design's starter data. Run this AFTER

@@ -266,6 +266,48 @@ export interface Database {
         }
         Relationships: []
       }
+      spoons: {
+        Row: {
+          id: string
+          space_id: string
+          name: string
+          image_url: string
+          place: string
+          lat: number | null
+          lng: number | null
+          acquired_on: string | null
+          notes: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          name: string
+          image_url?: string
+          place?: string
+          lat?: number | null
+          lng?: number | null
+          acquired_on?: string | null
+          notes?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          name?: string
+          image_url?: string
+          place?: string
+          lat?: number | null
+          lng?: number | null
+          acquired_on?: string | null
+          notes?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       entry_repeats: {
         Row: {
           id: string

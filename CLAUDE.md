@@ -8,9 +8,9 @@ Guidance for working in this repo. Read this before making changes.
 behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
-and `/ice-cream` are the **Tier Lists** feature; `/french-toast`, `/parks`, and `/spoons` are placeholder
-pages for features not built yet (a french toast ranking, a 63-national-parks
-visit tracker, a souvenir-spoon collection map). All features share the one
+and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
+feature; `/french-toast` and `/parks` are placeholder pages for features not
+built yet (a french toast ranking, a 63-national-parks visit tracker). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
 **Doing Stuff** — the landing feature — is a shared activity tracker for logging
@@ -95,6 +95,21 @@ You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
 (`BoardView`). Drops are optimistic: on write failure the store records the
 error and refetches, so the card snaps back. Per-kind wording (watch/read,
 shelf labels, emoji, hints) lives in the tier-list `copy.ts`.
+
+**Spoons** (`/spoons`) — Squabby's souvenir spoon collection. A **spoon**
+(`spoons` table, shared space data, uniform RLS) has a name, an optional
+**photo**, an optional free-text **place** it came from (geocoded on save like
+entry addresses; lat/lng stored, blank/unlocatable = list-only), an optional
+**date acquired**, and **notes**. Photos are real uploads, not pasted URLs —
+the only feature using **Supabase Storage**: the public `spoons` bucket, paths
+`<space_id>/<uuid>.jpg`, storage RLS restricting writes to space members (see
+the storage section at the end of `schema.sql`), photos downscaled client-side
+to ≤1200px JPEG before upload (`src/lib/image.ts`), and best-effort object
+cleanup when a photo is replaced or its spoon deleted (`photos.ts`). One route
+with an in-page **Collection / Map** toggle: a photo card grid (newest first,
+undated last, 🥄 fallback) and a Leaflet map of circular photo pins that
+fit-bounds to the collection on open — same-place spoons fan out a few meters
+(deterministically, in `derive.ts`) so every pin stays clickable.
 
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
 paper), ported from the Claude Design "Compass" direction.
@@ -241,7 +256,8 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
-  `tier_item_reads`, `watchlist_items`.
+  `tier_item_reads`, `watchlist_items`, `spoons`. Plus the `spoons` **storage
+  bucket** (public read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_reads`** (members read all, but
@@ -281,6 +297,7 @@ src/
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     geocode.ts             Nominatim address → lat/lng (on save only)
+    image.ts               client-side photo downscale (≤1200px JPEG) for uploads
     profile.ts             displayNameFor() — profile → short display label
     tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
     openLibrary.ts         Open Library book search (covers) for ItemModal — keyless
@@ -326,6 +343,15 @@ src/
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
       ItemModal.tsx        add/edit pool item, TMDB/Open Library suggestions
       Watchlist.tsx        shared watch/reading list (check off → pool item)
+    spoons/                the souvenir spoon collection (list + map)
+      SpoonsPage.tsx       owns the store, Collection/Map toggle, modal state
+      useSpoonStore.ts     data seam: spoons CRUD + geocode (or seed fallback)
+      photos.ts            storage bucket upload / best-effort delete
+      derive.ts            pure sort, same-place pin fan-out, map bounds
+      derive.test.ts       vitest coverage for derive.ts
+      SpoonGrid.tsx        photo card grid + SpoonPhoto (🥄 fallback)
+      SpoonMap.tsx         Leaflet map: circular photo pins, fit-bounds framing
+      SpoonModal.tsx       add/edit spoon (photo upload, place, date, story)
 e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
