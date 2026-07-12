@@ -7,6 +7,7 @@ import {
   distinctTags,
   filterByTags,
   findContainer,
+  listIsPersonal,
   moveItem,
   normalizeTags,
   positionBetween,
@@ -219,6 +220,15 @@ describe('datesArePersonal', () => {
     expect(datesArePersonal('movie')).toBe(false)
     expect(datesArePersonal('tv')).toBe(false)
     expect(datesArePersonal('ice-cream')).toBe(false)
+  })
+})
+
+describe('listIsPersonal', () => {
+  it('is true only for books — reading lists are per person', () => {
+    expect(listIsPersonal('book')).toBe(true)
+    expect(listIsPersonal('movie')).toBe(false)
+    expect(listIsPersonal('tv')).toBe(false)
+    expect(listIsPersonal('ice-cream')).toBe(false)
   })
 })
 

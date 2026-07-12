@@ -23,9 +23,10 @@ interface WatchlistProps {
   onDelete: (id: string) => void
 }
 
-/** The shared "want to watch/read" list for one kind. Checking an item off
- *  promotes it into the tier pool (the page owns that action + the add/edit
- *  modal). */
+/** The "want to watch/read/try" list for one kind — shared, except books,
+ *  where each member keeps their own reading list (the page passes only the
+ *  viewer's rows). Checking an item off promotes it into the tier pool (the
+ *  page owns that action + the add/edit modal). */
 export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdit, onDelete }: WatchlistProps) {
   const copy = KIND_COPY[kind]
 

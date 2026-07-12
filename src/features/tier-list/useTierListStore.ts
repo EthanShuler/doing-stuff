@@ -99,12 +99,15 @@ function seed(): Snapshot {
       { id: 'r5', itemId: 'b4', userId: 'u1', readOn: '2026-06-25' },
     ],
     // A couple open wishes per kind so the watchlist is demoable offline.
+    // Reading lists are per person (owner = createdBy): the seed viewer u1
+    // sees only w4 on /books — u2's w6 exercises the filter.
     watchlist: [
       { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
       { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
       { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
       { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
+      { id: 'w6', kind: 'book', title: 'Babel', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T11:00:00Z' },
     ],
   }
 }
@@ -203,7 +206,9 @@ export interface TierListStore {
   placements: TierPlacement[]
   /** All members' book read records; deriveBoard picks one viewer's. */
   reads: TierRead[]
-  /** The shared watchlist — all kinds; filter by kind in the UI. */
+  /** Every member's watchlist rows — all kinds. Movie/TV/ice-cream lists are
+   *  shared; book reading lists are per person, so the UI additionally filters
+   *  those to `createdBy === selfId` (see listIsPersonal in derive.ts). */
   watchlist: WatchlistItem[]
   profiles: Profile[]
   /** Whose board "You" is: the auth user, or the seed self in keyless mode. */
@@ -241,7 +246,8 @@ export interface TierListStore {
    *  "I haven't read this". Inline flow — records the error and resyncs. */
   setReadOn: (itemId: string, readOn: string | null) => Promise<void>
 
-  /** Add a "want to watch" item to the shared watchlist. Throws on failure. */
+  /** Add a "want to watch" item to the watchlist (books: YOUR OWN reading
+   *  list — created_by marks the owner). Throws on failure. */
   addWatchlistItem: (kind: TierKind, title: string, imageUrl: string) => Promise<void>
   /** Edit a watchlist item's title/poster (open items only). Throws on failure. */
   updateWatchlistItem: (id: string, title: string, imageUrl: string) => Promise<void>

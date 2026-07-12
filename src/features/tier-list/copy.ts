@@ -6,8 +6,9 @@ import type { TierKind } from '../../types'
  * together); books are "read", and read state is per person (see
  * `tier_item_reads`); ice cream is "tried" — shared like movies/TV, but with
  * no visible date (the shared `watched_on` is just its tried/not-tried
- * marker). `datesArePersonal()` in derive.ts is the behavior switch — this
- * file is just the words.
+ * marker). The reading list is also per person — each member keeps their own
+ * (see `listIsPersonal`). `datesArePersonal()` / `listIsPersonal()` in
+ * derive.ts are the behavior switches — this file is just the words.
  */
 export interface KindCopy {
   /** Browser-tab / nav title for the kind's route. */
@@ -104,10 +105,11 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     dateLabel: 'Read on',
     boardHint:
       'New books land on your unranked shelf — or Unread with no date. Read dates are per person; your partner marks their own.',
-    listHint: 'Check it off when you finish — it lands ready to rank for you, and unread for your partner.',
+    listHint:
+      'This list is just yours. Check it off when you finish — it lands ready to rank for you, and unread for your partner.',
     listEmptyTitle: 'Nothing to read yet',
     listEmptyBlurb:
-      'Add a book either of you wants to read. Check it off when you finish and it lands on your tier board, ready to rank.',
+      'Add a book you want to read — this list is yours alone. Check it off when you finish and it lands on your tier board, ready to rank.',
     onBoardNote: 'On the board — it stays on your Unread shelf until you mark it read.',
     attribution: 'Book search by Open Library.',
   },

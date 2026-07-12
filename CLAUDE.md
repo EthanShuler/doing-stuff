@@ -76,9 +76,12 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   `derive.ts` is the behavior switch: for books, shelf drags and the modal's
   date field write the viewer's own read row and never touch `watched_on`.
   Same split RLS as placements (read everyone's, write only your own).
-- **Watchlist item** (`watchlist_items`) — a shared "want to watch/read/try"
-  entry per kind (UI label: Watchlist, Reading list for books, or To-try list
-  for ice cream). Checking one off
+- **Watchlist item** (`watchlist_items`) — a "want to watch/read/try" entry
+  per kind (UI label: Watchlist, Reading list for books, or To-try list for
+  ice cream). Movie/TV/ice-cream lists are shared; the book reading list is
+  **per person** — owned via `created_by`, the UI shows only the viewer's rows
+  (`listIsPersonal()` in the tier-list `derive.ts` is the switch), and RLS
+  lets only the owner write a book row. Checking one off
   creates the tier item — dated today: the shared `watched_on` for movies/TV
   and ice cream, the *checker's own read record* for books — and links via
   `tier_item_id`
@@ -240,10 +243,13 @@ schema in `supabase/schema.sql` is already applied to the current project.
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
   `tier_item_reads`, `watchlist_items`.
 - Most tables use the uniform "space members all" `for all` policy. The
-  exceptions: `profiles` (read self + co-members, update self) and
+  exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_reads`** (members read all, but
   insert/update/delete require `user_id = auth.uid()` — rankings and book read
-  state are personal). Follow that pattern for any future per-person opinion data.
+  state are personal), and **`watchlist_items`** (members read all; writes to
+  BOOK rows additionally require `created_by = auth.uid()` — reading lists are
+  personal, other kinds' lists stay shared). Follow that pattern for any
+  future per-person opinion data.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via

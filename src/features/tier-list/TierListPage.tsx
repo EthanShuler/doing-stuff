@@ -8,7 +8,7 @@ import { Pill } from '../../components/Pill'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
-import { datesArePersonal, deriveBoard, distinctTags, filterByTags } from './derive'
+import { datesArePersonal, deriveBoard, distinctTags, filterByTags, listIsPersonal } from './derive'
 import { KIND_COPY } from './copy'
 import { TierBoard } from './TierBoard'
 import { BoardView } from './BoardView'
@@ -66,13 +66,17 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const [draft, setDraft] = useState<ItemDraft>(() => emptyDraft('board'))
 
   // The watchlist for this kind: open items first, then checked-off ones.
+  // Reading lists (books) are per person — show only the viewer's own rows;
+  // the other lists are shared, so everyone's rows show.
   const watchItems = useMemo(() => {
-    const mine = store.watchlist.filter((w) => w.kind === kind)
+    const mine = store.watchlist.filter(
+      (w) => w.kind === kind && (!listIsPersonal(kind) || w.createdBy === store.selfId),
+    )
     const rank = (w: WatchlistItem) => (w.tierItemId === null ? 0 : 1)
     return [...mine].sort((a, b) =>
       rank(a) !== rank(b) ? rank(a) - rank(b) : a.createdAt < b.createdAt ? -1 : 1,
     )
-  }, [store.watchlist, kind])
+  }, [store.watchlist, kind, store.selfId])
 
   // Date per tier item id, for the checked-off watchlist rows (the wish itself
   // has no date — it's looked up via the tier item it produced). Movies/TV:
@@ -245,21 +249,28 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
           )}
 
           {mode === 'watchlist' ? (
-            <Watchlist
-              items={watchItems}
-              kind={kind}
-              watchedDates={watchedDates}
-              onCheck={(item) => {
-                void store.checkOffWatchlistItem(item)
-              }}
-              onUncheck={(id) => {
-                void store.uncheckWatchlistItem(id)
-              }}
-              onEdit={openEditWatch}
-              onDelete={(id) => {
-                void store.deleteWatchlistItem(id)
-              }}
-            />
+            <>
+              {listIsPersonal(kind) && partner && (
+                <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+                  Your {copy.listLabel.toLowerCase()} — {partnerName} keeps their own.
+                </Text>
+              )}
+              <Watchlist
+                items={watchItems}
+                kind={kind}
+                watchedDates={watchedDates}
+                onCheck={(item) => {
+                  void store.checkOffWatchlistItem(item)
+                }}
+                onUncheck={(id) => {
+                  void store.uncheckWatchlistItem(id)
+                }}
+                onEdit={openEditWatch}
+                onDelete={(id) => {
+                  void store.deleteWatchlistItem(id)
+                }}
+              />
+            </>
           ) : showingPartner ? (
             <>
               <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>

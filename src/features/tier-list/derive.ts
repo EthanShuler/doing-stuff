@@ -19,6 +19,15 @@ export type ContainerId = Tier | 'unranked' | 'unwatched'
  */
 export const datesArePersonal = (kind: TierKind): boolean => kind === 'book'
 
+/**
+ * Whether a kind's "want to" list belongs to one person rather than the space.
+ * Movies, TV, and ice cream are watched/tried together, so their watchlists
+ * are shared; books are read separately, so each member keeps their own
+ * reading list — the UI shows only rows whose `createdBy` is the viewer, and
+ * RLS lets only the owner write a book's row.
+ */
+export const listIsPersonal = (kind: TierKind): boolean => kind === 'book'
+
 /** Palette index per tier — a classic hot→cool ramp through the theme swatches. */
 const TIER_COLOR_INDEX: Record<Tier, number> = { S: 5, A: 1, B: 3, C: 0, D: 4, F: 2 }
 

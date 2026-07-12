@@ -85,12 +85,16 @@ test('tag filter makes the board read-only and hides non-matches', async ({ page
 })
 
 test('watchlist tab lists open wishes; books call it Reading list', async ({ page }) => {
+  // Movie watchlist is shared: both members' wishes show.
   await page.goto('/movies')
   await pickSegment(page, 'Watchlist')
   await expect(page.getByText('Dune: Part Two')).toBeVisible()
   await expect(page.getByText('Past Lives')).toBeVisible()
 
+  // Reading list is per person: only the viewer's (u1's) wish shows — the
+  // partner's "Babel" stays on their own list.
   await page.goto('/books')
   await pickSegment(page, 'Reading list')
   await expect(page.getByText('The Priory of the Orange Tree')).toBeVisible()
+  await expect(page.getByText('Babel')).not.toBeVisible()
 })

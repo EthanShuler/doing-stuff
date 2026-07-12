@@ -223,14 +223,16 @@ create index if not exists tier_item_reads_space_idx on public.tier_item_reads (
 create index if not exists tier_item_reads_item_idx  on public.tier_item_reads (item_id);
 
 -- ---------------------------------------------------------------------------
--- Watchlist (movies + TV + books + ice cream): a SHARED list of things we want
--- to watch, read, or try, per kind. Mirrors the wishlist → entry pattern: checking one off
--- creates a `tier_items` row in the shared pool (so it lands on both members'
--- shelves) and links to it via `tier_item_id` (null = still "want to", set =
--- added to the board). ON DELETE SET NULL means removing that tier item later
--- reopens the watchlist item rather than orphaning it. Unlike placements, the
--- whole list is shared — any member can add/edit/check off — so it uses the
--- "all" policy.
+-- Watchlist (movies + TV + books + ice cream): a list of things we want to
+-- watch, read, or try, per kind. Movie/TV/ice-cream lists are SHARED (any
+-- member can add/edit/check off); the book reading list is PER PERSON — each
+-- member keeps their own, owned via `created_by`, and RLS lets only the owner
+-- write a book row (the UI shows only the viewer's). Mirrors the wishlist →
+-- entry pattern: checking one off creates a `tier_items` row in the shared
+-- pool (so it lands on both members' shelves) and links to it via
+-- `tier_item_id` (null = still "want to", set = added to the board). ON DELETE
+-- SET NULL means removing that tier item later reopens the watchlist item
+-- rather than orphaning it.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.watchlist_items (
@@ -474,10 +476,39 @@ drop policy if exists "delete own reads" on public.tier_item_reads;
 create policy "delete own reads" on public.tier_item_reads
   for delete using (user_id = auth.uid());
 
--- The watchlist is shared like the pool: full access iff you belong to the space.
+-- Watchlists: movie/TV/ice-cream rows are shared (any member writes); book
+-- rows are per-person reading-list entries, writable only by their owner
+-- (`created_by`, which defaults to auth.uid()). Members still read every row —
+-- the shared kinds need it, and realtime delivers one stream per table.
 drop policy if exists "space members all" on public.watchlist_items;
-create policy "space members all" on public.watchlist_items
-  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+drop policy if exists "members read watchlist" on public.watchlist_items;
+create policy "members read watchlist" on public.watchlist_items
+  for select using (public.is_space_member(space_id));
+
+drop policy if exists "insert shared or own watchlist" on public.watchlist_items;
+create policy "insert shared or own watchlist" on public.watchlist_items
+  for insert with check (
+    public.is_space_member(space_id)
+    and (kind <> 'book' or created_by = auth.uid())
+  );
+
+drop policy if exists "update shared or own watchlist" on public.watchlist_items;
+create policy "update shared or own watchlist" on public.watchlist_items
+  for update using (
+    public.is_space_member(space_id)
+    and (kind <> 'book' or created_by = auth.uid())
+  )
+  with check (
+    public.is_space_member(space_id)
+    and (kind <> 'book' or created_by = auth.uid())
+  );
+
+drop policy if exists "delete shared or own watchlist" on public.watchlist_items;
+create policy "delete shared or own watchlist" on public.watchlist_items
+  for delete using (
+    public.is_space_member(space_id)
+    and (kind <> 'book' or created_by = auth.uid())
+  );
 
 -- ---------------------------------------------------------------------------
 -- Grants (needed because "Automatically expose new tables" is OFF).
