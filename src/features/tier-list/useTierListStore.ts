@@ -59,6 +59,12 @@ function seed(): Snapshot {
       { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
       { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', watchedOn: null, tags: ['fantasy', 'childhood reads'], createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
       { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
+      // Ice cream: dates never show — watchedOn is just the shared tried
+      // marker (null = the Not tried shelf).
+      { id: 'i1', kind: 'ice-cream', title: 'Mint chocolate chip', imageUrl: '', watchedOn: '2026-06-07', tags: [], createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
+      { id: 'i2', kind: 'ice-cream', title: 'Pistachio', imageUrl: '', watchedOn: '2026-06-13', tags: [], createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
+      { id: 'i3', kind: 'ice-cream', title: 'Rum raisin', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
+      { id: 'i4', kind: 'ice-cream', title: 'Strawberry cheesecake', imageUrl: '', watchedOn: '2026-06-21', tags: [], createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few items stay unranked — and some undated → unwatched — to exercise
@@ -79,6 +85,9 @@ function seed(): Snapshot {
       { id: 'p13', itemId: 'b1', userId: 'u2', tier: 'A', position: 1 },
       { id: 'p14', itemId: 'b2', userId: 'u1', tier: 'A', position: 1 },
       { id: 'p15', itemId: 'b3', userId: 'u2', tier: 'S', position: 1 },
+      { id: 'p16', itemId: 'i1', userId: 'u1', tier: 'S', position: 1 },
+      { id: 'p17', itemId: 'i2', userId: 'u1', tier: 'B', position: 1 },
+      { id: 'p18', itemId: 'i1', userId: 'u2', tier: 'A', position: 1 },
     ],
     // Book read records: b1 read by both, b2/b4 only by u1, b3 only by u2, b5
     // by neither — so each seed board shows a different Unread shelf.
@@ -95,6 +104,7 @@ function seed(): Snapshot {
       { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
       { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
       { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
     ],
   }
 }

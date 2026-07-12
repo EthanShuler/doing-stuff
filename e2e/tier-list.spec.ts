@@ -8,6 +8,9 @@ import { boardShelf, pickSegment, tierRow } from './helpers'
 //   Everything Everywhere is dated with no Avery placement (→ her Unranked).
 // - Books: read state is per person — Project Hail Mary is ranked A by Avery
 //   (she read it) but Unread for Jordan.
+// - Ice cream: no dates in the UI — watchedOn is just the shared tried marker.
+//   Rum raisin is untried (→ Not tried for both); Strawberry cheesecake is
+//   tried but unranked by Avery.
 
 test('movie board derives tiers and shelves for the viewer', async ({ page }) => {
   await page.goto('/movies')
@@ -40,6 +43,33 @@ test('book read state is per person (Unread shelf differs by viewer)', async ({ 
   // Jordan hasn't read it — same book, his Unread shelf.
   await pickSegment(page, 'Jordan')
   await expect(boardShelf(page, 'unwatched').getByText('Project Hail Mary')).toBeVisible()
+})
+
+test('ice cream board splits tried/not-tried with no dates shown', async ({ page }) => {
+  await page.goto('/ice-cream')
+  await expect(tierRow(page, 'S').getByText('Mint chocolate chip')).toBeVisible()
+  await expect(boardShelf(page, 'unranked').getByText('Strawberry cheesecake')).toBeVisible()
+  await expect(boardShelf(page, 'unwatched').getByText('Not tried')).toBeVisible()
+  await expect(boardShelf(page, 'unwatched').getByText('Rum raisin')).toBeVisible()
+
+  // The tried marker is shared: Rum raisin is Not tried for Jordan too.
+  await pickSegment(page, 'Jordan')
+  await expect(boardShelf(page, 'unwatched').getByText('Rum raisin')).toBeVisible()
+  await expect(tierRow(page, 'A').getByText('Mint chocolate chip')).toBeVisible()
+})
+
+test('ice cream add/edit modal has no date field', async ({ page }) => {
+  await page.goto('/ice-cream')
+  await page.getByRole('button', { name: '+ Add flavor' }).click()
+  await expect(page.getByRole('heading', { name: 'Add a flavor' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Tags' })).toBeVisible()
+  await expect(page.locator('input[type="date"]')).toHaveCount(0)
+})
+
+test('ice cream watchlist is the To-try list', async ({ page }) => {
+  await page.goto('/ice-cream')
+  await pickSegment(page, 'To-try list')
+  await expect(page.getByText('Ube')).toBeVisible()
 })
 
 test('tag filter makes the board read-only and hides non-matches', async ({ page }) => {

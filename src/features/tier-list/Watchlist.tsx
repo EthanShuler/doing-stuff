@@ -81,7 +81,7 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
                 </Text>
                 {done && (
                   <Text fz={12} c={colors.muted} mt={2} style={{ fontFamily: fonts.sans }}>
-                    {watchedOn
+                    {copy.usesDates && watchedOn
                       ? `${copy.pastCap} ${formatDate(watchedOn)} — on your tier board, go rank it.`
                       : copy.onBoardNote}
                   </Text>

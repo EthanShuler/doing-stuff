@@ -47,8 +47,8 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <DoingStuffPage screen={screen} spaceId={spaceId} userId={userId} configured={configured} />
   )
 
-  // Same trick for the tier lists: /movies, /tv, and /books render one
-  // component, so its store survives switching kinds — the board just
+  // Same trick for the tier lists: /movies, /tv, /books, and /ice-cream render
+  // one component, so its store survives switching kinds — the board just
   // re-derives.
   const tierList = (kind: TierKind) => (
     <TierListPage kind={kind} spaceId={spaceId} userId={userId} configured={configured} />
@@ -65,6 +65,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           <Route path="/movies" element={tierList('movie')} />
           <Route path="/tv" element={tierList('tv')} />
           <Route path="/books" element={tierList('book')} />
+          <Route path="/ice-cream" element={tierList('ice-cream')} />
           <Route
             path="/french-toast"
             element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}
@@ -80,10 +81,6 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           <Route
             path="/board-games"
             element={<ComingSoon title="Board games" blurb="The board game collection and rankings, coming soon." />}
-          />
-          <Route
-            path="/ice-cream"
-            element={<ComingSoon title="Ice cream" blurb="Local flavors, favorite pints, and where to find them. Coming soon." />}
           />
           <Route
             path="/recipes"

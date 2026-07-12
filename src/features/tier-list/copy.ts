@@ -4,12 +4,18 @@ import type { TierKind } from '../../types'
  * Per-kind wording + iconography, so the components stay kind-agnostic.
  * Movies and TV are "watched" (one shared date on the pool item — we watch
  * together); books are "read", and read state is per person (see
- * `tier_item_reads`). `datesArePersonal()` in derive.ts is the behavior
- * switch — this file is just the words.
+ * `tier_item_reads`); ice cream is "tried" — shared like movies/TV, but with
+ * no visible date (the shared `watched_on` is just its tried/not-tried
+ * marker). `datesArePersonal()` in derive.ts is the behavior switch — this
+ * file is just the words.
  */
 export interface KindCopy {
   /** Browser-tab / nav title for the kind's route. */
   pageTitle: string
+  /** Whether dates appear in the UI at all. False = the item modal has no
+   *  date field (tried/not-tried is managed by dragging on/off the shelf) and
+   *  the watchlist rows drop the date. */
+  usesDates: boolean
   /** Lowercase noun used inline in sentences: "Add a book". */
   noun: string
   /** Card / thumbnail fallback when there's no image. */
@@ -45,6 +51,7 @@ export interface KindCopy {
 export const KIND_COPY: Record<TierKind, KindCopy> = {
   movie: {
     pageTitle: 'Movies',
+    usesDates: true,
     noun: 'movie',
     emoji: '🎬',
     example: 'Paddington 2',
@@ -64,6 +71,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
   },
   tv: {
     pageTitle: 'TV',
+    usesDates: true,
     noun: 'show',
     emoji: '📺',
     example: 'Severance',
@@ -83,6 +91,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
   },
   book: {
     pageTitle: 'Books',
+    usesDates: true,
     noun: 'book',
     emoji: '📖',
     example: 'Piranesi',
@@ -101,5 +110,25 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
       'Add a book either of you wants to read. Check it off when you finish and it lands on your tier board, ready to rank.',
     onBoardNote: 'On the board — it stays on your Unread shelf until you mark it read.',
     attribution: 'Book search by Open Library.',
+  },
+  'ice-cream': {
+    pageTitle: 'Ice Cream',
+    usesDates: false,
+    noun: 'flavor',
+    emoji: '🍦',
+    example: 'Mint chocolate chip',
+    imageLabel: 'Photo URL',
+    listLabel: 'To-try list',
+    shelfLabel: 'Not tried',
+    verb: 'try',
+    past: 'tried',
+    pastCap: 'Tried',
+    dateLabel: 'Tried on',
+    boardHint: "New flavors land on both of your unranked shelves — drag one to Not tried if you haven't had it yet.",
+    listHint: 'Check it off later and it joins both of your unranked shelves.',
+    listEmptyTitle: 'Nothing to try yet',
+    listEmptyBlurb: 'Add a flavor you both want to try. Check it off and it lands on your tier board, ready to rank.',
+    onBoardNote: 'On your tier board — go rank it.',
+    attribution: '',
   },
 }

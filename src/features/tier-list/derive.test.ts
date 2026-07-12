@@ -183,11 +183,42 @@ describe('deriveBoard for books', () => {
   })
 })
 
+// --- deriveBoard: ice cream (shared tried state, no visible dates) --------------
+
+describe('deriveBoard for ice cream', () => {
+  it('an untried flavor (null watchedOn) sits on the Not tried shelf', () => {
+    const a = item({ kind: 'ice-cream', watchedOn: null })
+    const board = deriveBoard([a], [], [], 'u1', 'ice-cream')
+    expect(board.unwatched).toEqual([a])
+    expect(board.unranked).toEqual([])
+  })
+
+  it('the tried marker is shared — both viewers see it off the shelf', () => {
+    const a = item({ kind: 'ice-cream', watchedOn: '2026-06-07' })
+    expect(deriveBoard([a], [], [], 'u1', 'ice-cream').unranked).toEqual([a])
+    expect(deriveBoard([a], [], [], 'u2', 'ice-cream').unranked).toEqual([a])
+  })
+
+  it('ignores read records — only the shared marker rules', () => {
+    const a = item({ kind: 'ice-cream', watchedOn: null })
+    const board = deriveBoard([a], [], [read({ itemId: a.id, userId: 'u1' })], 'u1', 'ice-cream')
+    expect(board.unwatched).toEqual([a])
+  })
+
+  it('a placement wins over a missing tried marker', () => {
+    const a = item({ kind: 'ice-cream', watchedOn: null })
+    const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'S' })], [], 'u1', 'ice-cream')
+    expect(board.tiers.S).toEqual([a])
+    expect(board.unwatched).toEqual([])
+  })
+})
+
 describe('datesArePersonal', () => {
   it('is true only for books', () => {
     expect(datesArePersonal('book')).toBe(true)
     expect(datesArePersonal('movie')).toBe(false)
     expect(datesArePersonal('tv')).toBe(false)
+    expect(datesArePersonal('ice-cream')).toBe(false)
   })
 })
 

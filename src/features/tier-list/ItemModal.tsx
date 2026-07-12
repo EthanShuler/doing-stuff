@@ -14,8 +14,10 @@ export interface ItemDraft {
   imageUrl: string
   /** ISO date it was finished; '' = not yet (the item sits on the unwatched/
    *  unread shelf until it's dated or dragged into a tier). For movies/TV this
-   *  is the shared watched date; for books it's the EDITOR's own read date.
-   *  Board items only — list items aren't started yet, so the field is hidden. */
+   *  is the shared watched date; for books it's the EDITOR's own read date;
+   *  dateless kinds (ice cream) show no field and just pass the existing
+   *  tried marker through unchanged. Board items only — list items aren't
+   *  started yet, so the field is hidden. */
   watchedOn: string
   /** Shared filter labels ("disney", "fantasy"). Board items only. */
   tags: string[]
@@ -64,11 +66,12 @@ export function ItemModal({
   const isWatchlist = variant === 'watchlist'
 
   // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
-  // books (keyless, so always on). Only shown after the user actually types
-  // (so an edit modal opening with a full title doesn't pop the dropdown), and
-  // hidden again on blur or pick. Lookup is a convenience — hand-typed titles
-  // and pasted URLs work exactly as before.
-  const searchEnabled = kind === 'book' || isTmdbConfigured
+  // books (keyless, so always on). No provider covers ice cream — hand entry
+  // only. Only shown after the user actually types (so an edit modal opening
+  // with a full title doesn't pop the dropdown), and hidden again on blur or
+  // pick. Lookup is a convenience — hand-typed titles and pasted URLs work
+  // exactly as before.
+  const searchEnabled = kind === 'book' || ((kind === 'movie' || kind === 'tv') && isTmdbConfigured)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
 
@@ -98,7 +101,7 @@ export function ItemModal({
               imageUrl: b.coverUrl,
               thumbUrl: b.thumbUrl,
             }))
-          : (await searchTmdb(kind, query)).map((r) => ({
+          : (await searchTmdb(kind as 'movie' | 'tv', query)).map((r) => ({
               key: String(r.id),
               title: r.title,
               meta: r.year,
@@ -240,13 +243,18 @@ export function ItemModal({
           />
           {!isWatchlist && (
             <>
-              <TextInput
-                label={copy.dateLabel}
-                type="date"
-                value={draft.watchedOn}
-                onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
-                mb={18}
-              />
+              {/* Dateless kinds (ice cream) get no field here: tried/not-tried
+                  is managed by dragging on/off the shelf, and the draft passes
+                  the existing marker through untouched. */}
+              {copy.usesDates && (
+                <TextInput
+                  label={copy.dateLabel}
+                  type="date"
+                  value={draft.watchedOn}
+                  onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
+                  mb={18}
+                />
+              )}
               <TagsInput
                 label="Tags"
                 value={draft.tags}

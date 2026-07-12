@@ -149,8 +149,8 @@ create index if not exists entry_repeats_space_idx on public.entry_repeats (spac
 create index if not exists entry_repeats_entry_idx on public.entry_repeats (entry_id);
 
 -- ---------------------------------------------------------------------------
--- Tier lists (movies + TV + books): a SHARED pool of items, PER-PERSON
--- rankings. `tier_items` is the pool — any space member can add/edit.
+-- Tier lists (movies + TV + books + ice cream): a SHARED pool of items,
+-- PER-PERSON rankings. `tier_items` is the pool — any space member can add/edit.
 -- `tier_placements` holds one member's ranking of one item (tier + fractional
 -- position within the tier); "unranked" is simply the absence of a placement
 -- row. Placements are opinion data, so RLS below lets members READ each
@@ -161,14 +161,19 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 create table if not exists public.tier_items (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
-  kind        text not null check (kind in ('movie', 'tv', 'book')),
+  -- On an existing DB, admit a new kind with:
+  --   alter table public.tier_items drop constraint tier_items_kind_check;
+  --   alter table public.tier_items add constraint tier_items_kind_check
+  --     check (kind in ('movie', 'tv', 'book', 'ice-cream'));
+  kind        text not null check (kind in ('movie', 'tv', 'book', 'ice-cream')),
   title       text not null,
   -- Poster/cover image, pasted as a URL ('' = none; the card shows a fallback).
   image_url   text not null default '',
   -- The day we finished watching it (shared, like the item itself). Null =
   -- unknown; the client defaults it to today on add / watchlist check-off.
   -- Movies/TV only — books are read separately, so their dates are per person
-  -- in `tier_item_reads` and this column stays null.
+  -- in `tier_item_reads` and this column stays null. Ice cream shows no dates
+  -- in the UI but reuses this as its shared tried/not-tried marker.
   watched_on  date,
   -- Free-text labels ("disney", "fantasy", "childhood reads") for filtering
   -- the boards. Shared like the item itself — they describe it, not an
@@ -218,8 +223,8 @@ create index if not exists tier_item_reads_space_idx on public.tier_item_reads (
 create index if not exists tier_item_reads_item_idx  on public.tier_item_reads (item_id);
 
 -- ---------------------------------------------------------------------------
--- Watchlist (movies + TV + books): a SHARED list of things we want to watch or
--- read, per kind. Mirrors the wishlist → entry pattern: checking one off
+-- Watchlist (movies + TV + books + ice cream): a SHARED list of things we want
+-- to watch, read, or try, per kind. Mirrors the wishlist → entry pattern: checking one off
 -- creates a `tier_items` row in the shared pool (so it lands on both members'
 -- shelves) and links to it via `tier_item_id` (null = still "want to", set =
 -- added to the board). ON DELETE SET NULL means removing that tier item later
@@ -231,7 +236,8 @@ create index if not exists tier_item_reads_item_idx  on public.tier_item_reads (
 create table if not exists public.watchlist_items (
   id           uuid primary key default gen_random_uuid(),
   space_id     uuid not null references public.spaces (id) on delete cascade,
-  kind         text not null check (kind in ('movie', 'tv', 'book')),
+  -- Same kind set as tier_items — migrate both constraints together (see above).
+  kind         text not null check (kind in ('movie', 'tv', 'book', 'ice-cream')),
   title        text not null,
   -- Optional poster, pasted as a URL; carried onto the tier card when checked off.
   image_url    text not null default '',

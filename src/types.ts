@@ -81,14 +81,15 @@ export interface WishlistItem {
   lng: number | null
 }
 
-// --- Tier lists (movies + TV + books) -----------------------------------------
+// --- Tier lists (movies + TV + books + ice cream) -----------------------------
 
-export type TierKind = 'movie' | 'tv' | 'book'
+export type TierKind = 'movie' | 'tv' | 'book' | 'ice-cream'
 
 /** The fixed tier ladder — not user-editable. */
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
 
-/** A movie, show, or book in the space's SHARED pool — one row in `tier_items`. */
+/** A movie, show, book, or ice cream in the space's SHARED pool — one row in
+ *  `tier_items`. */
 export interface TierItem {
   id: string
   kind: TierKind
@@ -97,7 +98,9 @@ export interface TierItem {
   imageUrl: string
   /** ISO date ("YYYY-MM-DD") we finished watching it; null when unknown (legacy
    *  rows). Movies/TV only — books are read separately, so their dates live
-   *  per person in TierRead and this stays null. */
+   *  per person in TierRead and this stays null. Ice cream shows no dates in
+   *  the UI, but reuses this as its shared "tried it" marker (null = not
+   *  tried; any date = tried). */
   watchedOn: string | null
   /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
   tags: string[]

@@ -7,8 +7,8 @@ Guidance for working in this repo. Read this before making changes.
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
-`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, and
-`/books` are the **Tier Lists** feature; `/french-toast`, `/parks`, and `/spoons` are placeholder
+`/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
+and `/ice-cream` are the **Tier Lists** feature; `/french-toast`, `/parks`, and `/spoons` are placeholder
 pages for features not built yet (a french toast ranking, a 63-national-parks
 visit tracker, a souvenir-spoon collection map). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
@@ -39,14 +39,18 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`, `/books`) — drag-n-drop S/A/B/C/D/F boards.
-The domain model splits pool from opinion:
+**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`) — drag-n-drop
+S/A/B/C/D/F boards. The domain model splits pool from opinion:
 
-- **Tier item** (`tier_items`) — a movie, show, or book in the space's **shared
-  pool** (a `kind 'movie'|'tv'|'book'` column, a title, a hand-pasted
-  poster/cover `image_url`, a nullable `watched_on` date — when we finished
-  it; defaults to today on a board add or watchlist check-off. Movies/TV only —
-  books leave it null and use per-person read records instead — and free-text
+- **Tier item** (`tier_items`) — a movie, show, book, or ice cream flavor in the
+  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'` column, a
+  title, a hand-pasted poster/cover `image_url`, a nullable `watched_on` date —
+  when we finished it; defaults to today on a board add or watchlist check-off.
+  Movies/TV only — books leave it null and use per-person read records instead,
+  and ice cream never shows a date: `watched_on` is just its shared
+  tried/not-tried marker, managed by dragging on/off the Not tried shelf
+  (`usesDates: false` in the tier-list `copy.ts` hides the modal's date
+  field) — and free-text
   **`tags`** (`text[]`, e.g. "disney", "fantasy") shared like the item; the
   board page filters by them with multi-select pills (OR semantics, matched
   case-insensitively). A filtered board is **read-only** — hidden cards make
@@ -57,7 +61,8 @@ The domain model splits pool from opinion:
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
   to integers if float precision ever runs out). "Unranked" is the absence of a
   placement row; an unplaced item with **no date for the viewer** lands on a
-  second dashed **Unwatched** (books: **Unread**) shelf instead (a placement
+  second dashed **Unwatched** (books: **Unread**, ice cream: **Not tried**)
+  shelf instead (a placement
   wins over a missing date). Dragging out of that shelf stamps today's date;
   dropping onto it unranks the card and clears the date. RLS is split:
   members **read** everyone's placements but
@@ -71,15 +76,17 @@ The domain model splits pool from opinion:
   `derive.ts` is the behavior switch: for books, shelf drags and the modal's
   date field write the viewer's own read row and never touch `watched_on`.
   Same split RLS as placements (read everyone's, write only your own).
-- **Watchlist item** (`watchlist_items`) — a shared "want to watch/read" entry
-  per kind (UI label: Watchlist, or Reading list for books). Checking one off
-  creates the tier item — dated today: the shared `watched_on` for movies/TV,
-  the *checker's own read record* for books — and links via `tier_item_id`
+- **Watchlist item** (`watchlist_items`) — a shared "want to watch/read/try"
+  entry per kind (UI label: Watchlist, Reading list for books, or To-try list
+  for ice cream). Checking one off
+  creates the tier item — dated today: the shared `watched_on` for movies/TV
+  and ice cream, the *checker's own read record* for books — and links via
+  `tier_item_id`
   (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
-All three routes render the same `TierListPage` (kind prop), so the store —
+All four routes render the same `TierListPage` (kind prop), so the store —
 holding every kind plus all users' placements and read records — survives
-Movies ↔ TV ↔ Books switches. A
+kind switches. A
 You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
 (`TierBoard`), the partner's is the same layout with no drag wiring
 (`BoardView`). Drops are optimistic: on write failure the store records the
@@ -302,7 +309,7 @@ src/
       ManageModal.tsx      categories & activities editor + home base
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
-    tier-list/             movie/TV/book tier boards (/movies, /tv, /books; kind prop)
+    tier-list/             movie/TV/book/ice-cream tier boards (kind prop per route)
       TierListPage.tsx     owns the store, You/Partner toggle, item modal state
       useTierListStore.ts  data seam: pool + placements + reads CRUD (or seed fallback)
       derive.ts            pure board building, moveItem, positions, datesArePersonal

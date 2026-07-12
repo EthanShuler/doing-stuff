@@ -13,7 +13,9 @@ export type ContainerId = Tier | 'unranked' | 'unwatched'
  * Whether a kind's watched/read dates belong to one person rather than the
  * shared item. Movies and TV are watched together, so `watchedOn` lives on the
  * pool item; books are read separately, so each member's date is their own
- * TierRead row and the shared date is ignored.
+ * TierRead row and the shared date is ignored. Ice cream is tried together —
+ * shared like movies/TV — but shows no dates in the UI: `watchedOn` is just
+ * its tried/not-tried marker (see `usesDates` in copy.ts).
  */
 export const datesArePersonal = (kind: TierKind): boolean => kind === 'book'
 
