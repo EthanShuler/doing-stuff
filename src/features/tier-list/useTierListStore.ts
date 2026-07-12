@@ -43,28 +43,28 @@ function seed(): Snapshot {
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
-      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', watchedOn: '2026-06-01', tags: ['fantasy', 'ghibli'], createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
-      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', watchedOn: '2026-06-02', tags: ['fantasy'], createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', watchedOn: null, tags: ['sci-fi'], createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
-      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', watchedOn: '2026-06-14', tags: [], createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
-      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', watchedOn: '2026-06-20', tags: ['sci-fi'], createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
-      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', watchedOn: '2026-06-08', tags: ['sci-fi'], createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
-      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
-      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', watchedOn: '2026-06-15', tags: ['fantasy'], createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
-      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', watchedOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
+      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', watchedOn: '2026-06-02', tags: ['fantasy'], creator: '', createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', watchedOn: null, tags: ['sci-fi'], creator: '', createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
+      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', watchedOn: '2026-06-14', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
+      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', watchedOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', watchedOn: '2026-06-20', tags: ['sci-fi'], creator: '', createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
+      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', watchedOn: '2026-06-08', tags: ['sci-fi'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
+      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', watchedOn: null, tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
+      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', watchedOn: '2026-06-15', tags: ['fantasy'], creator: '', createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
+      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', watchedOn: null, tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
       // Books keep watchedOn null — read state is per person, in `reads` below.
-      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', watchedOn: null, tags: ['fantasy'], createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
-      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', watchedOn: null, tags: ['sci-fi'], createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
-      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
-      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', watchedOn: null, tags: ['fantasy', 'childhood reads'], createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
-      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
+      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', watchedOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
+      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', watchedOn: null, tags: ['sci-fi'], creator: 'Andy Weir', createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
+      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', watchedOn: null, tags: [], creator: 'Gabrielle Zevin', createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
+      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', watchedOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
+      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', watchedOn: null, tags: [], creator: 'Madeline Miller', createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
       // Ice cream: dates never show — watchedOn is just the shared tried
       // marker (null = the Not tried shelf).
-      { id: 'i1', kind: 'ice-cream', title: 'Mint chocolate chip', imageUrl: '', watchedOn: '2026-06-07', tags: [], createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
-      { id: 'i2', kind: 'ice-cream', title: 'Pistachio', imageUrl: '', watchedOn: '2026-06-13', tags: [], createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
-      { id: 'i3', kind: 'ice-cream', title: 'Rum raisin', imageUrl: '', watchedOn: null, tags: [], createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
-      { id: 'i4', kind: 'ice-cream', title: 'Strawberry cheesecake', imageUrl: '', watchedOn: '2026-06-21', tags: [], createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
+      { id: 'i1', kind: 'ice-cream', title: 'Mint chocolate chip', imageUrl: '', watchedOn: '2026-06-07', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
+      { id: 'i2', kind: 'ice-cream', title: 'Pistachio', imageUrl: '', watchedOn: '2026-06-13', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
+      { id: 'i3', kind: 'ice-cream', title: 'Rum raisin', imageUrl: '', watchedOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
+      { id: 'i4', kind: 'ice-cream', title: 'Strawberry cheesecake', imageUrl: '', watchedOn: '2026-06-21', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few items stay unranked — and some undated → unwatched — to exercise
@@ -102,12 +102,12 @@ function seed(): Snapshot {
     // Reading lists are per person (owner = createdBy): the seed viewer u1
     // sees only w4 on /books — u2's w6 exercises the filter.
     watchlist: [
-      { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
-      { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
-      { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
-      { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
-      { id: 'w6', kind: 'book', title: 'Babel', imageUrl: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T11:00:00Z' },
+      { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
+      { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
+      { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', creator: 'Samantha Shannon', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
+      { id: 'w6', kind: 'book', title: 'Babel', imageUrl: '', creator: 'R. F. Kuang', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T11:00:00Z' },
     ],
   }
 }
@@ -121,6 +121,7 @@ type TierItemRow = {
   image_url: string | null
   watched_on: string | null
   tags: string[] | null
+  creator: string | null
   created_by: string | null
   created_at: string
 }
@@ -142,6 +143,7 @@ type WatchlistItemRow = {
   kind: string
   title: string
   image_url: string | null
+  creator: string | null
   tier_item_id: string | null
   created_by: string | null
   created_at: string
@@ -154,6 +156,7 @@ const toTierItem = (r: TierItemRow): TierItem => ({
   imageUrl: r.image_url ?? '',
   watchedOn: r.watched_on,
   tags: r.tags ?? [],
+  creator: r.creator ?? '',
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -175,15 +178,16 @@ const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
   kind: r.kind as TierKind,
   title: r.title,
   imageUrl: r.image_url ?? '',
+  creator: r.creator ?? '',
   tierItemId: r.tier_item_id,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
 
-const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,watched_on,tags,created_by,created_at'
+const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,watched_on,tags,creator,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_READ_COLUMNS = 'id,item_id,user_id,read_on'
-const WATCHLIST_COLUMNS = 'id,kind,title,image_url,tier_item_id,created_by,created_at'
+const WATCHLIST_COLUMNS = 'id,kind,title,image_url,creator,tier_item_id,created_by,created_at'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('tx', 500)
@@ -218,14 +222,15 @@ export interface TierListStore {
   error: string | null
   clearError: () => void
 
-  /** Add to the shared pool. `dateOn` is an ISO date or null (= none yet):
-   *  the shared watched date for movies/TV, YOUR OWN read date for books.
-   *  `tags` are shared filter labels (normalized before saving).
+  /** Add to the shared pool. `creator` is who made it (author/director — see
+   *  copy.ts). `dateOn` is an ISO date or null (= none yet): the shared
+   *  watched date for movies/TV, YOUR OWN read date for books. `tags` are
+   *  shared filter labels (normalized before saving).
    *  Throws only when the item itself fails (the modal stays open). */
-  addItem: (kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => Promise<void>
-  /** Edit a pool item's title/image/tags + its date (same per-kind date
-   *  semantics as addItem). Throws only when the item write fails. */
-  updateItem: (id: string, kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => Promise<void>
+  addItem: (kind: TierKind, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => Promise<void>
+  /** Edit a pool item's title/image/creator/tags + its date (same per-kind
+   *  date semantics as addItem). Throws only when the item write fails. */
+  updateItem: (id: string, kind: TierKind, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => Promise<void>
   /** Remove from the pool — deletes EVERYONE's placements (and, for books,
    *  read records) of it. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
@@ -247,10 +252,11 @@ export interface TierListStore {
   setReadOn: (itemId: string, readOn: string | null) => Promise<void>
 
   /** Add a "want to watch" item to the watchlist (books: YOUR OWN reading
-   *  list — created_by marks the owner). Throws on failure. */
-  addWatchlistItem: (kind: TierKind, title: string, imageUrl: string) => Promise<void>
-  /** Edit a watchlist item's title/poster (open items only). Throws on failure. */
-  updateWatchlistItem: (id: string, title: string, imageUrl: string) => Promise<void>
+   *  list — created_by marks the owner). `creator` is carried onto the tier
+   *  item on check-off, like the image. Throws on failure. */
+  addWatchlistItem: (kind: TierKind, title: string, imageUrl: string, creator: string) => Promise<void>
+  /** Edit a watchlist item's title/poster/creator (open items only). Throws on failure. */
+  updateWatchlistItem: (id: string, title: string, imageUrl: string, creator: string) => Promise<void>
   /** Remove a watchlist item (does not touch any tier item it created). Throws on failure. */
   deleteWatchlistItem: (id: string) => Promise<void>
   /** Check off an open item: create the tier item in the pool and link to it.
@@ -389,18 +395,19 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // --- Pool actions. These throw on failure so the item modal can stay open. ---
 
   const addItem = useCallback(
-    async (kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => {
+    async (kind: TierKind, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
       const image = imageUrl.trim()
+      const maker = creator.trim()
       const cleanTags = normalizeTags(tags)
       // Books: the date is YOUR read record, not the shared item's.
       const personal = datesArePersonal(kind)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('tier_items')
-          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, watched_on: personal ? null : dateOn, tags: cleanTags })
+          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, creator: maker, watched_on: personal ? null : dateOn, tags: cleanTags })
           .select(TIER_ITEM_COLUMNS)
           .single()
         if (err) {
@@ -421,6 +428,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         imageUrl: image,
         watchedOn: personal ? null : dateOn,
         tags: cleanTags,
+        creator: maker,
         createdBy: selfId,
         createdAt: new Date().toISOString(),
       }
@@ -431,19 +439,20 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   )
 
   const updateItem = useCallback(
-    async (id: string, kind: TierKind, title: string, imageUrl: string, dateOn: string | null, tags: string[]) => {
+    async (id: string, kind: TierKind, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
       const image = imageUrl.trim()
+      const maker = creator.trim()
       const cleanTags = normalizeTags(tags)
       const personal = datesArePersonal(kind)
       if (supabase && spaceId) {
         // For books, leave the shared watched_on alone — the date belongs to
         // the caller's own read record instead.
         const patch = personal
-          ? { title: trimmed, image_url: image, tags: cleanTags }
-          : { title: trimmed, image_url: image, tags: cleanTags, watched_on: dateOn }
+          ? { title: trimmed, image_url: image, creator: maker, tags: cleanTags }
+          : { title: trimmed, image_url: image, creator: maker, tags: cleanTags, watched_on: dateOn }
         const { error: err } = await supabase.from('tier_items').update(patch).eq('id', id)
         if (err) {
           setError(err.message)
@@ -453,7 +462,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setItems((prev) =>
         prev.map((x) =>
           x.id === id
-            ? { ...x, title: trimmed, imageUrl: image, tags: cleanTags, ...(personal ? {} : { watchedOn: dateOn }) }
+            ? { ...x, title: trimmed, imageUrl: image, creator: maker, tags: cleanTags, ...(personal ? {} : { watchedOn: dateOn }) }
             : x,
         ),
       )
@@ -588,15 +597,16 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   //     check-off / uncheck are inline (checkbox) and record the error instead. ---
 
   const addWatchlistItem = useCallback(
-    async (kind: TierKind, title: string, imageUrl: string) => {
+    async (kind: TierKind, title: string, imageUrl: string, creator: string) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
       const image = imageUrl.trim()
+      const maker = creator.trim()
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('watchlist_items')
-          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image })
+          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, creator: maker })
           .select(WATCHLIST_COLUMNS)
           .single()
         if (err) {
@@ -608,29 +618,30 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       }
       setWatchlist((prev) => [
         ...prev,
-        { id: nextId(), kind, title: trimmed, imageUrl: image, tierItemId: null, createdBy: selfId, createdAt: new Date().toISOString() },
+        { id: nextId(), kind, title: trimmed, imageUrl: image, creator: maker, tierItemId: null, createdBy: selfId, createdAt: new Date().toISOString() },
       ])
     },
     [spaceId, selfId],
   )
 
   const updateWatchlistItem = useCallback(
-    async (id: string, title: string, imageUrl: string) => {
+    async (id: string, title: string, imageUrl: string, creator: string) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
       const image = imageUrl.trim()
+      const maker = creator.trim()
       if (supabase && spaceId) {
         const { error: err } = await supabase
           .from('watchlist_items')
-          .update({ title: trimmed, image_url: image })
+          .update({ title: trimmed, image_url: image, creator: maker })
           .eq('id', id)
         if (err) {
           setError(err.message)
           throw err
         }
       }
-      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, title: trimmed, imageUrl: image } : w)))
+      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, title: trimmed, imageUrl: image, creator: maker } : w)))
     },
     [spaceId],
   )
@@ -668,6 +679,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
             kind: wi.kind,
             title: wi.title,
             image_url: wi.imageUrl,
+            creator: wi.creator,
             watched_on: personal ? null : today(),
           })
           .select(TIER_ITEM_COLUMNS)
@@ -704,6 +716,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         imageUrl: wi.imageUrl,
         watchedOn: personal ? null : today(),
         tags: [],
+        creator: wi.creator,
         createdBy: selfId,
         createdAt: new Date().toISOString(),
       }

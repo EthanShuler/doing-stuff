@@ -180,6 +180,11 @@ create table if not exists public.tier_items (
   -- opinion of it. On an existing DB, apply with:
   --   alter table public.tier_items add column tags text[] not null default '{}';
   tags        text[] not null default '{}',
+  -- Who made it — the author for books, director for movies, and so on (see
+  -- `creatorLabel` in the tier-list copy.ts for the per-kind wording). Free
+  -- text, shared like the title ('' = unknown/not entered). On an existing DB:
+  --   alter table public.tier_items add column creator text not null default '';
+  creator     text not null default '',
   created_by  uuid references auth.users (id) default auth.uid(),
   created_at  timestamptz not null default now()
 );
@@ -243,6 +248,11 @@ create table if not exists public.watchlist_items (
   title        text not null,
   -- Optional poster, pasted as a URL; carried onto the tier card when checked off.
   image_url    text not null default '',
+  -- Who made it (author/director — see `creatorLabel` in the tier-list
+  -- copy.ts), carried onto the tier item when checked off, like the image.
+  -- On an existing DB:
+  --   alter table public.watchlist_items add column creator text not null default '';
+  creator      text not null default '',
   -- The tier item this produced when checked off; null while still open.
   tier_item_id uuid references public.tier_items (id) on delete set null,
   created_by   uuid references auth.users (id) default auth.uid(),

@@ -27,6 +27,7 @@ const emptyDraft = (variant: Mode): ItemDraft => ({
   imageUrl: '',
   watchedOn: variant === 'board' ? today() : '',
   tags: [],
+  creator: '',
 })
 
 interface TierListPageProps {
@@ -129,14 +130,14 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     const dateOn = personal
       ? store.reads.find((r) => r.itemId === item.id && r.userId === store.selfId)?.readOn ?? ''
       : item.watchedOn ?? ''
-    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: dateOn, tags: item.tags })
+    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: dateOn, tags: item.tags, creator: item.creator })
     setModalOpen(true)
   }
 
   const openEditWatch = (item: WatchlistItem) => {
     setModalVariant('watchlist')
     setEditingId(item.id)
-    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: '', tags: [] })
+    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: '', tags: [], creator: item.creator })
     setModalOpen(true)
   }
 
@@ -149,12 +150,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     if (!draft.title.trim()) return
     try {
       if (modalVariant === 'watchlist') {
-        if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl)
-        else await store.addWatchlistItem(kind, draft.title, draft.imageUrl)
+        if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl, draft.creator)
+        else await store.addWatchlistItem(kind, draft.title, draft.imageUrl, draft.creator)
       } else {
         const dateOn = draft.watchedOn || null
-        if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, dateOn, draft.tags)
-        else await store.addItem(kind, draft.title, draft.imageUrl, dateOn, draft.tags)
+        if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+        else await store.addItem(kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
       }
       closeModal()
     } catch {

@@ -25,6 +25,8 @@ export interface KindCopy {
   example: string
   /** Image URL field label in the item modal. */
   imageLabel: string
+  /** Label of the item's shared `creator` field: who made it. */
+  creatorLabel: string
   /** Tab label for the "want to" list. */
   listLabel: string
   /** Label of the second shelf (no date for the viewer yet). */
@@ -57,6 +59,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     emoji: '🎬',
     example: 'Paddington 2',
     imageLabel: 'Poster image URL',
+    creatorLabel: 'Director',
     listLabel: 'Watchlist',
     shelfLabel: 'Unwatched',
     verb: 'watch',
@@ -77,6 +80,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     emoji: '📺',
     example: 'Severance',
     imageLabel: 'Poster image URL',
+    creatorLabel: 'Creator',
     listLabel: 'Watchlist',
     shelfLabel: 'Unwatched',
     verb: 'watch',
@@ -97,6 +101,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     emoji: '📖',
     example: 'Piranesi',
     imageLabel: 'Cover image URL',
+    creatorLabel: 'Author',
     listLabel: 'Reading list',
     shelfLabel: 'Unread',
     verb: 'read',
@@ -120,6 +125,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     emoji: '🍦',
     example: 'Mint chocolate chip',
     imageLabel: 'Photo URL',
+    creatorLabel: 'Brand or shop',
     listLabel: 'To-try list',
     shelfLabel: 'Not tried',
     verb: 'try',

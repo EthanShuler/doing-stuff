@@ -80,6 +80,11 @@ export function Watchlist({ items, kind, watchedDates, onCheck, onUncheck, onEdi
                 >
                   {item.title}
                 </Text>
+                {item.creator && (
+                  <Text fz={12} c={colors.faint} mt={1} lineClamp={1} style={{ fontFamily: fonts.sans }}>
+                    {item.creator}
+                  </Text>
+                )}
                 {done && (
                   <Text fz={12} c={colors.muted} mt={2} style={{ fontFamily: fonts.sans }}>
                     {copy.usesDates && watchedOn

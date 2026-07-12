@@ -30,6 +30,7 @@ function item(over: Partial<TierItem> = {}): TierItem {
     // unwatched shelf, which the shelf-split tests exercise explicitly.
     watchedOn: '2026-06-15',
     tags: [],
+    creator: '',
     createdBy: 'u1',
     createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
     ...over,

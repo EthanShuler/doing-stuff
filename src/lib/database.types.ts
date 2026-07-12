@@ -149,6 +149,7 @@ export interface Database {
           image_url: string
           watched_on: string | null
           tags: string[]
+          creator: string
           created_by: string | null
           created_at: string
         }
@@ -160,6 +161,7 @@ export interface Database {
           image_url?: string
           watched_on?: string | null
           tags?: string[]
+          creator?: string
           created_by?: string | null
           created_at?: string
         }
@@ -171,6 +173,7 @@ export interface Database {
           image_url?: string
           watched_on?: string | null
           tags?: string[]
+          creator?: string
           created_by?: string | null
           created_at?: string
         }
@@ -240,6 +243,7 @@ export interface Database {
           kind: string
           title: string
           image_url: string
+          creator: string
           tier_item_id: string | null
           created_by: string | null
           created_at: string
@@ -250,6 +254,7 @@ export interface Database {
           kind: string
           title: string
           image_url?: string
+          creator?: string
           tier_item_id?: string | null
           created_by?: string | null
           created_at?: string
@@ -260,6 +265,7 @@ export interface Database {
           kind?: string
           title?: string
           image_url?: string
+          creator?: string
           tier_item_id?: string | null
           created_by?: string | null
           created_at?: string

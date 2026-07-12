@@ -21,6 +21,9 @@ export interface ItemDraft {
   watchedOn: string
   /** Shared filter labels ("disney", "fantasy"). Board items only. */
   tags: string[]
+  /** Who made it — author/director/etc. (label per kind in copy.ts). Both
+   *  variants: a watchlist row carries it onto the tier item on check-off. */
+  creator: string
 }
 
 /** One dropdown row, whichever provider it came from (TMDB or Open Library). */
@@ -31,6 +34,9 @@ interface Suggestion {
   meta: string
   imageUrl: string
   thumbUrl: string
+  /** Creator to prefill on pick — the author for books; '' for TMDB results
+   *  (its search response doesn't carry a director). */
+  creator: string
 }
 
 export function ItemModal({
@@ -100,6 +106,7 @@ export function ItemModal({
               meta: [b.author, b.year].filter(Boolean).join(' · '),
               imageUrl: b.coverUrl,
               thumbUrl: b.thumbUrl,
+              creator: b.author,
             }))
           : (await searchTmdb(kind as 'movie' | 'tv', query)).map((r) => ({
               key: String(r.id),
@@ -107,6 +114,7 @@ export function ItemModal({
               meta: r.year,
               imageUrl: r.posterUrl,
               thumbUrl: r.thumbUrl,
+              creator: '',
             }))
       if (!cancelled) setSuggestions(results)
     }, 300)
@@ -117,7 +125,9 @@ export function ItemModal({
   }, [draft.title, kind, opened, showSuggestions, searchEnabled])
 
   const pickSuggestion = (result: Suggestion) => {
-    onChange({ title: result.title, imageUrl: result.imageUrl })
+    // Only overwrite the creator when the provider knows one, so a TMDB pick
+    // doesn't blank a hand-typed director.
+    onChange({ title: result.title, imageUrl: result.imageUrl, ...(result.creator ? { creator: result.creator } : {}) })
     setSuggestions([])
     setShowSuggestions(false)
   }
@@ -141,6 +151,7 @@ export function ItemModal({
     imageUrl: draft.imageUrl.trim(),
     watchedOn: null,
     tags: [],
+    creator: draft.creator.trim(),
     createdBy: null,
     createdAt: '',
   }
@@ -239,6 +250,13 @@ export function ItemModal({
             value={draft.imageUrl}
             onChange={(e) => onChange({ imageUrl: e.currentTarget.value })}
             placeholder="Paste an image link (optional)"
+            mb={18}
+          />
+          <TextInput
+            label={copy.creatorLabel}
+            value={draft.creator}
+            onChange={(e) => onChange({ creator: e.currentTarget.value })}
+            placeholder="Optional"
             mb={isWatchlist ? 6 : 18}
           />
           {!isWatchlist && (

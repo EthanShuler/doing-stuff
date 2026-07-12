@@ -104,6 +104,9 @@ export interface TierItem {
   watchedOn: string | null
   /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
   tags: string[]
+  /** Who made it — author for books, director for movies, etc. (per-kind label
+   *  in copy.ts). Free text, shared like the title. '' = unknown/not entered. */
+  creator: string
   /** auth.users id of the member who added it (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp; orders the unranked shelf. */
@@ -150,6 +153,9 @@ export interface WatchlistItem {
   title: string
   /** Optional poster/cover URL; carried onto the tier card when checked off. '' = none. */
   imageUrl: string
+  /** Who made it — author/director/etc. (per-kind label in copy.ts). Carried
+   *  onto the tier item when checked off, like the image. '' = unknown. */
+  creator: string
   /** The tier item this produced when checked off; null while still "want to watch". */
   tierItemId: string | null
   /** auth.users id of the member who added it (null for legacy rows). */

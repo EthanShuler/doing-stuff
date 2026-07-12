@@ -55,6 +55,10 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   board page filters by them with multi-select pills (OR semantics, matched
   case-insensitively). A filtered board is **read-only** — hidden cards make
   drop positions ambiguous — so it renders `BoardView` with clickable cards.
+  Items also carry a free-text **`creator`** — who made it, shared like the
+  title and shown as a faint line under the card title; the modal labels it
+  per kind via `creatorLabel` in `copy.ts` (Author / Director / Creator /
+  Brand or shop), and picking an Open Library suggestion prefills the author.
   Any member can add/edit/delete; deleting removes everyone's rankings of it.
 - **Tier placement** (`tier_placements`) — **one person's** ranking of one item:
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
@@ -81,10 +85,11 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   ice cream). Movie/TV/ice-cream lists are shared; the book reading list is
   **per person** — owned via `created_by`, the UI shows only the viewer's rows
   (`listIsPersonal()` in the tier-list `derive.ts` is the switch), and RLS
-  lets only the owner write a book row. Checking one off
+  lets only the owner write a book row. Rows carry their own `creator`
+  (shown under the row title). Checking one off
   creates the tier item — dated today: the shared `watched_on` for movies/TV
-  and ice cream, the *checker's own read record* for books — and links via
-  `tier_item_id`
+  and ice cream, the *checker's own read record* for books — carrying the
+  image and creator onto it, and links via `tier_item_id`
   (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
 All four routes render the same `TierListPage` (kind prop), so the store —

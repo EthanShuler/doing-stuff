@@ -109,6 +109,21 @@ export function CardVisual({
       >
         {item.title}
       </Text>
+      {item.creator && (
+        <Text
+          fz={9}
+          lh={1.2}
+          c={colors.faint}
+          px={5}
+          pb={4}
+          mt={-2}
+          lineClamp={1}
+          ta="center"
+          style={{ fontFamily: fonts.sans }}
+        >
+          {item.creator}
+        </Text>
+      )}
     </Box>
   )
 }
