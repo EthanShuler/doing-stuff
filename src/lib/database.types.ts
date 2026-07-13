@@ -244,6 +244,7 @@ export interface Database {
           title: string
           image_url: string
           creator: string
+          position: number
           tier_item_id: string | null
           created_by: string | null
           created_at: string
@@ -255,6 +256,7 @@ export interface Database {
           title: string
           image_url?: string
           creator?: string
+          position?: number
           tier_item_id?: string | null
           created_by?: string | null
           created_at?: string
@@ -266,6 +268,7 @@ export interface Database {
           title?: string
           image_url?: string
           creator?: string
+          position?: number
           tier_item_id?: string | null
           created_by?: string | null
           created_at?: string

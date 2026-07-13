@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TierItem, TierPlacement, TierRead } from '../../types'
+import type { TierItem, TierPlacement, TierRead, WatchlistItem } from '../../types'
 import {
   TIERS,
   datesArePersonal,
@@ -9,9 +9,11 @@ import {
   findContainer,
   listIsPersonal,
   moveItem,
+  nextWatchlistPosition,
   normalizeTags,
   positionBetween,
   renormalizedPositions,
+  sortWatchlist,
   tierSwatch,
 } from './derive'
 import { palette } from '../../theme'
@@ -45,6 +47,22 @@ function placement(over: Partial<TierPlacement> = {}): TierPlacement {
 function read(over: Partial<TierRead> = {}): TierRead {
   seq += 1
   return { id: `r${seq}`, itemId: 'i1', userId: 'u1', readOn: '2026-06-20', ...over }
+}
+
+function wish(over: Partial<WatchlistItem> = {}): WatchlistItem {
+  seq += 1
+  return {
+    id: `w${seq}`,
+    kind: 'movie',
+    title: `Wish ${seq}`,
+    imageUrl: '',
+    creator: '',
+    position: seq,
+    tierItemId: null,
+    createdBy: 'u1',
+    createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
+    ...over,
+  }
 }
 
 // --- deriveBoard ---------------------------------------------------------------
@@ -383,6 +401,63 @@ describe('renormalizedPositions', () => {
       { itemId: 'y', position: 2 },
       { itemId: 'z', position: 3 },
     ])
+  })
+})
+
+// --- watchlist ordering ------------------------------------------------------------
+
+describe('sortWatchlist', () => {
+  it('orders open items by position (top = next up)', () => {
+    const second = wish({ position: 2 })
+    const first = wish({ position: 1 })
+    expect(sortWatchlist([second, first]).map((w) => w.id)).toEqual([first.id, second.id])
+  })
+
+  it('fractional positions land between their neighbors', () => {
+    const a = wish({ position: 1 })
+    const b = wish({ position: 2 })
+    const between = wish({ position: 1.5 })
+    expect(sortWatchlist([a, b, between]).map((w) => w.id)).toEqual([a.id, between.id, b.id])
+  })
+
+  it('checked-off items sink below open ones, keeping their queue order', () => {
+    const doneLate = wish({ position: 3, tierItemId: 'x' })
+    const open = wish({ position: 2 })
+    const doneEarly = wish({ position: 1, tierItemId: 'y' })
+    expect(sortWatchlist([doneLate, open, doneEarly]).map((w) => w.id)).toEqual([
+      open.id,
+      doneEarly.id,
+      doneLate.id,
+    ])
+  })
+
+  it('ties (e.g. legacy rows all at 0) break by createdAt, oldest first', () => {
+    const newer = wish({ position: 0, createdAt: '2026-06-02T00:00:00Z' })
+    const older = wish({ position: 0, createdAt: '2026-06-01T00:00:00Z' })
+    expect(sortWatchlist([newer, older]).map((w) => w.id)).toEqual([older.id, newer.id])
+  })
+
+  it('never mutates the input', () => {
+    const input = [wish({ position: 2 }), wish({ position: 1 })]
+    const ids = input.map((w) => w.id)
+    sortWatchlist(input)
+    expect(input.map((w) => w.id)).toEqual(ids)
+  })
+})
+
+describe('nextWatchlistPosition', () => {
+  it('appends after the kind’s highest position', () => {
+    const items = [wish({ position: 4 }), wish({ position: 1.5 })]
+    expect(nextWatchlistPosition(items, 'movie')).toBe(5)
+  })
+
+  it('ignores other kinds', () => {
+    const items = [wish({ kind: 'tv', position: 9 }), wish({ kind: 'movie', position: 2 })]
+    expect(nextWatchlistPosition(items, 'movie')).toBe(3)
+  })
+
+  it('starts an empty list at 1', () => {
+    expect(nextWatchlistPosition([], 'movie')).toBe(1)
   })
 })
 

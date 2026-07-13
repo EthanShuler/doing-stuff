@@ -85,16 +85,21 @@ test('tag filter makes the board read-only and hides non-matches', async ({ page
 })
 
 test('watchlist tab lists open wishes; books call it Reading list', async ({ page }) => {
-  // Movie watchlist is shared: both members' wishes show.
+  // Movie watchlist is shared: both members' wishes show, in queue order
+  // (position, top = next up), with the drag-to-reorder hint. The drag itself
+  // is covered by derive.test.ts — dnd-kit drags are flaky under automation.
   await page.goto('/movies')
   await pickSegment(page, 'Watchlist')
   await expect(page.getByText('Dune: Part Two')).toBeVisible()
   await expect(page.getByText('Past Lives')).toBeVisible()
+  await expect(page.getByText("Drag to reorder — the top of the list is what you'll watch next.")).toBeVisible()
 
   // Reading list is per person: only the viewer's (u1's) wish shows — the
-  // partner's "Babel" stays on their own list.
+  // partner's "Babel" stays on their own list. One open row = nothing to
+  // reorder, so no hint.
   await page.goto('/books')
   await pickSegment(page, 'Reading list')
   await expect(page.getByText('The Priory of the Orange Tree')).toBeVisible()
   await expect(page.getByText('Babel')).not.toBeVisible()
+  await expect(page.getByText(/Drag to reorder/)).not.toBeVisible()
 })

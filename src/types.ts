@@ -156,11 +156,15 @@ export interface WatchlistItem {
   /** Who made it — author/director/etc. (per-kind label in copy.ts). Carried
    *  onto the tier item when checked off, like the image. '' = unknown. */
   creator: string
+  /** Queue order within the kind's list — top (lowest) = watch next.
+   *  Fractional midpoint insertion on drag reorder; new items append at the
+   *  end (max + 1). */
+  position: number
   /** The tier item this produced when checked off; null while still "want to watch". */
   tierItemId: string | null
   /** auth.users id of the member who added it (null for legacy rows). */
   createdBy: string | null
-  /** ISO timestamp; orders the list. */
+  /** ISO timestamp; tiebreak ordering for same-position rows. */
   createdAt: string
 }
 

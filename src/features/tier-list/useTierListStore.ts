@@ -4,7 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
-import { datesArePersonal, normalizeTags, renormalizedPositions } from './derive'
+import { datesArePersonal, nextWatchlistPosition, normalizeTags, renormalizedPositions } from './derive'
 import { PROFILE_COLUMNS, errorMessage, idFactory, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 
@@ -102,12 +102,12 @@ function seed(): Snapshot {
     // Reading lists are per person (owner = createdBy): the seed viewer u1
     // sees only w4 on /books — u2's w6 exercises the filter.
     watchlist: [
-      { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
-      { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
-      { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', creator: 'Samantha Shannon', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
-      { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', creator: '', tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
-      { id: 'w6', kind: 'book', title: 'Babel', imageUrl: '', creator: 'R. F. Kuang', tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T11:00:00Z' },
+      { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
+      { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', creator: '', position: 2, tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
+      { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', creator: 'Samantha Shannon', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
+      { id: 'w6', kind: 'book', title: 'Babel', imageUrl: '', creator: 'R. F. Kuang', position: 2, tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T11:00:00Z' },
     ],
   }
 }
@@ -144,6 +144,7 @@ type WatchlistItemRow = {
   title: string
   image_url: string | null
   creator: string | null
+  position: number
   tier_item_id: string | null
   created_by: string | null
   created_at: string
@@ -179,6 +180,7 @@ const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
   title: r.title,
   imageUrl: r.image_url ?? '',
   creator: r.creator ?? '',
+  position: r.position,
   tierItemId: r.tier_item_id,
   createdBy: r.created_by,
   createdAt: r.created_at,
@@ -187,7 +189,7 @@ const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
 const TIER_ITEM_COLUMNS = 'id,kind,title,image_url,watched_on,tags,creator,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_READ_COLUMNS = 'id,item_id,user_id,read_on'
-const WATCHLIST_COLUMNS = 'id,kind,title,image_url,creator,tier_item_id,created_by,created_at'
+const WATCHLIST_COLUMNS = 'id,kind,title,image_url,creator,position,tier_item_id,created_by,created_at'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('tx', 500)
@@ -259,6 +261,11 @@ export interface TierListStore {
   updateWatchlistItem: (id: string, title: string, imageUrl: string, creator: string) => Promise<void>
   /** Remove a watchlist item (does not touch any tier item it created). Throws on failure. */
   deleteWatchlistItem: (id: string) => Promise<void>
+  /** Reorder: move one open item to a new queue position (top = next up).
+   *  Inline flow — records the error and resyncs instead of throwing. */
+  moveWatchlistItem: (id: string, position: number) => Promise<void>
+  /** Rewrite one list's ordering at integer positions (float-precision rescue). */
+  renormalizeWatchlist: (orderedIds: string[]) => Promise<void>
   /** Check off an open item: create the tier item in the pool and link to it.
    *  Inline flow — records the error instead of throwing. */
   checkOffWatchlistItem: (item: WatchlistItem) => Promise<void>
@@ -292,7 +299,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       supabase.from('tier_item_reads').select(TIER_READ_COLUMNS).eq('space_id', spaceId).order('created_at'),
       // RLS scopes this to the current user + anyone they share a space with.
       supabase.from('profiles').select(PROFILE_COLUMNS),
-      supabase.from('watchlist_items').select(WATCHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
+      supabase.from('watchlist_items').select(WATCHLIST_COLUMNS).eq('space_id', spaceId).order('position').order('created_at'),
     ])
     if (its.error) throw its.error
     if (places.error) throw places.error
@@ -603,10 +610,12 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setError(null)
       const image = imageUrl.trim()
       const maker = creator.trim()
+      // New wishes join the back of the queue (the top is "next up").
+      const position = nextWatchlistPosition(watchlist, kind)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
           .from('watchlist_items')
-          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, creator: maker })
+          .insert({ space_id: spaceId, kind, title: trimmed, image_url: image, creator: maker, position })
           .select(WATCHLIST_COLUMNS)
           .single()
         if (err) {
@@ -618,10 +627,10 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       }
       setWatchlist((prev) => [
         ...prev,
-        { id: nextId(), kind, title: trimmed, imageUrl: image, creator: maker, tierItemId: null, createdBy: selfId, createdAt: new Date().toISOString() },
+        { id: nextId(), kind, title: trimmed, imageUrl: image, creator: maker, position, tierItemId: null, createdBy: selfId, createdAt: new Date().toISOString() },
       ])
     },
-    [spaceId, selfId],
+    [spaceId, selfId, watchlist],
   )
 
   const updateWatchlistItem = useCallback(
@@ -659,6 +668,46 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setWatchlist((prev) => prev.filter((w) => w.id !== id))
     },
     [spaceId],
+  )
+
+  // --- Reorder (drag) actions. Inline flows like the board's drops: optimistic
+  //     local move first; on failure record the error and resync — the row
+  //     snaps back and the banner says why. ---
+
+  const moveWatchlistItem = useCallback(
+    async (id: string, position: number) => {
+      setError(null)
+      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, position } : w)))
+      if (!supabase || !spaceId) return
+      const { error: err } = await supabase.from('watchlist_items').update({ position }).eq('id', id)
+      if (err) {
+        setError(err.message)
+        resync()
+      }
+    },
+    [spaceId, resync],
+  )
+
+  const renormalizeWatchlist = useCallback(
+    async (orderedIds: string[]) => {
+      setError(null)
+      const rewrites = renormalizedPositions(orderedIds)
+      const positionById = new Map(rewrites.map((r) => [r.itemId, r.position]))
+      setWatchlist((prev) => prev.map((w) => (positionById.has(w.id) ? { ...w, position: positionById.get(w.id)! } : w)))
+      if (!supabase || !spaceId) return
+      // Row-by-row updates: unlike placements there's no upsert target that
+      // wouldn't need every NOT NULL column. Rare path (float precision ran
+      // out), tiny lists — sequential is fine.
+      for (const { itemId, position } of rewrites) {
+        const { error: err } = await supabase.from('watchlist_items').update({ position }).eq('id', itemId)
+        if (err) {
+          setError(err.message)
+          resync()
+          return
+        }
+      }
+    },
+    [spaceId, resync],
   )
 
   const checkOffWatchlistItem = useCallback(
@@ -763,6 +812,8 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     addWatchlistItem,
     updateWatchlistItem,
     deleteWatchlistItem,
+    moveWatchlistItem,
+    renormalizeWatchlist,
     checkOffWatchlistItem,
     uncheckWatchlistItem,
   }

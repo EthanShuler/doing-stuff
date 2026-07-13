@@ -253,6 +253,16 @@ create table if not exists public.watchlist_items (
   -- On an existing DB:
   --   alter table public.watchlist_items add column creator text not null default '';
   creator      text not null default '',
+  -- Queue order within the kind's list — the list is a priority queue, top
+  -- (lowest position) = watch/read/try next. Fractional midpoint insertion on
+  -- drag, like tier_placements.position; the client appends new rows at
+  -- max + 1. On an existing DB:
+  --   alter table public.watchlist_items add column position double precision not null default 0;
+  --   update public.watchlist_items w set position = sub.rn
+  --     from (select id, row_number() over (partition by space_id, kind order by created_at) as rn
+  --           from public.watchlist_items) sub
+  --     where w.id = sub.id;
+  position     double precision not null default 0,
   -- The tier item this produced when checked off; null while still open.
   tier_item_id uuid references public.tier_items (id) on delete set null,
   created_by   uuid references auth.users (id) default auth.uid(),

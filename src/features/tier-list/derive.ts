@@ -1,4 +1,4 @@
-import type { Tier, TierItem, TierKind, TierPlacement, TierRead } from '../../types'
+import type { Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 
@@ -221,4 +221,31 @@ export function positionBetween(before: number | null, after: number | null): nu
 /** Rewrite a tier's ordering at clean integer positions (renormalize path). */
 export function renormalizedPositions(itemIds: string[]): { itemId: string; position: number }[] {
   return itemIds.map((itemId, i) => ({ itemId, position: i + 1 }))
+}
+
+// --- Watchlist ordering -------------------------------------------------------
+// The list is a priority queue: open items sort by `position` (top = watch/
+// read/try next; drag to reorder via the same midpoint-insertion scheme as
+// tier placements). Checked-off items sink below the open ones, keeping their
+// queue order so unchecking restores an item's old slot.
+
+/** Order one kind's watchlist for display: open first, then by position, with
+ *  createdAt (then id) breaking ties — e.g. legacy rows all at position 0. */
+export function sortWatchlist(items: WatchlistItem[]): WatchlistItem[] {
+  const rank = (w: WatchlistItem) => (w.tierItemId === null ? 0 : 1)
+  return [...items].sort((a, b) => {
+    if (rank(a) !== rank(b)) return rank(a) - rank(b)
+    if (a.position !== b.position) return a.position - b.position
+    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1
+    return a.id < b.id ? -1 : 1
+  })
+}
+
+/** Position that appends a new wish at the bottom of one kind's queue. */
+export function nextWatchlistPosition(items: WatchlistItem[], kind: TierKind): number {
+  let max = 0
+  for (const w of items) {
+    if (w.kind === kind && w.position > max) max = w.position
+  }
+  return max + 1
 }

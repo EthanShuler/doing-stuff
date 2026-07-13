@@ -86,7 +86,11 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   **per person** — owned via `created_by`, the UI shows only the viewer's rows
   (`listIsPersonal()` in the tier-list `derive.ts` is the switch), and RLS
   lets only the owner write a book row. Rows carry their own `creator`
-  (shown under the row title). Checking one off
+  (shown under the row title). The open rows are a **priority queue**: a
+  fractional `position` (same midpoint-insertion scheme as placements) orders
+  them, drag-to-reorder in `Watchlist.tsx`, top = watch/read/try next; new
+  rows append at max + 1, and checked-off rows sink below the queue (keeping
+  their slot, so unchecking restores it). Checking one off
   creates the tier item — dated today: the shared `watched_on` for movies/TV
   and ice cream, the *checker's own read record* for books — carrying the
   image and creator onto it, and links via `tier_item_id`
