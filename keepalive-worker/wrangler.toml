@@ -1,0 +1,18 @@
+# Cloudflare Worker that pings the Supabase project twice a week so the
+# free-tier project never pauses for inactivity (pause threshold: 7 days).
+# Deploy from this directory: npx wrangler deploy
+name = "cajubinile-keepalive"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+[triggers]
+# Mondays and Thursdays at 15:00 UTC — max gap 4 days, well under 7.
+crons = ["0 15 * * 1,4"]
+
+[observability]
+enabled = true
+
+[vars]
+# Public browser keys (same values the site ships to every visitor).
+SUPABASE_URL = "https://adiywpsrbbwbdxntpjvb.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_pZLRFg3RvtvbDG-g_sWRQg_5JqZCPvG"

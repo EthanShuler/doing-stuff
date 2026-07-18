@@ -277,18 +277,27 @@ describe('distinctTags', () => {
 describe('filterByTags', () => {
   const disney = item({ tags: ['Disney'] })
   const fantasy = item({ tags: ['fantasy'] })
+  const disneyFantasy = item({ tags: ['Disney', 'fantasy'] })
   const untagged = item()
 
-  it('an empty selection filters nothing', () => {
-    expect(filterByTags([disney, fantasy, untagged], [])).toEqual([disney, fantasy, untagged])
+  it('empty selections filter nothing', () => {
+    expect(filterByTags([disney, fantasy, untagged], [], [])).toEqual([disney, fantasy, untagged])
   })
 
-  it('keeps items matching ANY selected tag (case-insensitive)', () => {
-    expect(filterByTags([disney, fantasy, untagged], ['disney', 'fantasy'])).toEqual([disney, fantasy])
+  it('keeps items matching ANY included tag (case-insensitive)', () => {
+    expect(filterByTags([disney, fantasy, untagged], ['disney', 'fantasy'], [])).toEqual([disney, fantasy])
   })
 
-  it('drops untagged items when a filter is on', () => {
-    expect(filterByTags([disney, untagged], ['disney'])).toEqual([disney])
+  it('drops untagged items when an include filter is on', () => {
+    expect(filterByTags([disney, untagged], ['disney'], [])).toEqual([disney])
+  })
+
+  it('an exclude drops its items but keeps untagged ones (case-insensitive)', () => {
+    expect(filterByTags([disney, fantasy, untagged], [], ['disney'])).toEqual([fantasy, untagged])
+  })
+
+  it('exclude wins over include when an item carries both', () => {
+    expect(filterByTags([disney, fantasy, disneyFantasy], ['fantasy'], ['disney'])).toEqual([fantasy])
   })
 })
 

@@ -177,6 +177,8 @@ npm run build      # tsc -b && vite build  (this is the typecheck-on-build gate)
 npm run typecheck  # tsc -b --noEmit
 npm test           # vitest run — covers the pure logic in src/data/derive.ts
 npm run test:e2e   # Playwright suite in e2e/ — keyless seed mode, port 5199
+npx playwright test --ui      # Playwright UI mode — pick specs, watch runs, time-travel DOM
+npx playwright test --debug   # Playwright Inspector — step through a test, live locator console
 npm run preview    # serve the production build
 ```
 

@@ -72,12 +72,20 @@ export function distinctTags(items: TierItem[], kind: TierKind): string[] {
   return [...byKey.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 }
 
-/** Keep the items carrying at least one selected tag (OR semantics — the
- *  filter pills widen, not narrow). An empty selection filters nothing. */
-export function filterByTags(items: TierItem[], selected: string[]): TierItem[] {
-  if (selected.length === 0) return items
-  const wanted = new Set(selected.map(tagKey))
-  return items.filter((item) => item.tags.some((tag) => wanted.has(tagKey(tag))))
+/** Keep the items matching the include/exclude tag selections. Includes are
+ *  OR (any selected tag matches — the pills widen, not narrow); an item
+ *  carrying any excluded tag is dropped even if it also matches an include.
+ *  Untagged items survive an exclude-only filter ("all movies besides disney"
+ *  keeps the untagged ones) but not an include filter. Empty selections
+ *  filter nothing. */
+export function filterByTags(items: TierItem[], included: string[], excluded: string[]): TierItem[] {
+  if (included.length === 0 && excluded.length === 0) return items
+  const wanted = new Set(included.map(tagKey))
+  const banned = new Set(excluded.map(tagKey))
+  return items.filter((item) => {
+    if (item.tags.some((tag) => banned.has(tagKey(tag)))) return false
+    return wanted.size === 0 || item.tags.some((tag) => wanted.has(tagKey(tag)))
+  })
 }
 
 /** One viewer's board: items per tier (in ranked order) + the two shelves. */

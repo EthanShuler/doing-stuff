@@ -659,3 +659,17 @@ create policy "members delete spoon photos" on storage.objects
 -- select id, c.name, c.ci from new_space,
 --   (values ('Outdoor',0),('City',1),('Brain',2)) as c(name, ci);
 -- ============================================================================
+
+-- ============================================================================
+-- Keepalive — free-tier projects pause after 7 days without API activity.
+-- A Cloudflare Worker cron (keepalive-worker/) calls this no-op RPC twice a
+-- week as anon. It reads no tables; anon's only grant is executing this.
+-- ============================================================================
+create or replace function public.keepalive()
+returns timestamptz
+language sql
+stable
+as $$ select now() $$;
+
+revoke all on function public.keepalive() from public;
+grant execute on function public.keepalive() to anon, authenticated;

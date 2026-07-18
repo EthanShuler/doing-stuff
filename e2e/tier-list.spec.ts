@@ -84,6 +84,29 @@ test('tag filter makes the board read-only and hides non-matches', async ({ page
   await expect(page.getByText('Spirited Away')).toBeVisible()
 })
 
+test('tag pills cycle include → exclude → off', async ({ page }) => {
+  await page.goto('/movies')
+
+  // First click: include — only fantasy-tagged movies remain.
+  await page.getByText('fantasy', { exact: true }).click()
+  await expect(page.getByText('Spirited Away')).toBeVisible()
+  await expect(page.getByText('Paddington 2')).not.toBeVisible() // untagged
+
+  // Second click: exclude — the pill relabels "− fantasy"; fantasy movies
+  // hide, everything else (including untagged) comes back.
+  await page.getByText('fantasy', { exact: true }).click()
+  await expect(page.getByText('− fantasy', { exact: true })).toBeVisible()
+  await expect(page.getByText('Spirited Away')).not.toBeVisible()
+  await expect(page.getByText('The Princess Bride')).not.toBeVisible()
+  await expect(page.getByText('Paddington 2')).toBeVisible()
+  await expect(page.getByText('Everything Everywhere All at Once')).toBeVisible()
+
+  // Third click: off — full board, drag mode back (no filtered note).
+  await page.getByText('− fantasy', { exact: true }).click()
+  await expect(page.getByText('Spirited Away')).toBeVisible()
+  await expect(page.getByText('Filtered by tag — clear the filter to rearrange.')).not.toBeVisible()
+})
+
 test('watchlist tab lists open wishes; books call it Reading list', async ({ page }) => {
   // Movie watchlist is shared: both members' wishes show, in queue order
   // (position, top = next up), with the drag-to-reorder hint. The drag itself

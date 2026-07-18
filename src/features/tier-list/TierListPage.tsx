@@ -92,20 +92,30 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     [personal, store.reads, store.selfId, store.items, kind],
   )
 
-  // Tag filter: multi-select pills over the tags in use on this kind. While
-  // any are selected the board shows only matching items — read-only, because
-  // drops between visible neighbors would land at arbitrary positions relative
-  // to the hidden cards.
-  const [tagFilter, setTagFilter] = useState<string[]>([])
-  useEffect(() => setTagFilter([]), [kind])
+  // Tag filter: tri-state pills over the tags in use on this kind — a click
+  // cycles off → include → exclude → off ("all movies besides disney" =
+  // exclude disney). Includes are OR; an excluded tag hides its items even
+  // when they also match an include. While any state is set the board shows
+  // only matching items — read-only, because drops between visible neighbors
+  // would land at arbitrary positions relative to the hidden cards.
+  const [tagFilter, setTagFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  useEffect(() => setTagFilter({}), [kind])
   const kindTags = useMemo(() => distinctTags(store.items, kind), [store.items, kind])
-  const filterActive = tagFilter.length > 0
+  const includedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'include')
+  const excludedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'exclude')
+  const filterActive = includedTags.length > 0 || excludedTags.length > 0
   const toggleTag = (tag: string) =>
-    setTagFilter((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+    setTagFilter((prev) => {
+      const next = { ...prev }
+      if (prev[tag] === 'include') next[tag] = 'exclude'
+      else if (prev[tag] === 'exclude') delete next[tag]
+      else next[tag] = 'include'
+      return next
+    })
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
-    () => deriveBoard(filterByTags(store.items, tagFilter), store.placements, store.reads, viewerId, kind),
+    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.reads, viewerId, kind),
     [store.items, tagFilter, store.placements, store.reads, viewerId, kind],
   )
 
@@ -234,19 +244,26 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
           </Group>
 
           {/* Tag filter pills — only once something on this kind is tagged.
-              Multi-select widens the filter (any selected tag matches). */}
+              Tri-state: click cycles include → exclude → off. Includes widen
+              (any selected tag matches); excludes always hide their items. */}
           {mode === 'board' && kindTags.length > 0 && (
             <Group gap={8} mt={16} wrap="wrap">
-              <Pill label={`All ${noun}s`} active={!filterActive} activeBg={ACCENT} onClick={() => setTagFilter([])} />
+              <Pill label={`All ${noun}s`} active={!filterActive} activeBg={ACCENT} onClick={() => setTagFilter({})} />
               {kindTags.map((tag) => (
                 <Pill
                   key={tag.toLowerCase()}
                   label={tag}
-                  active={tagFilter.includes(tag)}
+                  active={tagFilter[tag] !== undefined}
+                  excluded={tagFilter[tag] === 'exclude'}
                   activeBg={ACCENT}
                   onClick={() => toggleTag(tag)}
                 />
               ))}
+              {filterActive && (
+                <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+                  tap a tag again to exclude it
+                </Text>
+              )}
             </Group>
           )}
 
@@ -302,8 +319,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               <BoardView
                 board={board}
                 renderCard={(item) => <CardVisual key={item.id} item={item} onClick={() => openEdit(item)} />}
-                shelfHint={`No unranked ${noun}s match this tag.`}
-                unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this tag.`}
+                shelfHint={`No unranked ${noun}s match this filter.`}
+                unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this filter.`}
                 unwatchedLabel={copy.shelfLabel}
               />
             </>
