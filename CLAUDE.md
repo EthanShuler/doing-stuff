@@ -9,8 +9,8 @@ behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
 and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
-feature; `/french-toast` and `/parks` are placeholder pages for features not
-built yet (a french toast ranking, a 63-national-parks visit tracker). All features share the one
+feature; `/parks` is the **Parks** feature; `/french-toast` is a placeholder
+page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
 **Doing Stuff** — the landing feature — is a shared activity tracker for logging
@@ -119,6 +119,46 @@ with an in-page **Collection / Map** toggle: a photo card grid (newest first,
 undated last, 🥄 fallback) and a Leaflet map of circular photo pins that
 fit-bounds to the collection on open — same-place spoons fan out a few meters
 (deterministically, in `derive.ts`) so every pin stays clickable.
+
+**Parks** (`/parks`) — the 63-national-parks tracker. The parks themselves are
+a **static in-repo list** (the parks feature's `parks.ts`: NPS park code as the
+stable id, name, states, region, lat/lng, year established, one-line blurb,
+nps.gov link) — deliberately no DB table. Only **visits** are stored:
+`park_visits` (uniform shared RLS), each row = one trip with an optional
+`visited_on` date ("went as a kid" is fine), notes, and `attendee_ids uuid[]`
+of who went (the form requires ≥1, defaults to everyone). A park can have many
+visit rows. Stats derive per person plus **Together**, which means *the same
+trip* — both members on one row's attendees, not two separate visits. The
+in-between case — **both have been, but never together** — is a first-class
+state: it derives automatically from one solo row per person, or from one row
+with both attendees plus the **`separate` boolean** (the form's "We went
+separately" checkbox, shown only with >1 attendee — a shorthand so "we both
+went as kids" is one row, counting toward each person's total but never
+Together; the store never persists the flag on solo rows). Pin/badge colors
+are **person-fixed by membership join order** (the store reads `space_members`
+ordered by `created_at`) and **colorblind-safe — Ethan is red-green
+colorblind**, so status is never hue-alone: first member = **blue**
+(`ACCENT_BLUE` in `theme.ts`), second = **orange** (`ACCENT`), together = a
+**ring** (blue around orange), both-separately = a half-and-half **split
+dot**, unvisited = small + faint gray — every state also distinct in
+grayscale. `MEMBER_COLORS`/`parkPin`/`memberColor` live in the parks
+`derive.ts`; `StatusDot.tsx` is the single dot renderer (stats, legend, list)
+with `pinVariant` mirrored by ParkMap's divIcon HTML. Keep the shape-plus-
+color rule for any future meaning-carrying color in the app. One route with an in-page **Map / List** toggle and a stats strip
+(each member n/63 + Together n/63). The map always shows all 63 pins
+(continental-US default framing; Alaska/Hawaiʻi/territories are a pan away)
+with a display-name legend; the list groups by region with
+All / member / Together / Unvisited filter pills. Clicking a pin's popup or a
+list row opens the park detail modal — static facts + visit history +
+add/edit/delete trips behind an internal mode switch (deletes confirm) — and a
+header "+ Log visit" button opens the same trip fields behind a searchable
+park picker. Scope cuts (deliberate): no photos, no parks wishlist (the
+Unvisited filter is the wishlist).
+
+Shared Leaflet plumbing lives in `src/components/MapCanvas.tsx` (framed
+MapContainer + CARTO tiles, `Recenter`, `FitToPins`, a divIcon cache with
+`emojiIcon`) — all three feature maps (doing-stuff, spoons, parks) render
+through it; new maps should too.
 
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
 paper), ported from the Claude Design "Compass" direction.
@@ -267,8 +307,9 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
-  `tier_item_reads`, `watchlist_items`, `spoons`. Plus the `spoons` **storage
-  bucket** (public read, member-only writes via policies on `storage.objects`).
+  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`. Plus the
+  `spoons` **storage bucket** (public read, member-only writes via policies on
+  `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_reads`** (members read all, but
@@ -324,6 +365,7 @@ src/
     ComingSoon.tsx         placeholder page for unbuilt features
     EmptyCard.tsx          dashed empty-state card
     FloatingBanner.tsx     fixed dismissible error/notice banner
+    MapCanvas.tsx          shared Leaflet frame: tiles, Recenter, FitToPins, icon cache
     ModalShell.tsx         shared Mantine modal chrome
     Pill.tsx               category filter pill
     Splash.tsx             centered loading/fatal message
@@ -363,10 +405,21 @@ src/
       SpoonGrid.tsx        photo card grid + SpoonPhoto (🥄 fallback)
       SpoonMap.tsx         Leaflet map: circular photo pins, fit-bounds framing
       SpoonModal.tsx       add/edit spoon (photo upload, place, date, story)
+    parks/                 the 63-national-parks tracker (map + list)
+      ParksPage.tsx        owns the store, Map/List toggle, stats strip, modals
+      parks.ts             static dataset: the 63 parks (code, region, coords…)
+      useParkStore.ts      data seam: park_visits CRUD + ordered members (or seed)
+      derive.ts            pure statuses, stats, filters, regions, pin colors
+      derive.test.ts       vitest coverage for derive.ts + dataset sanity
+      ParkMap.tsx          Leaflet map: all 63 pins colored by who's been + legend
+      ParkList.tsx         region-grouped list + status filter pills
+      ParkModal.tsx        park facts + visit history + add/edit visit form
+      LogVisitModal.tsx    header flow: searchable park picker + trip fields
+      VisitFields.tsx      shared trip fields (date, attendees, notes)
 e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
-                           tier-list, mobile) — see playwright.config.ts
+                           tier-list, spoons, parks, mobile) — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants
 ```

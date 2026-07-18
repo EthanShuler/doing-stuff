@@ -302,6 +302,38 @@ create table if not exists public.spoons (
 create index if not exists spoons_space_idx on public.spoons (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Park visits: the 63-national-parks tracker. The parks themselves are a
+-- static in-repo list (src/features/parks/parks.ts, keyed by NPS park code) —
+-- only visits live here. Each row is ONE TRIP: a park can accumulate many
+-- rows (Yosemite 2019 and 2023), the date is optional ("went as a kid"), and
+-- `attendee_ids` records who was on the trip so stats derive per person AND
+-- together (= both ids on one row that isn't marked `separate`). Shared space
+-- data with the uniform policy below — attendees are data, not ownership;
+-- either member can log or fix up a trip.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.park_visits (
+  id           uuid primary key default gen_random_uuid(),
+  space_id     uuid not null references public.spaces (id) on delete cascade,
+  -- NPS park code from the static list ('yose', 'zion', …).
+  park_code    text not null,
+  -- When the trip was. Null = sometime, long ago.
+  visited_on   date,
+  notes        text not null default '',
+  -- auth.users ids of who was on the trip (the UI defaults to both members).
+  attendee_ids uuid[] not null default '{}',
+  -- One-row shorthand for "we've both been, but on different trips": all
+  -- attendees, separate = true. Counts toward each attendee's total but NOT
+  -- toward Together (same as logging one solo row per person, which derives
+  -- the same "separately" state). Meaningless on solo rows.
+  separate     boolean not null default false,
+  created_by   uuid references auth.users (id) default auth.uid(),
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists park_visits_space_idx on public.park_visits (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -410,6 +442,7 @@ alter table public.profiles      enable row level security;
 alter table public.wishlist_items enable row level security;
 alter table public.entry_repeats enable row level security;
 alter table public.spoons        enable row level security;
+alter table public.park_visits   enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_reads  enable row level security;
@@ -484,6 +517,10 @@ create policy "space members all" on public.entry_repeats
 
 drop policy if exists "space members all" on public.spoons;
 create policy "space members all" on public.spoons
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.park_visits;
+create policy "space members all" on public.park_visits
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -575,7 +612,7 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
-  public.tier_item_reads, public.watchlist_items, public.spoons
+  public.tier_item_reads, public.watchlist_items, public.spoons, public.park_visits
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -595,7 +632,8 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items', 'spoons']
+          'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items', 'spoons',
+          'park_visits']
   loop
     if not exists (
       select 1 from pg_publication_tables

@@ -10,6 +10,7 @@ import { Splash } from './components/Splash'
 import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
 import { TierListPage } from './features/tier-list/TierListPage'
 import { SpoonsPage } from './features/spoons/SpoonsPage'
+import { ParksPage } from './features/parks/ParksPage'
 
 export default function App() {
   const { session, loading, configured } = useSession()
@@ -71,10 +72,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/french-toast"
             element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}
           />
-          <Route
-            path="/parks"
-            element={<ComingSoon title="National parks" blurb="Tracking the 63 together, coming soon." />}
-          />
+          <Route path="/parks" element={<ParksPage spaceId={spaceId} userId={userId} configured={configured} />} />
           <Route path="/spoons" element={<SpoonsPage spaceId={spaceId} configured={configured} />} />
           <Route
             path="/board-games"

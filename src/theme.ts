@@ -23,6 +23,10 @@ export const palette: PaletteSwatch[] = [
 export const ACCENT = 'oklch(0.62 0.13 45)'
 export const ACCENT_HOVER = 'oklch(0.56 0.13 45)'
 export const DANGER = 'oklch(0.55 0.14 25)'
+/** ACCENT's colorblind-safe counterpart for UI where color CARRIES MEANING
+ *  (status pins/dots): Ethan is red-green colorblind, so meaningful pairs must
+ *  be blue vs orange (plus a shape/lightness cue), never terracotta vs sage. */
+export const ACCENT_BLUE = 'oklch(0.55 0.12 250)'
 
 export const fonts = {
   sans: "'Plus Jakarta Sans', sans-serif",

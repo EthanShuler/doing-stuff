@@ -194,6 +194,31 @@ export interface Spoon {
   createdAt: string
 }
 
+// --- Parks (the 63-national-parks tracker) ------------------------------------
+
+/** One trip to a national park — one row in `park_visits`. The park itself is
+ *  static in-repo data (src/features/parks/parks.ts), referenced by NPS code.
+ *  A park can have many visits; shared space data (either member edits any). */
+export interface ParkVisit {
+  id: string
+  /** NPS park code ('yose', 'zion', …) into the static PARKS list. */
+  parkCode: string
+  /** ISO date of the trip; null = sometime, long ago. */
+  date: string | null
+  notes: string
+  /** auth.users ids of who was on this trip. Together = both on one row
+   *  that isn't marked `separate`. */
+  attendeeIds: string[]
+  /** One-row shorthand for "we've both been, but on different trips": all
+   *  attendees + separate = true counts toward each person's total, not
+   *  Together. Meaningless on solo rows. */
+  separate: boolean
+  /** auth.users id of the member who logged it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; tiebreak ordering for undated visits. */
+  createdAt: string
+}
+
 export type SortKey = 'recent' | 'rating' | 'category'
 export type ViewMode = 'cards' | 'table'
 export type Screen = 'log' | 'wishlist' | 'map' | 'calendar'

@@ -53,12 +53,16 @@ test('/spoons renders the spoon collection', async ({ page }) => {
   await expect(page.getByRole('button', { name: '+ Add spoon' })).toBeVisible()
 })
 
+test('/parks renders the park tracker map', async ({ page }) => {
+  await page.goto('/parks')
+  await expect(page.locator('.leaflet-container')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Log visit' })).toBeVisible()
+})
+
 test('placeholder routes render ComingSoon', async ({ page }) => {
   // exact — the header nav's "French Toast" button would match a loose search
   await page.goto('/french-toast')
   await expect(page.getByText('French toast', { exact: true })).toBeVisible()
-  await page.goto('/parks')
-  await expect(page.getByText('National parks', { exact: true })).toBeVisible()
 })
 
 test('unknown paths redirect to /', async ({ page }) => {

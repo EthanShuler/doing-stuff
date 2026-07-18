@@ -317,6 +317,42 @@ export interface Database {
         }
         Relationships: []
       }
+      park_visits: {
+        Row: {
+          id: string
+          space_id: string
+          park_code: string
+          visited_on: string | null
+          notes: string
+          attendee_ids: string[]
+          separate: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          park_code: string
+          visited_on?: string | null
+          notes?: string
+          attendee_ids?: string[]
+          separate?: boolean
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          park_code?: string
+          visited_on?: string | null
+          notes?: string
+          attendee_ids?: string[]
+          separate?: boolean
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       entry_repeats: {
         Row: {
           id: string
