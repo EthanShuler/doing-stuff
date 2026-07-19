@@ -5,7 +5,7 @@ import type { Profile, Tier, TierItem, TierKind, TierPlacement, TierRead, Watchl
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { datesArePersonal, nextWatchlistPosition, normalizeTags, renormalizedPositions } from './derive'
-import { PROFILE_COLUMNS, errorMessage, idFactory, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { PROFILE_COLUMNS, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
@@ -422,7 +422,8 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           throw err
         }
         const created = toTierItem(data as TierItemRow)
-        setItems((prev) => [...prev, created])
+        // upsert, not append: the realtime echo of this write may land first.
+        upsertById(setItems, created)
         // The item exists either way now, so a failed read-record write only
         // surfaces the error banner (setReadOn resyncs) — no throw.
         if (personal && dateOn) await setReadOn(created.id, dateOn)
@@ -622,7 +623,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           setError(err.message)
           throw err
         }
-        setWatchlist((prev) => [...prev, toWatchlistItem(data as WatchlistItemRow)])
+        upsertById(setWatchlist, toWatchlistItem(data as WatchlistItemRow))
         return
       }
       setWatchlist((prev) => [
@@ -738,7 +739,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           return
         }
         const created = toTierItem(itemData as TierItemRow)
-        setItems((prev) => (prev.some((x) => x.id === created.id) ? prev : [...prev, created]))
+        upsertById(setItems, created)
         // 2. Your read record (books). A failure surfaces the banner and
         //    resyncs inside setReadOn; the item is on the board regardless.
         if (personal) await setReadOn(created.id, today())

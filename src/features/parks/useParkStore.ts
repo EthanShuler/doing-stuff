@@ -7,6 +7,7 @@ import {
   idFactory,
   syncTable,
   toProfile,
+  upsertById,
   useSpaceSync,
 } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
@@ -200,7 +201,7 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
           throw err
         }
         const created = toVisit(data as VisitRow)
-        setVisits((prev) => (prev.some((v) => v.id === created.id) ? prev : [...prev, created]))
+        upsertById(setVisits, created)
         return
       }
       setVisits((prev) => [

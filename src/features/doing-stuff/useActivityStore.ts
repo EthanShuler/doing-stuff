@@ -4,7 +4,7 @@ import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, Wish
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { geocode } from '../../lib/geocode'
-import { PROFILE_COLUMNS, idFactory, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { PROFILE_COLUMNS, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 
 // The app's single source of domain data (categories / activities / entries).
@@ -374,7 +374,8 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           throw err
         }
         const entry = toEntry(data as EntryRow)
-        setEntries((prev) => [...prev, entry])
+        // upsert, not append: the realtime echo of this write may land first.
+        upsertById(setEntries, entry)
         return entry.id
       }
       const id = nextId()
@@ -495,7 +496,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           setError(err.message)
           throw err
         }
-        setRepeats((prev) => [...prev, toRepeat(data as RepeatRow)])
+        upsertById(setRepeats, toRepeat(data as RepeatRow))
         return
       }
       setRepeats((prev) => [...prev, { id: nextId(), entryId, date: repeatDate, createdBy: userId }])
@@ -536,7 +537,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           setError(err.message)
           return
         }
-        setActivities((prev) => [...prev, toActivity(data as ActivityRow)])
+        upsertById(setActivities, toActivity(data as ActivityRow))
         return
       }
       setActivities((prev) => [...prev, { id: nextId(), categoryId, name: trimmed, emoji: '' }])
@@ -592,7 +593,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           setError(err.message)
           return
         }
-        setCategories((prev) => [...prev, toCategory(data as CategoryRow)])
+        upsertById(setCategories, toCategory(data as CategoryRow))
         return
       }
       setCategories((prev) => [...prev, { id: nextId(), name: trimmed, colorIndex }])
@@ -664,7 +665,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           setError(err.message)
           return
         }
-        setWishlist((prev) => [...prev, toWishlistItem(data as WishlistRow)])
+        upsertById(setWishlist, toWishlistItem(data as WishlistRow))
         return
       }
       setWishlist((prev) => [

@@ -3,7 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Spoon } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { geocode } from '../../lib/geocode'
-import { idFactory, syncTable, useSpaceSync } from '../../data/spaceSync'
+import { idFactory, syncTable, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { removeSpoonPhoto, uploadSpoonPhoto } from './photos'
 
 // Data seam for the spoon collection, mirroring the other stores' two modes:
@@ -203,7 +203,7 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
           throw err
         }
         const created = toSpoon(data as SpoonRow)
-        setSpoons((prev) => (prev.some((s) => s.id === created.id) ? prev : [...prev, created]))
+        upsertById(setSpoons, created)
         return
       }
       setSpoons((prev) => [

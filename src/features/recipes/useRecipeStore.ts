@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Recipe } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { idFactory, PROFILE_COLUMNS, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { idFactory, PROFILE_COLUMNS, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeRecipePhoto, uploadRecipePhoto } from './photos'
 
@@ -272,7 +272,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
           throw err
         }
         const created = toRecipe(data as RecipeRow)
-        setRecipes((prev) => (prev.some((r) => r.id === created.id) ? prev : [...prev, created]))
+        upsertById(setRecipes, created)
         return
       }
       setRecipes((prev) => [
