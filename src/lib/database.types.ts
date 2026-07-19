@@ -353,6 +353,57 @@ export interface Database {
         }
         Relationships: []
       }
+      recipes: {
+        Row: {
+          id: string
+          space_id: string
+          title: string
+          image_url: string
+          ingredients: string
+          steps: string
+          source: string
+          source_url: string
+          tags: string[]
+          servings: string
+          total_time: string
+          notes: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          title: string
+          image_url?: string
+          ingredients?: string
+          steps?: string
+          source?: string
+          source_url?: string
+          tags?: string[]
+          servings?: string
+          total_time?: string
+          notes?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          title?: string
+          image_url?: string
+          ingredients?: string
+          steps?: string
+          source?: string
+          source_url?: string
+          tags?: string[]
+          servings?: string
+          total_time?: string
+          notes?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       entry_repeats: {
         Row: {
           id: string

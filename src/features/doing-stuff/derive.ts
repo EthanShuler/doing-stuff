@@ -2,6 +2,7 @@ import type { Activity, Category, Entry, Profile, Repeat, SortKey, WishlistItem 
 import type { YearMonth } from '../../lib/format'
 import { ACCENT, FALLBACK_COLOR, colors, swatchFor } from '../../theme'
 import { currentMonthPrefix, isoDate, today } from '../../lib/format'
+import { fuzzyMatch } from '../../lib/fuzzy'
 import { displayNameFor } from '../../lib/profile'
 
 /** An entry joined with its activity + category, ready for display. */
@@ -170,25 +171,9 @@ export function wishMarkers(items: WishlistItem[]): MapMarker[] {
   return markers
 }
 
-/**
- * Fuzzy subsequence match: every character of `query` appears in `text` in
- * order (case-insensitive, whitespace in the query ignored). Empty query
- * matches everything. So "prk" matches "Park" and "botgar" matches
- * "Botanical Garden".
- */
-export function fuzzyMatch(text: string, query: string): boolean {
-  const needle = query.toLowerCase().replace(/\s+/g, '')
-  if (!needle) return true
-  const haystack = text.toLowerCase()
-  let i = 0
-  for (const char of haystack) {
-    if (char === needle[i]) {
-      i += 1
-      if (i === needle.length) return true
-    }
-  }
-  return false
-}
+// Moved to src/lib/fuzzy.ts (the recipe index searches with it too);
+// re-exported so this stays the doing-stuff derive surface.
+export { fuzzyMatch }
 
 export function filterAndSort(
   rows: DisplayRow[],

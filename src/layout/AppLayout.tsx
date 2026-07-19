@@ -5,7 +5,9 @@ import { useLocation, useNavigate } from 'react-router'
 import { ACCENT, colors, fonts } from '../theme'
 import { supabase } from '../lib/supabase'
 
-/** Top-level features behind the shell nav. Doing Stuff spans four routes. */
+/** Top-level features behind the shell nav. Doing Stuff spans four routes;
+ *  a match also claims its sub-paths (so /recipes/:id lights up Recipes —
+ *  '/' is exempt or it would claim everything). */
 const FEATURES = [
   { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
   { label: 'Movies', path: '/movies', matches: ['/movies'] },
@@ -19,6 +21,9 @@ const FEATURES = [
   { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
   { label: 'Cats', path: '/cats', matches: ['/cats'] },
 ]
+
+const isActive = (matches: string[], pathname: string) =>
+  matches.some((m) => m === pathname || (m !== '/' && pathname.startsWith(`${m}/`)))
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.
  *  On phones the nav collapses into a burger-toggled drawer. */
@@ -67,7 +72,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <FeatureLink
                   key={feature.path}
                   label={feature.label}
-                  active={feature.matches.includes(pathname)}
+                  active={isActive(feature.matches, pathname)}
                   onClick={() => go(feature.path)}
                 />
               ))}
@@ -95,7 +100,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <FeatureLink
             key={feature.path}
             label={feature.label}
-            active={feature.matches.includes(pathname)}
+            active={isActive(feature.matches, pathname)}
             onClick={() => go(feature.path)}
             block
           />

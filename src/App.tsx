@@ -11,6 +11,7 @@ import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
 import { TierListPage } from './features/tier-list/TierListPage'
 import { SpoonsPage } from './features/spoons/SpoonsPage'
 import { ParksPage } from './features/parks/ParksPage'
+import { RecipesPage } from './features/recipes/RecipesPage'
 
 export default function App() {
   const { session, loading, configured } = useSession()
@@ -56,6 +57,8 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <TierListPage kind={kind} spaceId={spaceId} userId={userId} configured={configured} />
   )
 
+  const recipes = <RecipesPage spaceId={spaceId} configured={configured} />
+
   return (
     <BrowserRouter>
       <AppLayout>
@@ -78,10 +81,10 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/board-games"
             element={<ComingSoon title="Board games" blurb="The board game collection and rankings, coming soon." />}
           />
-          <Route
-            path="/recipes"
-            element={<ComingSoon title="Recipes" blurb="The recipes we actually make, coming soon." />}
-          />
+          {/* The recipe index and the per-recipe page render one component
+              (same tree position), so the store survives opening a recipe. */}
+          <Route path="/recipes" element={recipes} />
+          <Route path="/recipes/:id" element={recipes} />
           <Route
             path="/cats"
             element={<ComingSoon title="Cat photo wall" blurb="A wall of our cats. Coming soon." />}

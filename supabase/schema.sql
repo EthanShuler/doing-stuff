@@ -334,6 +334,43 @@ create table if not exists public.park_visits (
 create index if not exists park_visits_space_idx on public.park_visits (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Recipes: the shared cookbook. Each row is one recipe we've actually made,
+-- written out in full — shared space data (uniform "space members all" policy
+-- below; either member can add or fix up a recipe). The text fields hold
+-- plain text with light client-side structure: `ingredients` is one
+-- ingredient per line, `steps` splits into numbered steps on blank lines
+-- (see src/features/recipes/derive.ts). The photo is uploaded to the public
+-- `recipes` storage bucket (see the storage section at the end) and stored
+-- here as its public URL ('' = none; the UI shows a 🍲 fallback).
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.recipes (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  title       text not null,
+  image_url   text not null default '',
+  -- One ingredient per line ("2 cups flour").
+  ingredients text not null default '',
+  -- Instructions; blank lines split them into numbered steps.
+  steps       text not null default '',
+  -- Where it's from ("Adapted from Smitten Kitchen", "Grandma Ruth") plus an
+  -- optional link to the original.
+  source      text not null default '',
+  source_url  text not null default '',
+  -- Free-text labels ("dinner", "soup", "thai") for the index filter pills.
+  tags        text[] not null default '{}',
+  -- Both plain display text, no math ("4", "6 as a side"; "45 min").
+  servings    text not null default '',
+  total_time  text not null default '',
+  -- Our notes — tweaks and verdicts ("double the garlic next time").
+  notes       text not null default '',
+  created_by  uuid references auth.users (id) default auth.uid(),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists recipes_space_idx on public.recipes (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -443,6 +480,7 @@ alter table public.wishlist_items enable row level security;
 alter table public.entry_repeats enable row level security;
 alter table public.spoons        enable row level security;
 alter table public.park_visits   enable row level security;
+alter table public.recipes       enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_reads  enable row level security;
@@ -521,6 +559,10 @@ create policy "space members all" on public.spoons
 
 drop policy if exists "space members all" on public.park_visits;
 create policy "space members all" on public.park_visits
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.recipes;
+create policy "space members all" on public.recipes
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -612,7 +654,8 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
-  public.tier_item_reads, public.watchlist_items, public.spoons, public.park_visits
+  public.tier_item_reads, public.watchlist_items, public.spoons, public.park_visits,
+  public.recipes
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -633,7 +676,7 @@ begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
           'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items', 'spoons',
-          'park_visits']
+          'park_visits', 'recipes']
   loop
     if not exists (
       select 1 from pg_publication_tables
@@ -682,6 +725,44 @@ create policy "members delete spoon photos" on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'spoons'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+-- ---------------------------------------------------------------------------
+-- Storage: the `recipes` bucket holds recipe photos — same design as the
+-- `spoons` bucket above (public read via unguessable uuid paths, writes
+-- locked to the space members of the `<space_id>/` prefix, client downscale
+-- before upload).
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('recipes', 'recipes', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "members upload recipe photos" on storage.objects;
+create policy "members upload recipe photos" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'recipes'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "members update recipe photos" on storage.objects;
+create policy "members update recipe photos" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'recipes'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "members delete recipe photos" on storage.objects;
+create policy "members delete recipe photos" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'recipes'
     and public.is_space_member(((storage.foldername(name))[1])::uuid)
   );
 

@@ -194,6 +194,41 @@ export interface Spoon {
   createdAt: string
 }
 
+// --- Recipes (the shared cookbook) --------------------------------------------
+
+/** One recipe we've actually made — one row in `recipes`. Shared space data
+ *  (uniform space-member RLS; either member edits any). The text fields carry
+ *  light structure parsed client-side: `ingredients` is one per line,
+ *  `steps` splits into numbered steps on blank lines (see the recipes
+ *  feature's derive.ts). */
+export interface Recipe {
+  id: string
+  title: string
+  /** Public URL of the uploaded photo (recipes storage bucket). '' = none —
+   *  cards and the detail page show a 🍲 fallback. */
+  imageUrl: string
+  /** One ingredient per line ("2 cups flour"). '' = not written out. */
+  ingredients: string
+  /** Instructions; blank lines split them into numbered steps. */
+  steps: string
+  /** Where it's from ("Adapted from Smitten Kitchen", "Grandma Ruth"). */
+  source: string
+  /** Optional link to the original recipe. '' = none. */
+  sourceUrl: string
+  /** Free-text filter labels ("dinner", "soup", "thai"). */
+  tags: string[]
+  /** Plain display text, no math ("4", "6 as a side"). '' = unstated. */
+  servings: string
+  /** Plain display text ("45 min", "3h including rise"). '' = unstated. */
+  totalTime: string
+  /** Our notes — tweaks and verdicts ("double the garlic next time"). */
+  notes: string
+  /** auth.users id of the member who added it (shown as a faint byline). */
+  createdBy: string | null
+  /** ISO timestamp; the byline's "added" date and the A–Z tiebreak. */
+  createdAt: string
+}
+
 // --- Parks (the 63-national-parks tracker) ------------------------------------
 
 /** One trip to a national park — one row in `park_visits`. The park itself is

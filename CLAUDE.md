@@ -9,7 +9,8 @@ behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
 Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
 and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
-feature; `/parks` is the **Parks** feature; `/french-toast` is a placeholder
+feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
+the **Recipes** feature; `/french-toast` is a placeholder
 page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
@@ -154,6 +155,30 @@ add/edit/delete trips behind an internal mode switch (deletes confirm) — and a
 header "+ Log visit" button opens the same trip fields behind a searchable
 park picker. Scope cuts (deliberate): no photos, no parks wishlist (the
 Unvisited filter is the wishlist).
+
+**Recipes** (`/recipes`, `/recipes/:id`) — the shared cookbook. Deliberately a
+**pure cookbook**: only recipes we've actually made, fully written out — no
+ratings (opinions live in the notes field), no cook log, no to-try queue, no
+URL auto-import (the app stays serverless; you copy-paste). A **recipe**
+(`recipes` table, shared uniform RLS) has a required title and everything else
+optional: plain-text **ingredients** (one per line → rendered as tappable
+bullets), one **steps** textarea (**blank lines split numbered steps**; single
+newlines survive inside a step — parsing lives in the recipes feature's
+`derive.ts`), a **source** (free text + optional URL, shown as the attribution
+line), free-text **tags** (`text[]`, tri-state include/exclude filter pills
+like the tier boards), plain-text **servings** and **total time** (display
+only, no scaling math), **notes**, and ONE hero **photo** uploaded to the
+public `recipes` Storage bucket (same design as spoons; shared helpers in
+`src/lib/photos.ts`). The index (`/recipes`) is A–Z (no sort control) with
+fuzzy title search (`src/lib/fuzzy.ts`, shared with the Log dashboard) and a
+**Grid / List** toggle (photo cards vs dense rows). Opening a recipe navigates
+to **`/recipes/:id` — the app's first full-page sub-route detail** (both
+routes render one `RecipesPage`, so the store survives; the AppLayout nav
+matches sub-paths). The detail page is built for cooking from a phone:
+tapping an ingredient strikes it through, tapping a step dims it — ephemeral
+component state keyed by recipe id, never stored — plus a faint
+"Added by X · date" byline (profiles join). Add/edit stay in a `ModalShell`
+modal; delete confirms and bounces an open detail page back to the index.
 
 Shared Leaflet plumbing lives in `src/components/MapCanvas.tsx` (framed
 MapContainer + CARTO tiles, `Recenter`, `FitToPins`, a divIcon cache with
@@ -307,9 +332,9 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
-  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`. Plus the
-  `spoons` **storage bucket** (public read, member-only writes via policies on
-  `storage.objects`).
+  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`, `recipes`.
+  Plus the `spoons` and `recipes` **storage buckets** (public read, member-only
+  writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_reads`** (members read all, but
@@ -348,8 +373,10 @@ src/
     AppLayout.tsx          Mantine AppShell: brand, feature nav, sign-out; mobile burger
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
+    fuzzy.ts               fuzzyMatch() subsequence title search (Log + recipes)
     geocode.ts             Nominatim address → lat/lng (on save only)
     image.ts               client-side photo downscale (≤1200px JPEG) for uploads
+    photos.ts              shared Storage bucket photo upload / best-effort delete
     profile.ts             displayNameFor() — profile → short display label
     tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
     openLibrary.ts         Open Library book search (covers) for ItemModal — keyless
@@ -416,10 +443,21 @@ src/
       ParkModal.tsx        park facts + visit history + add/edit visit form
       LogVisitModal.tsx    header flow: searchable park picker + trip fields
       VisitFields.tsx      shared trip fields (date, attendees, notes)
+    recipes/               the shared cookbook (index + full-page recipe)
+      RecipesPage.tsx      owns the store; /recipes index + /recipes/:id detail
+      useRecipeStore.ts    data seam: recipes CRUD + profiles (or seed fallback)
+      photos.ts            recipes bucket upload/delete (thin lib/photos.ts wrapper)
+      derive.ts            pure parse (lines/steps), sort, search, tag filter
+      derive.test.ts       vitest coverage for derive.ts
+      RecipeGrid.tsx       photo card grid + RecipePhoto (🍲 fallback)
+      RecipeList.tsx       dense A–Z rows (title, source, tags, serves/time)
+      RecipeDetail.tsx     full recipe page: tap-to-cross-off, notes, byline
+      RecipeModal.tsx      add/edit recipe (photo upload, textareas, tags)
 e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
-                           tier-list, spoons, parks, mobile) — see playwright.config.ts
+                           tier-list, spoons, parks, recipes, mobile) — see
+                           playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants
 ```
