@@ -34,6 +34,7 @@ export function FloatingBanner({
   const t = TONES[tone]
   return (
     <Box
+      role="alert"
       c={t.color}
       px={14}
       py={9}
@@ -43,7 +44,9 @@ export function FloatingBanner({
         top,
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 60,
+        // Above Mantine's modal (200): failed writes keep their modal open and
+        // rely on this banner to say why.
+        zIndex: 300,
         maxWidth: 'min(92vw, 520px)',
         border: t.border,
         borderRadius: 9,
@@ -56,7 +59,22 @@ export function FloatingBanner({
       }}
     >
       {message}
-      <span style={{ marginLeft: 10, color: colors.faint }}>✕</span>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={onDismiss}
+        style={{
+          marginLeft: 10,
+          padding: 0,
+          border: 'none',
+          background: 'none',
+          color: colors.faint,
+          font: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        ✕
+      </button>
     </Box>
   )
 }
