@@ -49,6 +49,16 @@ export function ManageModal({
       return next
     })
   }
+  // The modal stays mounted between opens, so drop half-typed drafts each time
+  // it opens — stale text reappearing next visit reads as a glitch.
+  useEffect(() => {
+    if (!opened) return
+    setActivityDrafts({})
+    setEmojiDrafts({})
+    setNewCatName('')
+    setNewCatColor(3)
+  }, [opened])
+
   // Home address is edited locally and committed (geocoded) on blur / Enter /
   // button, so we don't hit Nominatim on every keystroke.
   const [homeDraft, setHomeDraft] = useState(home.address)
