@@ -142,16 +142,13 @@ export function useSpaceSync<Snapshot>({
 
     const channel = wire(client.channel(`${channelPrefix}:${spaceId}`), `space_id=eq.${spaceId}`)
 
-    let subscribedOnce = false
     channel.subscribe((status) => {
       if (status !== 'SUBSCRIBED') return
-      // The first subscribe races the initial load, which already covers it.
-      // Later ones mean the socket dropped and rejoined — refetch to pick up
-      // anything missed while disconnected.
-      if (!subscribedOnce) {
-        subscribedOnce = true
-        return
-      }
+      // Refetch on every join. On the first, a write landing between the
+      // initial snapshot's server-side read and the channel joining would be
+      // in neither; later joins mean the socket dropped and rejoined. Either
+      // way a fresh snapshot covers the gap — applySnapshot is idempotent, so
+      // overlapping the initial load is harmless.
       fetchAll()
         .then((snap) => {
           if (!cancelled && snap) applySnapshot(snap)
