@@ -53,6 +53,14 @@ export function today(): string {
   return isoDate(now.getFullYear(), now.getMonth() + 1, now.getDate())
 }
 
+/** The local calendar date ("YYYY-MM-DD") of a full timestamp string. Never
+ *  slice a UTC timestamptz for display — an evening save west of UTC would
+ *  read as tomorrow. */
+export function localDateOf(timestamp: string): string {
+  const d = new Date(timestamp)
+  return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate())
+}
+
 /** "YYYY-MM" prefix for the current month, used for the "this month" stat. */
 export function currentMonthPrefix(): string {
   const now = new Date()

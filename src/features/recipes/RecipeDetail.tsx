@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Anchor, Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
 import type { Profile, Recipe } from '../../types'
 import { colors, fieldLabelStyle, fonts } from '../../theme'
-import { formatDateWithYear } from '../../lib/format'
+import { formatDateWithYear, localDateOf } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { ingredientLines, servingsTimeLine, stepBlocks } from './derive'
 import { RecipePhoto } from './RecipeGrid'
@@ -40,7 +40,7 @@ export function RecipeDetail({
     })
 
   const author = displayNameFor(profiles.find((p) => p.id === recipe.createdBy))
-  const byline = [author && `Added by ${author}`, formatDateWithYear(recipe.createdAt.slice(0, 10))]
+  const byline = [author && `Added by ${author}`, formatDateWithYear(localDateOf(recipe.createdAt))]
     .filter(Boolean)
     .join(' · ')
 
