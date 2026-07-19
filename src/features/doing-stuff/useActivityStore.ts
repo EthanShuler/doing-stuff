@@ -571,9 +571,19 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           return
         }
       }
-      // DB cascades entries server-side; mirror it locally to stay in sync.
+      // DB cascades entries server-side — and with them their repeats, while
+      // linked wishes reopen via ON DELETE SET NULL; mirror all of it locally.
+      const removedEntryIds = new Set(
+        entriesRef.current.filter((entry) => entry.activityId === id).map((entry) => entry.id),
+      )
       setActivities((prev) => prev.filter((activity) => activity.id !== id))
       setEntries((prev) => prev.filter((entry) => entry.activityId !== id))
+      setRepeats((prev) => prev.filter((repeat) => !removedEntryIds.has(repeat.entryId)))
+      setWishlist((prev) =>
+        prev.map((item) =>
+          item.entryId && removedEntryIds.has(item.entryId) ? { ...item, entryId: null } : item,
+        ),
+      )
     },
     [spaceId],
   )
@@ -611,12 +621,24 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           return
         }
       }
-      // DB cascades activities + their entries; mirror it locally.
+      // DB cascades activities + their entries — and the entries' repeats,
+      // while linked wishes reopen via ON DELETE SET NULL; mirror all of it.
       const removedActivityIds = new Set(
         activitiesRef.current.filter((a) => a.categoryId === id).map((a) => a.id),
       )
+      const removedEntryIds = new Set(
+        entriesRef.current
+          .filter((entry) => removedActivityIds.has(entry.activityId))
+          .map((entry) => entry.id),
+      )
       setActivities((prev) => prev.filter((a) => a.categoryId !== id))
       setEntries((prev) => prev.filter((entry) => !removedActivityIds.has(entry.activityId)))
+      setRepeats((prev) => prev.filter((repeat) => !removedEntryIds.has(repeat.entryId)))
+      setWishlist((prev) =>
+        prev.map((item) =>
+          item.entryId && removedEntryIds.has(item.entryId) ? { ...item, entryId: null } : item,
+        ),
+      )
       setCategories((prev) => prev.filter((category) => category.id !== id))
     },
     [spaceId],
