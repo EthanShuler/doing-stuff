@@ -213,7 +213,9 @@ export interface ActivityStore {
   /** Set the shared home address; geocodes it for the map center. */
   setHome: (address: string) => Promise<void>
 
-  addWishlistItem: (text: string) => Promise<void>
+  /** Resolves false when the write failed (error recorded, not thrown) so the
+   *  input can keep the typed text. */
+  addWishlistItem: (text: string) => Promise<boolean>
   updateWishlistItem: (id: string, text: string) => Promise<void>
   /** Set (or clear, when empty) a wish's place; geocodes it for a map pin. */
   setWishlistAddress: (id: string, address: string) => Promise<void>
@@ -675,7 +677,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   const addWishlistItem = useCallback(
     async (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed) return
+      if (!trimmed) return true
       setError(null)
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
@@ -685,10 +687,10 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
           .single()
         if (err) {
           setError(err.message)
-          return
+          return false
         }
         upsertById(setWishlist, toWishlistItem(data as WishlistRow))
-        return
+        return true
       }
       setWishlist((prev) => [
         ...prev,
@@ -696,6 +698,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         // date — sortWishlist compares the strings lexicographically.
         { id: nextId(), text: trimmed, entryId: null, createdBy: userId, createdAt: new Date().toISOString(), address: '', lat: null, lng: null },
       ])
+      return true
     },
     [spaceId, userId],
   )

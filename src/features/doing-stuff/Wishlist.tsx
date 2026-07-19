@@ -10,7 +10,8 @@ interface WishlistProps {
   onCheck: (item: WishlistItem) => void
   /** Reopen a done item (clears its entry link). */
   onUncheck: (id: string) => void
-  onAdd: (text: string) => void
+  /** Resolves false when the write failed, so the input keeps the text. */
+  onAdd: (text: string) => Promise<boolean>
   onEdit: (id: string, text: string) => void
   /** Set (or clear, when empty) the place for a wish; geocodes for a map pin. */
   onSetAddress: (id: string, address: string) => void
@@ -33,11 +34,14 @@ export function Wishlist({
   const [locationId, setLocationId] = useState<string | null>(null)
   const [locationText, setLocationText] = useState('')
 
-  const submitAdd = () => {
+  const submitAdd = async () => {
     const trimmed = addText.trim()
     if (!trimmed) return
-    onAdd(trimmed)
+    // Clear right away (so Enter-Enter can't double-add), but put the text
+    // back if the write fails — no retyping a lost wish from memory.
     setAddText('')
+    const ok = await onAdd(trimmed)
+    if (!ok) setAddText((current) => current || trimmed)
   }
 
   const startEdit = (item: WishlistItem) => {
