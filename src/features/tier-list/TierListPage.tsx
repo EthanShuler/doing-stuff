@@ -100,6 +100,14 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   // would land at arbitrary positions relative to the hidden cards.
   const [tagFilter, setTagFilter] = useState<Record<string, 'include' | 'exclude'>>({})
   useEffect(() => setTagFilter({}), [kind])
+  // All four routes render this same component, so a kind switch (browser
+  // back/forward — the header nav is behind the overlay) must drop an open
+  // modal: saving a movie draft onto /tv would file it under the wrong kind,
+  // and a book edit saved on a movie route would flip its date semantics.
+  useEffect(() => {
+    setModalOpen(false)
+    setEditingId(null)
+  }, [kind])
   const kindTags = useMemo(() => distinctTags(store.items, kind), [store.items, kind])
   const includedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'include')
   const excludedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'exclude')
