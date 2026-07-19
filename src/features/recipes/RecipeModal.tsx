@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Box, Button, FileButton, Group, TagsInput, Textarea, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { colors, DANGER, fonts } from '../../theme'
 import { ModalShell } from '../../components/ModalShell'
@@ -32,16 +32,26 @@ export function RecipeModal({
 }) {
   const canSave = Boolean(draft.title.trim())
   const [uploading, setUploading] = useState(false)
+  // A slow upload must not land in a different session's draft (edit A, pick a
+  // photo, cancel, open B): bump the token on every open/close and drop
+  // resolutions that started under a stale one.
+  const uploadSession = useRef(0)
+  useEffect(() => {
+    uploadSession.current += 1
+    setUploading(false)
+  }, [opened])
 
   const pickPhoto = async (file: File | null) => {
     if (!file) return
+    const session = uploadSession.current
     setUploading(true)
     try {
-      onChange({ imageUrl: await onUpload(file) })
+      const imageUrl = await onUpload(file)
+      if (session === uploadSession.current) onChange({ imageUrl })
     } catch {
       // Upload failed — store.error shows the reason; the draft keeps its old image.
     } finally {
-      setUploading(false)
+      if (session === uploadSession.current) setUploading(false)
     }
   }
 
