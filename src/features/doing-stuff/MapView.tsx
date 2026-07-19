@@ -1,6 +1,6 @@
 import { Box, Button, Text } from '@mantine/core'
 import { Marker, Popup } from 'react-leaflet'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Category, Home } from '../../types'
 import type { MapMarker } from './derive'
 import { ACCENT, colors, fonts } from '../../theme'
@@ -30,28 +30,31 @@ const eyebrowStyle = {
 }
 
 export function MapView({ home, categories, markers, onEditEntry }: MapViewProps) {
-  // Map-local filter: 'all', a category id, or 'wishlist'. Kept here (not in the
-  // shared dashboard filter) because 'wishlist' is map-specific. A deleted
-  // category can leave it pointing at nothing — fall back to 'all'.
+  // Only show categories that actually have pins on the map, so the filter row
+  // doesn't list empty categories.
+  const shownIds = new Set(markers.filter((m) => m.kind === 'entry').map((m) => m.categoryId))
+  const shownCategories = categories.filter((c) => shownIds.has(c.id))
+  const hasWishes = markers.some((m) => m.kind === 'wish')
+
+  // Map-local filter: 'all', a category id, or 'wishlist'. Kept here (not in
+  // the shared dashboard filter) because 'wishlist' is map-specific. A filter
+  // whose pins are gone (category deleted, last pinned entry removed or
+  // hidden) would strand an empty map with its pill missing — fall back to
+  // 'all' whenever the selection no longer appears in the pill row.
   const [rawFilter, setFilter] = useState<MapFilter>('all')
   const filter =
-    rawFilter === 'all' || rawFilter === 'wishlist' || categories.some((c) => c.id === rawFilter)
+    rawFilter === 'all' ||
+    (rawFilter === 'wishlist' && hasWishes) ||
+    shownCategories.some((c) => c.id === rawFilter)
       ? rawFilter
       : 'all'
 
-  // Only show categories that actually have pins on the map, so the filter row
-  // doesn't list empty categories.
-  const shownCategories = useMemo(() => {
-    const ids = new Set(markers.filter((m) => m.kind === 'entry').map((m) => m.categoryId))
-    return categories.filter((c) => ids.has(c.id))
-  }, [categories, markers])
-  const hasWishes = useMemo(() => markers.some((m) => m.kind === 'wish'), [markers])
-
-  const visibleMarkers = useMemo(() => {
-    if (filter === 'all') return markers
-    if (filter === 'wishlist') return markers.filter((m) => m.kind === 'wish')
-    return markers.filter((m) => m.kind === 'entry' && m.categoryId === filter)
-  }, [markers, filter])
+  const visibleMarkers =
+    filter === 'all'
+      ? markers
+      : filter === 'wishlist'
+        ? markers.filter((m) => m.kind === 'wish')
+        : markers.filter((m) => m.kind === 'entry' && m.categoryId === filter)
 
   const hasHome = home.lat !== null && home.lng !== null
   const center: [number, number] = hasHome
