@@ -35,14 +35,24 @@ export const separateVariant = (members: Member[]): DotVariant => ({
   right: members[1]?.color ?? colors.faint,
 })
 
-export function StatusDot({ variant, size = 10 }: { variant: DotVariant; size?: number }) {
+export function StatusDot({
+  variant,
+  size = 10,
+  title,
+}: {
+  variant: DotVariant
+  size?: number
+  /** Optional hover tooltip (e.g. the member's name in list rows). */
+  title?: string
+}) {
   const base = { width: size, height: size, borderRadius: '50%', flexShrink: 0 }
   switch (variant.kind) {
     case 'solid':
-      return <Box style={{ ...base, background: variant.color }} />
+      return <Box title={title} style={{ ...base, background: variant.color }} />
     case 'ring':
       return (
         <Box
+          title={title}
           style={{
             ...base,
             background: variant.inner,
@@ -52,9 +62,9 @@ export function StatusDot({ variant, size = 10 }: { variant: DotVariant; size?: 
       )
     case 'split':
       return (
-        <Box style={{ ...base, background: `linear-gradient(90deg, ${variant.left} 50%, ${variant.right} 50%)` }} />
+        <Box title={title} style={{ ...base, background: `linear-gradient(90deg, ${variant.left} 50%, ${variant.right} 50%)` }} />
       )
     case 'faint':
-      return <Box style={{ ...base, background: colors.faint, opacity: 0.55 }} />
+      return <Box title={title} style={{ ...base, background: colors.faint, opacity: 0.55 }} />
   }
 }

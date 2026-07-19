@@ -6,6 +6,7 @@ import type { Park } from './parks'
 import { PARKS } from './parks'
 import type { Member, ParkFilter, ParkStatus } from './derive'
 import { filterParks, groupByRegion } from './derive'
+import { StatusDot } from './StatusDot'
 
 /** Pill row value: 'all' | 'together' | 'unvisited' | a member id. */
 type FilterValue = string
@@ -122,11 +123,9 @@ export function ParkList({
                     {members
                       .filter((m) => status?.visitorIds.includes(m.id))
                       .map((m) => (
-                        <Box key={m.id} w={11} h={11} title={m.name} style={{ borderRadius: '50%', background: m.color }} />
+                        <StatusDot key={m.id} variant={{ kind: 'solid', color: m.color }} size={11} title={m.name} />
                       ))}
-                    {!visited && (
-                      <Box w={11} h={11} style={{ borderRadius: '50%', background: colors.faint, opacity: 0.45 }} />
-                    )}
+                    {!visited && <StatusDot variant={{ kind: 'faint' }} size={11} />}
                   </Group>
                 </Group>
               </UnstyledButton>
