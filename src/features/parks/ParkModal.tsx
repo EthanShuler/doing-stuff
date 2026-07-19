@@ -78,7 +78,10 @@ export function ParkModal({
       parkCode: park.code,
       date: visit.date ?? '',
       notes: visit.notes,
-      attendeeIds: visit.attendeeIds.filter((id) => members.some((m) => m.id === id)),
+      // Keep attendees verbatim, including anyone no longer a member — they
+      // just don't render a checkbox. Filtering them out here would silently
+      // rewrite attendee_ids on an unrelated notes edit.
+      attendeeIds: visit.attendeeIds,
       separate: visit.separate,
     })
     setEditing({ id: visit.id })
