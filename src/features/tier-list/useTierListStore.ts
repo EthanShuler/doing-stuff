@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
@@ -711,68 +711,78 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     [spaceId, resync],
   )
 
+  // Wishes with a check-off in flight: local state stays unchanged until the
+  // insert round-trips, so without this a double-click on a slow connection
+  // would create two pool items for one wish.
+  const checkingOff = useRef<Set<string>>(new Set())
+
   const checkOffWatchlistItem = useCallback(
     async (wi: WatchlistItem) => {
-      // Already checked off — nothing to do.
-      if (wi.tierItemId) return
-      setError(null)
-      // Checking off means "just finished it" → dated today. For movies/TV
-      // that's the shared watched date; for books it's the CHECKER's own read
-      // record — the partner's copy lands on their Unread shelf.
-      const personal = datesArePersonal(wi.kind)
-      if (supabase && spaceId) {
-        // 1. Create the tier item in the shared pool.
-        const { data: itemData, error: itemErr } = await supabase
-          .from('tier_items')
-          .insert({
-            space_id: spaceId,
-            kind: wi.kind,
-            title: wi.title,
-            image_url: wi.imageUrl,
-            creator: wi.creator,
-            watched_on: personal ? null : today(),
-          })
-          .select(TIER_ITEM_COLUMNS)
-          .single()
-        if (itemErr) {
-          setError(itemErr.message)
+      // Already checked off (or mid-check-off) — nothing to do.
+      if (wi.tierItemId || checkingOff.current.has(wi.id)) return
+      checkingOff.current.add(wi.id)
+      try {
+        setError(null)
+        // Checking off means "just finished it" → dated today. For movies/TV
+        // that's the shared watched date; for books it's the CHECKER's own read
+        // record — the partner's copy lands on their Unread shelf.
+        const personal = datesArePersonal(wi.kind)
+        if (supabase && spaceId) {
+          // 1. Create the tier item in the shared pool.
+          const { data: itemData, error: itemErr } = await supabase
+            .from('tier_items')
+            .insert({
+              space_id: spaceId,
+              kind: wi.kind,
+              title: wi.title,
+              image_url: wi.imageUrl,
+              creator: wi.creator,
+              watched_on: personal ? null : today(),
+            })
+            .select(TIER_ITEM_COLUMNS)
+            .single()
+          if (itemErr) {
+            setError(itemErr.message)
+            return
+          }
+          const created = toTierItem(itemData as TierItemRow)
+          upsertById(setItems, created)
+          // 2. Your read record (books). A failure surfaces the banner and
+          //    resyncs inside setReadOn; the item is on the board regardless.
+          if (personal) await setReadOn(created.id, today())
+          // 3. Link the watchlist item to it (marks it done).
+          const { error: linkErr } = await supabase
+            .from('watchlist_items')
+            .update({ tier_item_id: created.id })
+            .eq('id', wi.id)
+          if (linkErr) {
+            // The tier item exists; the link write failed. Surface it and resync
+            // so local state matches the DB (the item is on the board regardless).
+            setError(linkErr.message)
+            resync()
+            return
+          }
+          setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
           return
         }
-        const created = toTierItem(itemData as TierItemRow)
-        upsertById(setItems, created)
-        // 2. Your read record (books). A failure surfaces the banner and
-        //    resyncs inside setReadOn; the item is on the board regardless.
+        // Seed mode: create the pool item and link locally.
+        const created: TierItem = {
+          id: nextId(),
+          kind: wi.kind,
+          title: wi.title,
+          imageUrl: wi.imageUrl,
+          watchedOn: personal ? null : today(),
+          tags: [],
+          creator: wi.creator,
+          createdBy: selfId,
+          createdAt: new Date().toISOString(),
+        }
+        setItems((prev) => [...prev, created])
         if (personal) await setReadOn(created.id, today())
-        // 3. Link the watchlist item to it (marks it done).
-        const { error: linkErr } = await supabase
-          .from('watchlist_items')
-          .update({ tier_item_id: created.id })
-          .eq('id', wi.id)
-        if (linkErr) {
-          // The tier item exists; the link write failed. Surface it and resync
-          // so local state matches the DB (the item is on the board regardless).
-          setError(linkErr.message)
-          resync()
-          return
-        }
         setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
-        return
+      } finally {
+        checkingOff.current.delete(wi.id)
       }
-      // Seed mode: create the pool item and link locally.
-      const created: TierItem = {
-        id: nextId(),
-        kind: wi.kind,
-        title: wi.title,
-        imageUrl: wi.imageUrl,
-        watchedOn: personal ? null : today(),
-        tags: [],
-        creator: wi.creator,
-        createdBy: selfId,
-        createdAt: new Date().toISOString(),
-      }
-      setItems((prev) => [...prev, created])
-      if (personal) await setReadOn(created.id, today())
-      setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
     },
     [spaceId, selfId, resync, setReadOn],
   )
