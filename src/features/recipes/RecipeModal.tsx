@@ -14,6 +14,7 @@ export function RecipeModal({
   tagSuggestions,
   onChange,
   onUpload,
+  saving,
   onSave,
   onDelete,
   onClose,
@@ -26,6 +27,7 @@ export function RecipeModal({
   onChange: (patch: Partial<RecipeDraft>) => void
   /** Downscale + upload a picked photo; resolves to its URL (see useRecipeStore). */
   onUpload: (file: File) => Promise<string>
+  saving: boolean
   onSave: () => void
   onDelete: () => void
   onClose: () => void
@@ -184,7 +186,7 @@ export function RecipeModal({
           <Button variant="secondary" onClick={onClose} radius={10}>
             Cancel
           </Button>
-          <Button onClick={onSave} disabled={!canSave || uploading} radius={10}>
+          <Button onClick={onSave} disabled={!canSave || uploading} loading={saving} radius={10}>
             {isEditing ? 'Save changes' : 'Add recipe'}
           </Button>
         </Group>

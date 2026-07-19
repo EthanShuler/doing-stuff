@@ -47,6 +47,7 @@ export function ItemModal({
   variant = 'board',
   tagSuggestions = [],
   onChange,
+  saving,
   onSave,
   onDelete,
   onClose,
@@ -62,6 +63,7 @@ export function ItemModal({
    *  so spellings converge instead of forking ("Disney" vs "disney"). */
   tagSuggestions?: string[]
   onChange: (patch: Partial<ItemDraft>) => void
+  saving: boolean
   onSave: () => void
   onDelete: () => void
   onClose: () => void
@@ -307,7 +309,7 @@ export function ItemModal({
           <Button variant="secondary" onClick={onClose} radius={10}>
             Cancel
           </Button>
-          <Button onClick={onSave} disabled={!canSave} radius={10}>
+          <Button onClick={onSave} disabled={!canSave} loading={saving} radius={10}>
             {saveLabel}
           </Button>
         </Group>

@@ -4,6 +4,7 @@ import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
 import { today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
+import { useBusy } from '../../lib/useBusy'
 import { Pill } from '../../components/Pill'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { Splash } from '../../components/Splash'
@@ -165,22 +166,24 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     setEditingId(null)
   }
 
-  const saveItem = async () => {
-    if (!draft.title.trim()) return
-    try {
-      if (modalVariant === 'watchlist') {
-        if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl, draft.creator)
-        else await store.addWatchlistItem(kind, draft.title, draft.imageUrl, draft.creator)
-      } else {
-        const dateOn = draft.watchedOn || null
-        if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
-        else await store.addItem(kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+  const { busy: saving, run: runSave } = useBusy()
+  const saveItem = () =>
+    runSave(async () => {
+      if (!draft.title.trim()) return
+      try {
+        if (modalVariant === 'watchlist') {
+          if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl, draft.creator)
+          else await store.addWatchlistItem(kind, draft.title, draft.imageUrl, draft.creator)
+        } else {
+          const dateOn = draft.watchedOn || null
+          if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+          else await store.addItem(kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+        }
+        closeModal()
+      } catch {
+        // Write failed — keep the modal open; store.error shows the reason.
       }
-      closeModal()
-    } catch {
-      // Write failed — keep the modal open; store.error shows the reason.
-    }
-  }
+    })
 
   const deleteEditingItem = async () => {
     if (!editingId) {
@@ -377,6 +380,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         variant={modalVariant}
         tagSuggestions={kindTags}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+        saving={saving}
         onSave={saveItem}
         onDelete={deleteEditingItem}
         onClose={closeModal}

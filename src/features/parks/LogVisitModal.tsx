@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Group, Select, Title } from '@mantine/core'
 import { ModalShell } from '../../components/ModalShell'
 import { today } from '../../lib/format'
+import { useBusy } from '../../lib/useBusy'
 import { PARKS } from './parks'
 import type { Member } from './derive'
 import type { VisitDraft } from './useParkStore'
@@ -38,15 +39,17 @@ export function LogVisitModal({
 
   const canSave = Boolean(draft.parkCode) && draft.attendeeIds.length > 0
 
-  const save = async () => {
-    if (!canSave) return
-    try {
-      await onSave(draft)
-      onClose()
-    } catch {
-      // Write failed — keep the modal open; store.error shows the reason.
-    }
-  }
+  const { busy: saving, run: runSave } = useBusy()
+  const save = () =>
+    runSave(async () => {
+      if (!canSave) return
+      try {
+        await onSave(draft)
+        onClose()
+      } catch {
+        // Write failed — keep the modal open; store.error shows the reason.
+      }
+    })
 
   return (
     <ModalShell opened={opened} onClose={onClose} width={520}>
@@ -71,7 +74,7 @@ export function LogVisitModal({
         <Button variant="secondary" onClick={onClose} radius={10}>
           Cancel
         </Button>
-        <Button onClick={() => void save()} disabled={!canSave} radius={10}>
+        <Button onClick={() => void save()} disabled={!canSave} loading={saving} radius={10}>
           Log visit
         </Button>
       </Group>

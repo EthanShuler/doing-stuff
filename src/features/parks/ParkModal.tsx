@@ -3,6 +3,7 @@ import { Anchor, Box, Button, Group, Text, Title, UnstyledButton } from '@mantin
 import { colors, DANGER, fonts } from '../../theme'
 import { ModalShell } from '../../components/ModalShell'
 import { formatDateWithYear, today } from '../../lib/format'
+import { useBusy } from '../../lib/useBusy'
 import type { ParkVisit } from '../../types'
 import type { Park } from './parks'
 import type { Member } from './derive'
@@ -83,16 +84,18 @@ export function ParkModal({
     setEditing({ id: visit.id })
   }
 
-  const save = async () => {
-    if (!editing || draft.attendeeIds.length === 0) return
-    try {
-      if (editing.id) await onUpdate(editing.id, draft)
-      else await onAdd(draft)
-      setEditing(null)
-    } catch {
-      // Write failed — keep the form open; store.error shows the reason.
-    }
-  }
+  const { busy: saving, run: runSave } = useBusy()
+  const save = () =>
+    runSave(async () => {
+      if (!editing || draft.attendeeIds.length === 0) return
+      try {
+        if (editing.id) await onUpdate(editing.id, draft)
+        else await onAdd(draft)
+        setEditing(null)
+      } catch {
+        // Write failed — keep the form open; store.error shows the reason.
+      }
+    })
 
   const deleteEditingVisit = async () => {
     if (!editing?.id) return
@@ -139,7 +142,7 @@ export function ParkModal({
               <Button variant="secondary" onClick={() => setEditing(null)} radius={10}>
                 Cancel
               </Button>
-              <Button onClick={() => void save()} disabled={draft.attendeeIds.length === 0} radius={10}>
+              <Button onClick={() => void save()} disabled={draft.attendeeIds.length === 0} loading={saving} radius={10}>
                 {editing.id ? 'Save changes' : 'Log visit'}
               </Button>
             </Group>

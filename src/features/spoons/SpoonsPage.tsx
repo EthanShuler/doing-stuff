@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Box, Button, Group, SegmentedControl } from '@mantine/core'
 import type { Spoon } from '../../types'
 import { colors, fonts } from '../../theme'
+import { useBusy } from '../../lib/useBusy'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { Splash } from '../../components/Splash'
 import { useSpoonStore } from './useSpoonStore'
@@ -52,16 +53,20 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
     setEditingId(null)
   }
 
-  const saveSpoon = async () => {
-    if (!draft.name.trim()) return
-    try {
-      if (editingId) await store.updateSpoon(editingId, draft)
-      else await store.addSpoon(draft)
-      closeModal()
-    } catch {
-      // Write failed — keep the modal open; store.error shows the reason.
-    }
-  }
+  // addSpoon awaits a geocode before inserting, so an unguarded double-click
+  // has a wide window to create duplicate spoons.
+  const { busy: saving, run: runSave } = useBusy()
+  const saveSpoon = () =>
+    runSave(async () => {
+      if (!draft.name.trim()) return
+      try {
+        if (editingId) await store.updateSpoon(editingId, draft)
+        else await store.addSpoon(draft)
+        closeModal()
+      } catch {
+        // Write failed — keep the modal open; store.error shows the reason.
+      }
+    })
 
   const deleteEditingSpoon = async () => {
     if (!editingId) {
@@ -129,6 +134,7 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
         isEditing={editingId !== null}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
         onUpload={store.uploadPhoto}
+        saving={saving}
         onSave={() => void saveSpoon()}
         onDelete={() => void deleteEditingSpoon()}
         onClose={closeModal}

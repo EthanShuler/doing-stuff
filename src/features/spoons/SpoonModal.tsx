@@ -11,6 +11,7 @@ export function SpoonModal({
   isEditing,
   onChange,
   onUpload,
+  saving,
   onSave,
   onDelete,
   onClose,
@@ -21,6 +22,7 @@ export function SpoonModal({
   onChange: (patch: Partial<SpoonDraft>) => void
   /** Downscale + upload a picked photo; resolves to its URL (see useSpoonStore). */
   onUpload: (file: File) => Promise<string>
+  saving: boolean
   onSave: () => void
   onDelete: () => void
   onClose: () => void
@@ -135,7 +137,7 @@ export function SpoonModal({
           <Button variant="secondary" onClick={onClose} radius={10}>
             Cancel
           </Button>
-          <Button onClick={onSave} disabled={!canSave || uploading} radius={10}>
+          <Button onClick={onSave} disabled={!canSave || uploading} loading={saving} radius={10}>
             {isEditing ? 'Save changes' : 'Add spoon'}
           </Button>
         </Group>

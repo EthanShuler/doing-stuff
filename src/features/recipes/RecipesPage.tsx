@@ -3,6 +3,7 @@ import { Box, Button, Group, SegmentedControl, Text, TextInput, UnstyledButton }
 import { useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
 import { ACCENT, colors, fonts } from '../../theme'
+import { useBusy } from '../../lib/useBusy'
 import { Pill } from '../../components/Pill'
 import { EmptyCard } from '../../components/EmptyCard'
 import { FloatingBanner } from '../../components/FloatingBanner'
@@ -95,16 +96,18 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
     setEditingId(null)
   }
 
-  const saveRecipe = async () => {
-    if (!draft.title.trim()) return
-    try {
-      if (editingId) await store.updateRecipe(editingId, draft)
-      else await store.addRecipe(draft)
-      closeModal()
-    } catch {
-      // Write failed — keep the modal open; store.error shows the reason.
-    }
-  }
+  const { busy: saving, run: runSave } = useBusy()
+  const saveRecipe = () =>
+    runSave(async () => {
+      if (!draft.title.trim()) return
+      try {
+        if (editingId) await store.updateRecipe(editingId, draft)
+        else await store.addRecipe(draft)
+        closeModal()
+      } catch {
+        // Write failed — keep the modal open; store.error shows the reason.
+      }
+    })
 
   const deleteEditingRecipe = async () => {
     if (!editingId) {
@@ -241,6 +244,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
         tagSuggestions={allTags}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
         onUpload={store.uploadPhoto}
+        saving={saving}
         onSave={() => void saveRecipe()}
         onDelete={() => void deleteEditingRecipe()}
         onClose={closeModal}

@@ -22,6 +22,7 @@ interface EntryModalProps {
   categories: Category[]
   activities: Activity[]
   onChange: (patch: Partial<EntryDraft>) => void
+  saving: boolean
   onSave: () => void
   onDelete: () => void
   onClose: () => void
@@ -34,6 +35,7 @@ export function EntryModal({
   categories,
   activities,
   onChange,
+  saving,
   onSave,
   onDelete,
   onClose,
@@ -150,7 +152,7 @@ export function EntryModal({
           <Button variant="secondary" onClick={onClose} radius={10}>
             Cancel
           </Button>
-          <Button onClick={onSave} disabled={!canSave} radius={10}>
+          <Button onClick={onSave} disabled={!canSave} loading={saving} radius={10}>
             {isEditing ? 'Save changes' : 'Add entry'}
           </Button>
         </Group>

@@ -3,6 +3,7 @@ import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@man
 import type { Repeat } from '../../types'
 import { colors, DANGER, fieldLabelStyle, fonts, warmBorder } from '../../theme'
 import { formatDate, today } from '../../lib/format'
+import { useBusy } from '../../lib/useBusy'
 import { ModalShell } from '../../components/ModalShell'
 
 interface RepeatModalProps {
@@ -13,7 +14,8 @@ interface RepeatModalProps {
   firstDate: string
   /** This entry's repeats, oldest first. */
   repeats: Repeat[]
-  onAdd: (date: string) => void
+  /** Rejects on a failed write (the store throws for repeat actions). */
+  onAdd: (date: string) => Promise<void>
   onRemove: (repeatId: string) => void
   onClose: () => void
 }
@@ -35,10 +37,16 @@ export function RepeatModal({
     if (opened) setDate(today())
   }, [opened])
 
-  const add = () => {
-    onAdd(date || today())
-    setDate(today())
-  }
+  const { busy, run } = useBusy()
+  const add = () =>
+    run(async () => {
+      try {
+        await onAdd(date || today())
+        setDate(today())
+      } catch {
+        // Write failed — keep the picked date; store.error shows the reason.
+      }
+    })
 
   // First entry + repeats, newest first, for the history list.
   const history = [
@@ -63,7 +71,7 @@ export function RepeatModal({
           onChange={(e) => setDate(e.currentTarget.value)}
           style={{ flex: 1 }}
         />
-        <Button onClick={add} radius={10} disabled={!date}>
+        <Button onClick={() => void add()} radius={10} disabled={!date} loading={busy}>
           Add repeat
         </Button>
       </Group>

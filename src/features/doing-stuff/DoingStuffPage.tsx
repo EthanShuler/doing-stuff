@@ -5,6 +5,7 @@ import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../
 import { useActivityStore } from './useActivityStore'
 import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist, wishMarkers } from './derive'
 import { currentYearMonth, today } from '../../lib/format'
+import { useBusy } from '../../lib/useBusy'
 import type { YearMonth } from '../../lib/format'
 import { colors, fonts } from '../../theme'
 import { FloatingBanner } from '../../components/FloatingBanner'
@@ -150,20 +151,24 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
     setRepeatEntryId(null)
   }
 
-  const saveEntry = async () => {
-    if (!draft.activityId || !draft.rating) return
-    try {
-      if (editingId) {
-        await store.updateEntry(editingId, draft)
-      } else {
-        const newEntryId = await store.addEntry(draft)
-        if (pendingWishId) await store.linkWishlistItem(pendingWishId, newEntryId)
+  // addEntry awaits a geocode before inserting, so an unguarded double-click
+  // has a wide window to create duplicate entries.
+  const { busy: saving, run: runSave } = useBusy()
+  const saveEntry = () =>
+    runSave(async () => {
+      if (!draft.activityId || !draft.rating) return
+      try {
+        if (editingId) {
+          await store.updateEntry(editingId, draft)
+        } else {
+          const newEntryId = await store.addEntry(draft)
+          if (pendingWishId) await store.linkWishlistItem(pendingWishId, newEntryId)
+        }
+        closeModal()
+      } catch {
+        // Write failed — keep the modal open; store.error shows the reason.
       }
-      closeModal()
-    } catch {
-      // Write failed — keep the modal open; store.error shows the reason.
-    }
-  }
+    })
 
   const confirmDeleteEntry = () =>
     window.confirm('Delete this entry? Any repeats logged on it are deleted too.')
@@ -282,6 +287,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
         categories={store.categories}
         activities={store.activities}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+        saving={saving}
         onSave={saveEntry}
         onDelete={deleteEditingEntry}
         onClose={closeModal}
@@ -292,7 +298,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
         entryTitle={repeatTitle}
         firstDate={repeatEntry ? repeatEntry.date : today()}
         repeats={repeatEntry ? store.repeats.filter((r) => r.entryId === repeatEntry.id) : []}
-        onAdd={(date) => repeatEntry && store.addRepeat(repeatEntry.id, date).catch(() => {})}
+        onAdd={(date) => (repeatEntry ? store.addRepeat(repeatEntry.id, date) : Promise.resolve())}
         onRemove={(repeatId) => store.deleteRepeat(repeatId).catch(() => {})}
         onClose={closeModal}
       />
