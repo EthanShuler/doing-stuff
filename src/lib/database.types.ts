@@ -45,9 +45,9 @@ export interface Database {
         Relationships: []
       }
       activities: {
-        Row: { id: string; space_id: string; category_id: string; name: string; emoji: string | null; created_at: string }
-        Insert: { id?: string; space_id: string; category_id: string; name: string; emoji?: string | null; created_at?: string }
-        Update: { id?: string; space_id?: string; category_id?: string; name?: string; emoji?: string | null; created_at?: string }
+        Row: { id: string; space_id: string; category_id: string; name: string; emoji: string; created_at: string }
+        Insert: { id?: string; space_id: string; category_id: string; name: string; emoji?: string; created_at?: string }
+        Update: { id?: string; space_id?: string; category_id?: string; name?: string; emoji?: string; created_at?: string }
         Relationships: []
       }
       entries: {
@@ -61,7 +61,7 @@ export interface Database {
           rating: number
           created_by: string | null
           created_at: string
-          address: string | null
+          address: string
           lat: number | null
           lng: number | null
           hide_from_map: boolean
@@ -76,7 +76,7 @@ export interface Database {
           rating: number
           created_by?: string | null
           created_at?: string
-          address?: string | null
+          address?: string
           lat?: number | null
           lng?: number | null
           hide_from_map?: boolean
@@ -91,7 +91,7 @@ export interface Database {
           rating?: number
           created_by?: string | null
           created_at?: string
-          address?: string | null
+          address?: string
           lat?: number | null
           lng?: number | null
           hide_from_map?: boolean
