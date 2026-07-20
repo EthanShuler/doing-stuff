@@ -229,6 +229,24 @@ export interface Recipe {
   createdAt: string
 }
 
+// --- Music practice (the Bassoon circle-of-fifths tracker) --------------------
+
+/** One calendar day's chosen key for one person — a row in
+ *  `music_practice_days`. Personal state (each member's own; same split RLS as
+ *  tier placements). One row per day; picking again overwrites it. */
+export interface PracticeDay {
+  id: string
+  /** ISO date ("YYYY-MM-DD") of the practice day (DB `practice_date`, local). */
+  date: string
+  /** Clockwise slot on the circle of fifths, 0 = C (see CIRCLE in the
+   *  music-practice derive.ts). 0–11. */
+  position: number
+  /** auth.users id of the member whose day this is (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp of when the row was written. */
+  createdAt: string
+}
+
 // --- Parks (the 63-national-parks tracker) ------------------------------------
 
 /** One trip to a national park — one row in `park_visits`. The park itself is

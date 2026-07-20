@@ -90,7 +90,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/cats"
             element={<ComingSoon title="Cat photo wall" blurb="A wall of our cats. Coming soon." />}
           />
-          <Route path="/music-practice" element={<MusicPracticePage />} />
+          <Route path="/music-practice" element={<MusicPracticePage spaceId={spaceId} userId={userId} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>

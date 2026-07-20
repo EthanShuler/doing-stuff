@@ -6,7 +6,7 @@ import { Piano } from './Piano'
 
 type Screen = 'bassoon' | 'piano'
 
-export function MusicPracticePage() {
+export function MusicPracticePage({ spaceId, userId }: { spaceId: string | null; userId: string | null }) {
   const [screen, setScreen] = useState<Screen>('bassoon')
 
   return (
@@ -34,7 +34,7 @@ export function MusicPracticePage() {
           </Group>
 
           {screen === 'bassoon' ? (
-            <Bassoon />
+            <Bassoon spaceId={spaceId} userId={userId} />
           ) : (
             <Piano />
           )}

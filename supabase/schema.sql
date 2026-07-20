@@ -375,6 +375,33 @@ create table if not exists public.recipes (
 create index if not exists recipes_space_idx on public.recipes (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Music practice: the Bassoon circle-of-fifths daily key tracker. PERSONAL
+-- practice state — each row is ONE calendar day's chosen key for ONE person.
+-- `position` is the clockwise slot on the circle of fifths (0 = C, 1 = G, …,
+-- 11 = F; see CIRCLE in src/features/music-practice/derive.ts). Free picker,
+-- no enforced sequence; at most one key per day (upsert on
+-- (user_id, practice_date)). Per-person like tier_placements: members read all
+-- rows but write only their own (user_id = auth.uid()). Deliberately NOT added
+-- to the realtime publication below — solo, rarely-simultaneous use; another
+-- device picks it up on the next page load.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.music_practice_days (
+  id            uuid primary key default gen_random_uuid(),
+  space_id      uuid not null references public.spaces (id) on delete cascade,
+  user_id       uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  -- The practice day (the client sends its LOCAL date, not UTC).
+  practice_date date not null,
+  -- Clockwise position on the circle of fifths, 0 = C.
+  position      int not null check (position between 0 and 11),
+  created_at    timestamptz not null default now(),
+  -- One key per person per day — also the upsert conflict target.
+  unique (user_id, practice_date)
+);
+
+create index if not exists music_practice_days_space_idx on public.music_practice_days (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -489,6 +516,7 @@ alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_reads  enable row level security;
 alter table public.watchlist_items  enable row level security;
+alter table public.music_practice_days enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -649,6 +677,26 @@ create policy "delete shared or own watchlist" on public.watchlist_items
     and (kind <> 'book' or created_by = auth.uid())
   );
 
+-- music practice ---------------------------------------------------------------
+-- Per-person daily key, same split as tier_placements: members read everyone's
+-- rows, but each user writes only rows carrying their own user_id.
+drop policy if exists "members read practice days" on public.music_practice_days;
+create policy "members read practice days" on public.music_practice_days
+  for select using (public.is_space_member(space_id));
+
+drop policy if exists "insert own practice days" on public.music_practice_days;
+create policy "insert own practice days" on public.music_practice_days
+  for insert with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "update own practice days" on public.music_practice_days;
+create policy "update own practice days" on public.music_practice_days
+  for update using (user_id = auth.uid())
+  with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "delete own practice days" on public.music_practice_days;
+create policy "delete own practice days" on public.music_practice_days
+  for delete using (user_id = auth.uid());
+
 -- ---------------------------------------------------------------------------
 -- Grants (needed because "Automatically expose new tables" is OFF).
 -- RLS still governs *which rows* — these grants just expose the tables to the
@@ -660,7 +708,7 @@ grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
   public.tier_item_reads, public.watchlist_items, public.spoons, public.park_visits,
-  public.recipes
+  public.recipes, public.music_practice_days
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;

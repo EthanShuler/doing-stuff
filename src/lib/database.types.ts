@@ -404,6 +404,33 @@ export interface Database {
         }
         Relationships: []
       }
+      music_practice_days: {
+        Row: {
+          id: string
+          space_id: string
+          user_id: string
+          practice_date: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          user_id?: string
+          practice_date: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          user_id?: string
+          practice_date?: string
+          position?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       entry_repeats: {
         Row: {
           id: string

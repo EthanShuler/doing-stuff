@@ -1,6 +1,9 @@
 // Pure data + logic for the music-practice feature: the scale/chord and key
-// reference tables plus the practice-prompt randomizer. No React in here —
-// covered by derive.test.ts.
+// reference tables, the practice-prompt randomizer (Piano), and the
+// circle-of-fifths wheel data + daily-key helpers (Bassoon). No React in
+// here — covered by derive.test.ts.
+
+import type { PracticeDay } from '../../types'
 
 /** A scale paired with the chord symbol it voices over. */
 export type ScaleChord = { scale: string; chord: string }
@@ -51,4 +54,63 @@ export function randomPractice(rng: () => number = Math.random): Practice {
     keyIndex: Math.floor(rng() * KEYS.length),
     scaleIndex: Math.floor(rng() * SCALES_CHORDS.length),
   }
+}
+
+// --- Bassoon: the circle of fifths ------------------------------------------
+
+/** One slot on the circle of fifths. `pos` is the clockwise index (0 = C) and
+ *  is exactly what a practice day stores in `position`. */
+export type CircleKey = {
+  pos: number
+  /** Major key — the primary label (outer ring). */
+  major: string
+  /** Relative minor — reference only (inner ring). */
+  minor: string
+  /** Key signature label, e.g. '2♯', '3♭', '0'. */
+  keySig: string
+}
+
+/** The twelve slots, clockwise from C. The 6-o'clock slot is enharmonic
+ *  (G♭ = F♯), so it carries both spellings. Index === `pos` === the stored
+ *  `position`, so callers can index CIRCLE directly. */
+export const CIRCLE: readonly CircleKey[] = [
+  { pos: 0, major: 'C', minor: 'Am', keySig: '0' },
+  { pos: 1, major: 'G', minor: 'Em', keySig: '1♯' },
+  { pos: 2, major: 'D', minor: 'Bm', keySig: '2♯' },
+  { pos: 3, major: 'A', minor: 'F♯m', keySig: '3♯' },
+  { pos: 4, major: 'E', minor: 'C♯m', keySig: '4♯' },
+  { pos: 5, major: 'B', minor: 'G♯m', keySig: '5♯' },
+  { pos: 6, major: 'G♭/F♯', minor: 'E♭m/D♯m', keySig: '6♭/6♯' },
+  { pos: 7, major: 'D♭', minor: 'B♭m', keySig: '5♭' },
+  { pos: 8, major: 'A♭', minor: 'Fm', keySig: '4♭' },
+  { pos: 9, major: 'E♭', minor: 'Cm', keySig: '3♭' },
+  { pos: 10, major: 'B♭', minor: 'Gm', keySig: '2♭' },
+  { pos: 11, major: 'F', minor: 'Dm', keySig: '1♭' },
+]
+
+/** True if `pos` is a real circle slot (guards a value read from the DB). */
+export function isCirclePos(pos: number): boolean {
+  return Number.isInteger(pos) && pos >= 0 && pos < CIRCLE.length
+}
+
+/** The position chosen on `date`, or null if that day has no row. */
+export function keyForDate(days: PracticeDay[], date: string): number | null {
+  const row = days.find((d) => d.date === date)
+  return row ? row.position : null
+}
+
+/** The most recent logged day on or before `onOrBefore` (null if none). ISO
+ *  date strings compare lexicographically, so no Date math is needed. */
+export function mostRecentDay(days: PracticeDay[], onOrBefore: string): PracticeDay | null {
+  let best: PracticeDay | null = null
+  for (const d of days) {
+    if (d.date <= onOrBefore && (!best || d.date > best.date)) best = d
+  }
+  return best
+}
+
+/** The most recent logged day strictly before `date` (null if none) — powers
+ *  both the carry-forward pre-highlight and the "last practiced" line. */
+export function previousDay(days: PracticeDay[], date: string): PracticeDay | null {
+  return mostRecentDay(days.filter((d) => d.date !== date), date)
 }
