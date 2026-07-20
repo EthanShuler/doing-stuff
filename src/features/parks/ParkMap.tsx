@@ -15,9 +15,9 @@ import { StatusDot, pinVariant, separateVariant, togetherVariant } from './Statu
  *  member dot, together ring, separately split, faint not-yet. Shape + the
  *  blue/orange pair keep every state readable with red-green colorblindness. */
 function parkIcon(variant: DotVariant): L.DivIcon {
-  const pin = (size: number, style: string, extra = '') =>
+  const pin = (size: number, style: string) =>
     cachedDivIcon(`parkpin:${JSON.stringify(variant)}`, () => ({
-      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;${style}${extra}"></div>`,
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;${style}"></div>`,
       className: '',
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],

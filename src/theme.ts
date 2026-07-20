@@ -57,6 +57,8 @@ export const colors = {
   /** The heavier dotted rule under each page's control bar. */
   rule: warmBorder(0.4),
   chip: '#f3f0ea',
+  /** Warm neutral fill for stat cards / info panels, a touch deeper than pageBg. */
+  cardTint: 'oklch(0.96 0.018 78)',
   starEmpty: '#ddd6c9',
 }
 

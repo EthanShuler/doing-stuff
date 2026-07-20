@@ -100,8 +100,6 @@ export interface ParkStore {
   profiles: Profile[]
   /** Space member ids in join order — drives the person-fixed colors. */
   memberIds: string[]
-  /** The signed-in member (or the seed viewer in keyless mode). */
-  selfId: string | null
   loading: boolean
   /** Last failed write's message. Cleared when a new write starts, or via clearError. */
   error: string | null
@@ -263,7 +261,6 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
     visits,
     profiles,
     memberIds,
-    selfId,
     loading,
     error,
     clearError,

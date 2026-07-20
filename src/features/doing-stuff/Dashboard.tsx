@@ -13,7 +13,7 @@ import {
 } from '@mantine/core'
 import type { Category, SortKey, ViewMode } from '../../types'
 import type { DisplayRow, Stats } from './derive'
-import { ACCENT, colors, fonts, warmBorder } from '../../theme'
+import { ACCENT, colors, fonts, swatchFor, warmBorder } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { Stars } from '../../components/Stars'
 import { CategoryPills } from '../../components/CategoryPills'
@@ -67,13 +67,13 @@ export function Dashboard({
     <>
       {/* STATS */}
       <Group gap={14} mt={26} wrap="wrap" align="stretch">
-        <StatCard value={stats.total} label="Total entries" bg="oklch(0.96 0.018 78)" />
+        <StatCard value={stats.total} label="Total entries" bg={colors.cardTint} />
         <StatCard
           value={stats.thisMonth}
           label="This month"
-          bg="oklch(0.95 0.032 150)"
-          valueColor="oklch(0.42 0.06 150)"
-          labelColor="oklch(0.45 0.05 150)"
+          bg={swatchFor(0).tint}
+          valueColor={swatchFor(0).ink}
+          labelColor={swatchFor(0).ink}
         />
       </Group>
 

@@ -40,7 +40,10 @@ async function resolveSpace(userId: string): Promise<string> {
     return id
   })()
   creatingSpace.set(userId, pending)
-  pending.finally(() => creatingSpace.delete(userId))
+  // Swallow the rejection on this derived promise — the caller awaits
+  // `pending` itself and handles the error; without the catch, every failed
+  // insert also fired an unhandled-rejection from the .finally() chain.
+  pending.catch(() => {}).finally(() => creatingSpace.delete(userId))
   return pending
 }
 

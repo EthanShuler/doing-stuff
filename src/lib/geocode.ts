@@ -31,6 +31,9 @@ export async function geocode(address: string): Promise<GeoPoint | null> {
     // we pick the best candidate ourselves below.
     const url = `${ENDPOINT}?format=jsonv2&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`
     const res = await fetch(url, {
+      // Saves await this call before persisting — a stalled connection must
+      // resolve to "couldn't locate" instead of hanging the save for minutes.
+      signal: AbortSignal.timeout(10_000),
       headers: {
         // Identify the app per Nominatim policy. (Browsers ignore a manual
         // User-Agent, but Referer is sent automatically; this is best-effort.)

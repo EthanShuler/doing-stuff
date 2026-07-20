@@ -212,7 +212,7 @@ export function ManageModal({
                       }
                     }}
                     aria-label={`Remove ${activity.name}`}
-                    style={{ fontFamily: fonts.sans, fontSize: 14, lineHeight: 1, color: '#b3ada3', padding: '0 2px' }}
+                    style={{ fontFamily: fonts.sans, fontSize: 14, lineHeight: 1, color: colors.faint, padding: '0 2px' }}
                   >
                     ×
                   </UnstyledButton>
@@ -243,7 +243,7 @@ export function ManageModal({
       })}
 
       <Box
-        bg="oklch(0.96 0.018 78)"
+        bg={colors.cardTint}
         p="16px 18px"
         mt={18}
         style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14 }}

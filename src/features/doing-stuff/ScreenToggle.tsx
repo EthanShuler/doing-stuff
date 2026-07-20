@@ -1,7 +1,8 @@
 import { SegmentedControl } from '@mantine/core'
 import type { Screen } from '../../types'
 
-/** Top-level Log / Wishlist switcher, shown in both screens' headers. */
+/** Log / Wishlist / Map / Calendar switcher, rendered once in the feature
+ *  control bar (see HeaderActions). */
 export function ScreenToggle({ screen, onChange }: { screen: Screen; onChange: (screen: Screen) => void }) {
   return (
     <SegmentedControl

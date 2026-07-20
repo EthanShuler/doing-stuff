@@ -12,7 +12,7 @@ import {
   Title,
 } from '@mantine/core'
 import { supabase } from '../lib/supabase'
-import { colors, fonts } from '../theme'
+import { DANGER, colors, fonts } from '../theme'
 
 type Mode = 'signin' | 'signup'
 
@@ -136,7 +136,7 @@ function AuthForm({
         />
 
         {error && (
-          <Text fz={13} c="oklch(0.5 0.16 25)">
+          <Text fz={13} c={DANGER}>
             {error}
           </Text>
         )}
