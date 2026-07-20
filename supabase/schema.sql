@@ -63,7 +63,7 @@ create table if not exists public.entries (
   rating      int  not null check (rating between 1 and 5),
   -- Who logged this outing. Defaults to the inserting user; the UI resolves the
   -- name via the `profiles` table (the browser can't read auth.users directly).
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   -- Optional place this outing happened. Address is geocoded client-side
   -- (Nominatim) on save; lat/lng stay null when blank or unlocatable. An entry
   -- with coords shows as a pin on the map view.
@@ -76,7 +76,7 @@ create table if not exists public.entries (
 );
 
 -- If the entries table already exists from an earlier schema, add the column:
-alter table public.entries add column if not exists created_by uuid references auth.users (id) default auth.uid();
+alter table public.entries add column if not exists created_by uuid references auth.users (id) on delete set null default auth.uid();
 
 -- ---------------------------------------------------------------------------
 -- Map feature migration (run if these tables predate the map feature):
@@ -102,7 +102,7 @@ create table if not exists public.wishlist_items (
   space_id    uuid not null references public.spaces (id) on delete cascade,
   text        text not null default '',
   entry_id    uuid references public.entries (id) on delete set null,
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now(),
   -- Optional place we want to go, geocoded for an open-wish ⭐ pin on the map.
   address     text,
@@ -128,7 +128,7 @@ create table if not exists public.entry_repeats (
   space_id    uuid not null references public.spaces (id)  on delete cascade,
   entry_id    uuid not null references public.entries (id) on delete cascade,
   repeat_date date not null,
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
 
@@ -140,11 +140,14 @@ create table if not exists public.profiles (
 );
 
 -- Helpful indexes for the space-scoped queries the app runs.
+create index if not exists space_members_user_idx on public.space_members (user_id);
 create index if not exists categories_space_idx on public.categories (space_id);
 create index if not exists activities_space_idx on public.activities (space_id);
+create index if not exists activities_category_idx on public.activities (category_id);
 create index if not exists entries_space_idx     on public.entries (space_id);
 create index if not exists entries_activity_idx  on public.entries (activity_id);
 create index if not exists wishlist_space_idx     on public.wishlist_items (space_id);
+create index if not exists wishlist_entry_idx     on public.wishlist_items (entry_id);
 create index if not exists entry_repeats_space_idx on public.entry_repeats (space_id);
 create index if not exists entry_repeats_entry_idx on public.entry_repeats (entry_id);
 
@@ -185,7 +188,7 @@ create table if not exists public.tier_items (
   -- text, shared like the title ('' = unknown/not entered). On an existing DB:
   --   alter table public.tier_items add column creator text not null default '';
   creator     text not null default '',
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
 
@@ -193,7 +196,7 @@ create table if not exists public.tier_placements (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
   item_id     uuid not null references public.tier_items (id) on delete cascade,
-  user_id     uuid not null references auth.users (id) default auth.uid(),
+  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
   tier        text not null check (tier in ('S', 'A', 'B', 'C', 'D', 'F')),
   -- Fractional ordering within the tier (midpoint insertion; the client
   -- renormalizes a tier to integers if float precision ever runs out).
@@ -213,7 +216,7 @@ create table if not exists public.tier_item_reads (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
   item_id     uuid not null references public.tier_items (id) on delete cascade,
-  user_id     uuid not null references auth.users (id) default auth.uid(),
+  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
   -- The day this member finished it.
   read_on     date not null,
   created_at  timestamptz not null default now(),
@@ -265,11 +268,12 @@ create table if not exists public.watchlist_items (
   position     double precision not null default 0,
   -- The tier item this produced when checked off; null while still open.
   tier_item_id uuid references public.tier_items (id) on delete set null,
-  created_by   uuid references auth.users (id) default auth.uid(),
+  created_by   uuid references auth.users (id) on delete set null default auth.uid(),
   created_at   timestamptz not null default now()
 );
 
 create index if not exists watchlist_items_space_idx on public.watchlist_items (space_id);
+create index if not exists watchlist_items_tier_item_idx on public.watchlist_items (tier_item_id);
 
 -- ---------------------------------------------------------------------------
 -- Spoons: the souvenir spoon collection. Each row is one physical spoon —
@@ -295,7 +299,7 @@ create table if not exists public.spoons (
   acquired_on date,
   -- The story behind the spoon ("from the honeymoon").
   notes       text not null default '',
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
 
@@ -327,7 +331,7 @@ create table if not exists public.park_visits (
   -- toward Together (same as logging one solo row per person, which derives
   -- the same "separately" state). Meaningless on solo rows.
   separate     boolean not null default false,
-  created_by   uuid references auth.users (id) default auth.uid(),
+  created_by   uuid references auth.users (id) on delete set null default auth.uid(),
   created_at   timestamptz not null default now()
 );
 
@@ -364,7 +368,7 @@ create table if not exists public.recipes (
   total_time  text not null default '',
   -- Our notes — tweaks and verdicts ("double the garlic next time").
   notes       text not null default '',
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
 
@@ -514,10 +518,11 @@ drop policy if exists "members add members" on public.space_members;
 create policy "members add members" on public.space_members
   for insert with check (public.is_space_member(space_id));
 
--- A user can always remove their own membership (leave a space).
+-- A user can remove only their OWN membership (leave a space) — not kick a
+-- co-member.
 drop policy if exists "leave space" on public.space_members;
 create policy "leave space" on public.space_members
-  for delete using (user_id = auth.uid() or public.is_space_member(space_id));
+  for delete using (user_id = auth.uid());
 
 -- profiles -------------------------------------------------------------------
 -- You can read your own profile and the profiles of anyone you share a space
