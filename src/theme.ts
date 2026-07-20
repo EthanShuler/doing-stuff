@@ -27,6 +27,10 @@ export const DANGER = 'oklch(0.55 0.14 25)'
  *  (status pins/dots): Ethan is red-green colorblind, so meaningful pairs must
  *  be blue vs orange (plus a shape/lightness cue), never terracotta vs sage. */
 export const ACCENT_BLUE = 'oklch(0.55 0.12 250)'
+/** A lighter tint of ACCENT_BLUE for a secondary highlighted surface (e.g. the
+ *  inner ring of the selected circle-of-fifths wedge) — kept legible against
+ *  the solid ACCENT_BLUE beside it. */
+export const ACCENT_BLUE_SOFT = 'oklch(0.72 0.08 250)'
 
 export const fonts = {
   sans: "'Plus Jakarta Sans', sans-serif",

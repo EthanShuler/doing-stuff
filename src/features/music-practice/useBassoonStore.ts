@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PracticeDay } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { errorMessage, idFactory, SEED_SELF_ID } from '../../data/spaceSync'
@@ -100,11 +100,20 @@ export function useBassoonStore(spaceId: string | null, userId: string | null): 
     setDays((prev) => [...prev.filter((d) => d.date !== row.date), row])
   }, [])
 
+  // Latest days, read by setTodayKey to revert an optimistic write without
+  // re-creating the callback on every change.
+  const daysRef = useRef(days)
+  daysRef.current = days
+
   const setTodayKey = useCallback(
     async (position: number) => {
       const date = today()
       setError(null)
       if (supabase && spaceId && userId) {
+        // Show the pick immediately, then reconcile with the server row (or
+        // roll back to the pre-write snapshot on failure).
+        const snapshot = daysRef.current
+        putDay({ id: `optimistic-${date}`, date, position, createdBy: userId, createdAt: new Date().toISOString() })
         const { data, error: err } = await supabase
           .from('music_practice_days')
           .upsert(
@@ -114,6 +123,7 @@ export function useBassoonStore(spaceId: string | null, userId: string | null): 
           .select(DAY_COLUMNS)
           .single()
         if (err) {
+          setDays(snapshot)
           setError(err.message)
           return
         }

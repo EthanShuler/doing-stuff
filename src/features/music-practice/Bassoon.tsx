@@ -1,7 +1,7 @@
 import { Box, Stack, Text } from '@mantine/core'
-import { ACCENT_BLUE, colors, fonts, warmBorder } from '../../theme'
+import { ACCENT_BLUE, ACCENT_BLUE_SOFT, colors, fonts, warmBorder } from '../../theme'
 import { formatDate, today } from '../../lib/format'
-import { CIRCLE, keyForDate, previousDay, type CircleKey } from './derive'
+import { CIRCLE, isCirclePos, keyForDate, previousDay, type CircleKey } from './derive'
 import { useBassoonStore } from './useBassoonStore'
 
 /** Props for the wheel rendering. */
@@ -23,7 +23,7 @@ export function Bassoon({ spaceId, userId }: { spaceId: string | null; userId: s
   const previous = previousDay(store.days, t) // last practiced before today
   // On a fresh day, pre-highlight the last key as a hint — but don't log it.
   const carry = active === null ? previous?.position ?? null : null
-  const chosen = active !== null ? CIRCLE[active] : null
+  const chosen = active !== null && isCirclePos(active) ? CIRCLE[active] : null
 
   return (
     <Stack align="center" gap={16} mt={16}>
@@ -40,7 +40,7 @@ export function Bassoon({ spaceId, userId }: { spaceId: string | null; userId: s
 
       {/* Faint context line under the wheel. */}
       <Text fz={13} c={colors.faint} mt={4}>
-        {previous
+        {previous && isCirclePos(previous.position)
           ? `Last practiced: ${CIRCLE[previous.position].major} · ${formatDate(previous.date)}`
           : 'Tap a key to start tracking your practice.'}
       </Text>
@@ -103,10 +103,6 @@ const R_MAJOR_IN = 138 // major band: R_MAJOR_IN → R_OUTER
 const R_SIG_IN = 116 // key-signature band: R_SIG_IN → R_MAJOR_IN
 const R_HOLE = 78 // minor band: R_HOLE → R_SIG_IN, then the hole
 
-/** A tint of ACCENT_BLUE for the active wedge's inner (minor) band — lighter
- *  than the outer so the rings stay legible when selected. */
-const ACTIVE_INNER = 'oklch(0.72 0.08 250)'
-
 const rad = (deg: number) => (deg * Math.PI) / 180
 const pointAt = (r: number, deg: number): [number, number] => [
   CX + r * Math.cos(rad(deg)),
@@ -147,7 +143,14 @@ function WheelSvg({ active, carry, chosen, onSelect }: WheelProps) {
             <g
               key={k.pos}
               onClick={() => onSelect(k.pos)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelect(k.pos)
+                }
+              }}
               role="button"
+              tabIndex={0}
               aria-label={`${k.major} major, ${k.keySig}`}
               aria-pressed={isActive}
               style={{ cursor: 'pointer' }}
@@ -171,7 +174,7 @@ function WheelSvg({ active, carry, chosen, onSelect }: WheelProps) {
               {/* Minor (inner) band */}
               <path
                 d={annularSector(R_HOLE, R_SIG_IN, a0, a1)}
-                fill={isActive ? ACTIVE_INNER : colors.cardTint}
+                fill={isActive ? ACCENT_BLUE_SOFT : colors.cardTint}
                 stroke={stroke}
                 strokeWidth={strokeWidth}
                 strokeDasharray={dash}
