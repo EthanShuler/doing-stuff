@@ -1,4 +1,5 @@
 import type { Spoon } from '../../types'
+import { compareDatedDesc } from '../../lib/format'
 
 // Pure data-shaping for the spoon collection — no React in here (same pattern
 // as the doing-stuff and tier-list derive modules; covered by derive.test.ts).
@@ -6,13 +7,7 @@ import type { Spoon } from '../../types'
 /** Grid order: dated spoons newest first, undated ones after (newest logged
  *  first), so the collection reads as a timeline with the unknowns at the end. */
 export function sortSpoons(spoons: Spoon[]): Spoon[] {
-  return [...spoons].sort((a, b) => {
-    if (a.acquiredOn && b.acquiredOn && a.acquiredOn !== b.acquiredOn) {
-      return a.acquiredOn < b.acquiredOn ? 1 : -1
-    }
-    if (Boolean(a.acquiredOn) !== Boolean(b.acquiredOn)) return a.acquiredOn ? -1 : 1
-    return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0
-  })
+  return [...spoons].sort((a, b) => compareDatedDesc(a.acquiredOn, a.createdAt, b.acquiredOn, b.createdAt))
 }
 
 /** One map pin. lat/lng may be nudged off the spoon's stored coords when

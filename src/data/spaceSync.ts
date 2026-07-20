@@ -16,6 +16,15 @@ import { supabase } from '../lib/supabase'
 export const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Something went wrong.'
 
+// --- Keyless-mode seed identities: every feature's in-memory seed shares the
+//     same two demo members, with the first one acting as the signed-in user. ---
+
+export const SEED_SELF_ID = 'u1'
+export const SEED_PROFILES: Profile[] = [
+  { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
+  { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
+]
+
 // --- Profiles: every store fetches the same co-member identities. ---
 
 export type ProfileRow = { id: string; email: string | null; display_name: string | null }

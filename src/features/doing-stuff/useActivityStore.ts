@@ -3,8 +3,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
-import { geocode } from '../../lib/geocode'
-import { PROFILE_COLUMNS, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { resolveCoordsWithNotice } from '../../lib/geocode'
+import { PROFILE_COLUMNS, SEED_PROFILES, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 
 // The app's single source of domain data (categories / activities / entries).
@@ -36,10 +36,7 @@ function seed(): Snapshot {
   return {
     // A demo center + a few pre-geocoded pins so the map works in keyless mode.
     home: { address: 'Portland, OR', lat: 45.5152, lng: -122.6784 },
-    profiles: [
-      { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
-      { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
-    ],
+    profiles: SEED_PROFILES,
     wishlist: [
       { id: 'w1', text: 'Sunrise hike up Eagle Ridge', entryId: null, createdBy: 'u1', createdAt: '2026-06-02T09:00:00Z', address: '', lat: null, lng: null },
       { id: 'w2', text: 'Try the new ramen place downtown', entryId: null, createdBy: 'u2', createdAt: '2026-06-05T09:00:00Z', address: '', lat: null, lng: null },
@@ -261,15 +258,10 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
 
   // Geocode an address for a save: returns coords (or null) and posts a
   // non-blocking notice when a non-empty address can't be located.
-  const resolveCoords = useCallback(async (address: string) => {
-    const trimmed = address.trim()
-    if (!trimmed) return null
-    const point = await geocode(trimmed)
-    if (!point) {
-      setNotice(`Couldn't locate "${trimmed}" — saved, but it won't appear on the map.`)
-    }
-    return point
-  }, [])
+  const resolveCoords = useCallback(
+    (address: string) => resolveCoordsWithNotice(address, setNotice),
+    [],
+  )
 
   // Fetch one full snapshot of the space (live mode only). Shared by the
   // initial load and the resync after a realtime reconnect. Throws on the

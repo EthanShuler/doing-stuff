@@ -196,18 +196,19 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
                 onClear={clearTagFilter}
               />
 
-              {view === 'list' ? (
-                <RecipeList
-                  recipes={shown}
-                  filtered={filterActive || search.trim().length > 0}
-                  onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)}
-                />
+              {shown.length === 0 ? (
+                filterActive || search.trim().length > 0 ? (
+                  <EmptyCard title="Nothing matches" blurb="No recipe fits that search and those tags." />
+                ) : (
+                  <EmptyCard
+                    title="No recipes yet"
+                    blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
+                  />
+                )
+              ) : view === 'list' ? (
+                <RecipeList recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
               ) : (
-                <RecipeGrid
-                  recipes={shown}
-                  filtered={filterActive || search.trim().length > 0}
-                  onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)}
-                />
+                <RecipeGrid recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
               )}
             </>
           )}

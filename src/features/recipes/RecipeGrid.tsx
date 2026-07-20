@@ -1,72 +1,32 @@
-import { useState } from 'react'
 import { Box, Text, UnstyledButton } from '@mantine/core'
 import type { Recipe } from '../../types'
 import { colors, fonts } from '../../theme'
-import { EmptyCard } from '../../components/EmptyCard'
+import { PhotoWithFallback } from '../../components/PhotoWithFallback'
 import { servingsTimeLine } from './derive'
 
 export const RECIPE_EMOJI = '🍲'
 
-/** A recipe photo with a 🍲 fallback for '' or broken URLs. The broken state
- *  is remembered per URL, so uploading a replacement retries. Shared by the
+/** A recipe photo with a 🍲 fallback — see PhotoWithFallback. Shared by the
  *  grid cards, the detail page, and the modal preview. */
 export function RecipePhoto({
   imageUrl,
   title,
   height,
-  emojiSize = 40,
+  emojiSize,
 }: {
   imageUrl: string
   title: string
   height: number
   emojiSize?: number
 }) {
-  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
-  if (!imageUrl || brokenUrl === imageUrl) {
-    return (
-      <Box
-        w="100%"
-        h={height}
-        bg={colors.chip}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: emojiSize }}
-      >
-        {RECIPE_EMOJI}
-      </Box>
-    )
-  }
   return (
-    <img
-      src={imageUrl}
-      alt={title}
-      onError={() => setBrokenUrl(imageUrl)}
-      style={{ width: '100%', height, objectFit: 'cover', display: 'block' }}
-    />
+    <PhotoWithFallback imageUrl={imageUrl} alt={title} height={height} fallbackEmoji={RECIPE_EMOJI} emojiSize={emojiSize} />
   )
 }
 
 /** The cookbook as a photo card grid (already sorted A–Z — see sortRecipes).
  *  Clicking a card opens the recipe's page. */
-export function RecipeGrid({
-  recipes,
-  filtered,
-  onOpen,
-}: {
-  recipes: Recipe[]
-  /** True when a search/tag filter is active — flips the empty-state copy. */
-  filtered: boolean
-  onOpen: (recipe: Recipe) => void
-}) {
-  if (recipes.length === 0) {
-    return filtered ? (
-      <EmptyCard title="Nothing matches" blurb="No recipe fits that search and those tags." />
-    ) : (
-      <EmptyCard
-        title="No recipes yet"
-        blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
-      />
-    )
-  }
-
+export function RecipeGrid({ recipes, onOpen }: { recipes: Recipe[]; onOpen: (recipe: Recipe) => void }) {
   return (
     <Box
       mt={24}

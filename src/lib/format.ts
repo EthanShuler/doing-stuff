@@ -53,6 +53,20 @@ export function today(): string {
   return isoDate(now.getFullYear(), now.getMonth() + 1, now.getDate())
 }
 
+/** Comparator half for "dated rows newest first, undated after (newest
+ *  created first)" — the shared timeline order of the spoon grid and park
+ *  visit history. Pass each row's optional date and its createdAt. */
+export function compareDatedDesc(
+  aDate: string | null,
+  aCreated: string,
+  bDate: string | null,
+  bCreated: string,
+): number {
+  if (aDate && bDate && aDate !== bDate) return aDate < bDate ? 1 : -1
+  if (Boolean(aDate) !== Boolean(bDate)) return aDate ? -1 : 1
+  return aCreated < bCreated ? 1 : aCreated > bCreated ? -1 : 0
+}
+
 /** The local calendar date ("YYYY-MM-DD") of a full timestamp string. Never
  *  slice a UTC timestamptz for display — an evening save west of UTC would
  *  read as tomorrow. */

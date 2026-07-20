@@ -20,6 +20,20 @@ const ENDPOINT = 'https://nominatim.openstreetmap.org/search'
  * blank, unmatched, or the request fails — callers treat null as "save the
  * address text but leave it off the map" (never throws, never blocks a save).
  */
+/** Geocode for a save: coords or null, posting a non-blocking notice when
+ *  non-empty text can't be located. Shared by the doing-stuff and spoon
+ *  stores so the wording and never-block-a-save policy stay in one place. */
+export async function resolveCoordsWithNotice(
+  text: string,
+  notify: (message: string) => void,
+): Promise<GeoPoint | null> {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  const point = await geocode(trimmed)
+  if (!point) notify(`Couldn't locate "${trimmed}" — saved, but it won't appear on the map.`)
+  return point
+}
+
 export async function geocode(address: string): Promise<GeoPoint | null> {
   const query = address.trim()
   if (!query) return null

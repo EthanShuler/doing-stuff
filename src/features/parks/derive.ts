@@ -3,6 +3,7 @@ import type { Park, ParkRegion } from './parks'
 import { PARK_REGIONS } from './parks'
 import { ACCENT, ACCENT_BLUE } from '../../theme'
 import { displayNameFor } from '../../lib/profile'
+import { compareDatedDesc } from '../../lib/format'
 
 // Pure data-shaping for the parks tracker — no React in here (same pattern as
 // the other features' derive modules; covered by derive.test.ts).
@@ -37,11 +38,7 @@ export function buildMembers(memberIds: string[], profiles: Profile[]): Member[]
 /** History order within a park: dated trips newest first, undated ones after
  *  (newest logged first) — same convention as the spoon grid. */
 export function sortVisits(visits: ParkVisit[]): ParkVisit[] {
-  return [...visits].sort((a, b) => {
-    if (a.date && b.date && a.date !== b.date) return a.date < b.date ? 1 : -1
-    if (Boolean(a.date) !== Boolean(b.date)) return a.date ? -1 : 1
-    return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0
-  })
+  return [...visits].sort((a, b) => compareDatedDesc(a.date, a.createdAt, b.date, b.createdAt))
 }
 
 /** Everything the UI needs to know about one park's visit history. */

@@ -1,32 +1,12 @@
 import { Box, Group, Text, UnstyledButton } from '@mantine/core'
 import type { Recipe } from '../../types'
 import { colors, fonts } from '../../theme'
-import { EmptyCard } from '../../components/EmptyCard'
 import { servingsTimeLine } from './derive'
 
 /** The cookbook as a dense scannable index: one row per recipe (already
  *  sorted A–Z), title + source on the left, tags and serves/time on the
  *  right. The grid's counterpart for when you know what you're looking for. */
-export function RecipeList({
-  recipes,
-  filtered,
-  onOpen,
-}: {
-  recipes: Recipe[]
-  filtered: boolean
-  onOpen: (recipe: Recipe) => void
-}) {
-  if (recipes.length === 0) {
-    return filtered ? (
-      <EmptyCard title="Nothing matches" blurb="No recipe fits that search and those tags." />
-    ) : (
-      <EmptyCard
-        title="No recipes yet"
-        blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
-      />
-    )
-  }
-
+export function RecipeList({ recipes, onOpen }: { recipes: Recipe[]; onOpen: (recipe: Recipe) => void }) {
   return (
     <Box
       mt={24}

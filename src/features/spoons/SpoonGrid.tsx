@@ -1,46 +1,27 @@
-import { useState } from 'react'
 import { Box, Text, UnstyledButton } from '@mantine/core'
 import type { Spoon } from '../../types'
 import { colors, fonts } from '../../theme'
 import { formatDateWithYear } from '../../lib/format'
 import { EmptyCard } from '../../components/EmptyCard'
+import { PhotoWithFallback } from '../../components/PhotoWithFallback'
 
 export const SPOON_EMOJI = '🥄'
 
-/** A spoon photo with a 🥄 fallback for '' or broken URLs. The broken state is
- *  remembered per URL, so uploading a replacement retries. Shared by the grid
- *  cards and the modal preview. */
+/** A spoon photo with a 🥄 fallback — see PhotoWithFallback. Shared by the
+ *  grid cards and the modal preview. */
 export function SpoonPhoto({
   imageUrl,
   name,
   height,
-  emojiSize = 40,
+  emojiSize,
 }: {
   imageUrl: string
   name: string
   height: number
   emojiSize?: number
 }) {
-  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
-  if (!imageUrl || brokenUrl === imageUrl) {
-    return (
-      <Box
-        w="100%"
-        h={height}
-        bg={colors.chip}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: emojiSize }}
-      >
-        {SPOON_EMOJI}
-      </Box>
-    )
-  }
   return (
-    <img
-      src={imageUrl}
-      alt={name}
-      onError={() => setBrokenUrl(imageUrl)}
-      style={{ width: '100%', height, objectFit: 'cover', display: 'block' }}
-    />
+    <PhotoWithFallback imageUrl={imageUrl} alt={name} height={height} fallbackEmoji={SPOON_EMOJI} emojiSize={emojiSize} />
   )
 }
 

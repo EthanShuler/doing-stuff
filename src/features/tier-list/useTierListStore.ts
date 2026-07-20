@@ -5,7 +5,7 @@ import type { Profile, Tier, TierItem, TierKind, TierPlacement, TierRead, Watchl
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { datesArePersonal, nextWatchlistPosition, normalizeTags, renormalizedPositions } from './derive'
-import { PROFILE_COLUMNS, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
@@ -31,16 +31,9 @@ interface Snapshot {
   watchlist: WatchlistItem[]
 }
 
-// Seed viewer: keyless mode has no auth user, so the page ranks as this
-// profile (matches the doing-stuff seed's "Avery").
-const SEED_SELF_ID = 'u1'
-
 function seed(): Snapshot {
   return {
-    profiles: [
-      { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
-      { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
-    ],
+    profiles: SEED_PROFILES,
     // A few items carry tags so the filter pills are demoable offline.
     items: [
       { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', watchedOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },

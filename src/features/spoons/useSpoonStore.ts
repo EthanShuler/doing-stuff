@@ -2,8 +2,8 @@ import { useCallback, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Spoon } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { geocode } from '../../lib/geocode'
-import { idFactory, syncTable, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { resolveCoordsWithNotice } from '../../lib/geocode'
+import { errorMessage, idFactory, syncTable, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { removeSpoonPhoto, uploadSpoonPhoto } from './photos'
 
 // Data seam for the spoon collection, mirroring the other stores' two modes:
@@ -113,15 +113,10 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
 
   // Geocode a place for a save: coords or null, with a non-blocking notice
   // when a non-empty place can't be located.
-  const resolveCoords = useCallback(async (place: string) => {
-    const trimmed = place.trim()
-    if (!trimmed) return null
-    const point = await geocode(trimmed)
-    if (!point) {
-      setNotice(`Couldn't locate "${trimmed}" — saved, but it won't appear on the map.`)
-    }
-    return point
-  }, [])
+  const resolveCoords = useCallback(
+    (place: string) => resolveCoordsWithNotice(place, setNotice),
+    [],
+  )
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
@@ -160,7 +155,7 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
       try {
         return await uploadSpoonPhoto(spaceId, file)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't upload that photo.")
+        setError(errorMessage(err))
         throw err
       }
     },

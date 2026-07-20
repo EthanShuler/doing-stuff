@@ -4,6 +4,8 @@ import type { ParkVisit, Profile } from '../../types'
 import { supabase } from '../../lib/supabase'
 import {
   PROFILE_COLUMNS,
+  SEED_PROFILES,
+  SEED_SELF_ID,
   idFactory,
   syncTable,
   toProfile,
@@ -28,15 +30,9 @@ interface Snapshot {
   memberIds: string[]
 }
 
-// Seed viewer: keyless mode has no auth user (matches the other seeds).
-const SEED_SELF_ID = 'u1'
-
 function seed(): Snapshot {
   return {
-    profiles: [
-      { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
-      { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
-    ],
+    profiles: SEED_PROFILES,
     memberIds: ['u1', 'u2'],
     // Exercises every status the UI derives: a repeat park (Yosemite twice,
     // once together), solo parks for each member, an undated childhood visit,

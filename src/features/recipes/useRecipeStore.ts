@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Recipe } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { idFactory, PROFILE_COLUMNS, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { errorMessage, idFactory, PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeRecipePhoto, uploadRecipePhoto } from './photos'
 
@@ -22,10 +22,7 @@ interface Snapshot {
 
 function seed(): Snapshot {
   return {
-    profiles: [
-      { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
-      { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
-    ],
+    profiles: SEED_PROFILES,
     recipes: [
       {
         id: 'r1',
@@ -237,7 +234,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
       try {
         return await uploadRecipePhoto(spaceId, file)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't upload that photo.")
+        setError(errorMessage(err))
         throw err
       }
     },
@@ -277,7 +274,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
       }
       setRecipes((prev) => [
         ...prev,
-        { id: nextId(), ...fields, createdBy: 'u1', createdAt: new Date().toISOString() },
+        { id: nextId(), ...fields, createdBy: SEED_SELF_ID, createdAt: new Date().toISOString() },
       ])
     },
     [spaceId],
