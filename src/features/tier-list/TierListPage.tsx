@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Group, SegmentedControl, Text } from '@mantine/core'
 import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
-import { ACCENT, colors, fonts } from '../../theme'
+import { colors, fonts } from '../../theme'
 import { today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { useBusy } from '../../lib/useBusy'
-import { Pill } from '../../components/Pill'
+import { useTagFilter } from '../../lib/useTagFilter'
+import { TagFilterPills } from '../../components/TagFilterPills'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
@@ -93,14 +94,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     [personal, store.reads, store.selfId, store.items, kind],
   )
 
-  // Tag filter: tri-state pills over the tags in use on this kind — a click
-  // cycles off → include → exclude → off ("all movies besides disney" =
-  // exclude disney). Includes are OR; an excluded tag hides its items even
-  // when they also match an include. While any state is set the board shows
-  // only matching items — read-only, because drops between visible neighbors
-  // would land at arbitrary positions relative to the hidden cards.
-  const [tagFilter, setTagFilter] = useState<Record<string, 'include' | 'exclude'>>({})
-  useEffect(() => setTagFilter({}), [kind])
+  // Tag filter (shared tri-state pills — see src/lib/useTagFilter). While any
+  // state is set the board shows only matching items — read-only, because
+  // drops between visible neighbors would land at arbitrary positions
+  // relative to the hidden cards.
+  const { tagFilter, includedTags, excludedTags, filterActive, toggleTag, clearTagFilter } = useTagFilter()
+  useEffect(() => clearTagFilter(), [kind])
   // All four routes render this same component, so a kind switch (browser
   // back/forward — the header nav is behind the overlay) must drop an open
   // modal: saving a movie draft onto /tv would file it under the wrong kind,
@@ -110,17 +109,6 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     setEditingId(null)
   }, [kind])
   const kindTags = useMemo(() => distinctTags(store.items, kind), [store.items, kind])
-  const includedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'include')
-  const excludedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'exclude')
-  const filterActive = includedTags.length > 0 || excludedTags.length > 0
-  const toggleTag = (tag: string) =>
-    setTagFilter((prev) => {
-      const next = { ...prev }
-      if (prev[tag] === 'include') next[tag] = 'exclude'
-      else if (prev[tag] === 'exclude') delete next[tag]
-      else next[tag] = 'include'
-      return next
-    })
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
@@ -254,28 +242,16 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
             </Button>
           </Group>
 
-          {/* Tag filter pills — only once something on this kind is tagged.
-              Tri-state: click cycles include → exclude → off. Includes widen
-              (any selected tag matches); excludes always hide their items. */}
-          {mode === 'board' && kindTags.length > 0 && (
-            <Group gap={8} mt={16} wrap="wrap">
-              <Pill label={`All ${noun}s`} active={!filterActive} activeBg={ACCENT} onClick={() => setTagFilter({})} />
-              {kindTags.map((tag) => (
-                <Pill
-                  key={tag.toLowerCase()}
-                  label={tag}
-                  active={tagFilter[tag] !== undefined}
-                  excluded={tagFilter[tag] === 'exclude'}
-                  activeBg={ACCENT}
-                  onClick={() => toggleTag(tag)}
-                />
-              ))}
-              {filterActive && (
-                <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                  tap a tag again to exclude it
-                </Text>
-              )}
-            </Group>
+          {/* Tag filter pills — only once something on this kind is tagged. */}
+          {mode === 'board' && (
+            <TagFilterPills
+              tags={kindTags}
+              allLabel={`All ${noun}s`}
+              tagFilter={tagFilter}
+              filterActive={filterActive}
+              onToggle={toggleTag}
+              onClear={clearTagFilter}
+            />
           )}
 
           {mode === 'watchlist' ? (

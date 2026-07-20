@@ -1,6 +1,7 @@
 import type { Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
+import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
 
 /** The fixed ladder, best first — drives row order and drop-target ids. */
 export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
@@ -38,9 +39,7 @@ export function tierSwatch(tier: Tier): PaletteSwatch {
 // --- Tags -------------------------------------------------------------------
 // Tags are free text shared on the pool item ("disney", "fantasy"). All tag
 // comparisons here are case-insensitive so "Disney" and "disney" behave as one
-// tag even if both spellings were saved.
-
-const tagKey = (tag: string) => tag.trim().toLowerCase()
+// tag even if both spellings were saved (shared helpers in src/lib/tags.ts).
 
 /** Clean a tag list for saving: trim, drop blanks, dedupe case-insensitively
  *  (first spelling wins). */
@@ -61,31 +60,15 @@ export function normalizeTags(tags: string[]): string[] {
  *  spelling seen wins) and sorted alphabetically. Drives the filter pills and
  *  the item modal's suggestions. */
 export function distinctTags(items: TierItem[], kind: TierKind): string[] {
-  const byKey = new Map<string, string>()
-  for (const item of items) {
-    if (item.kind !== kind) continue
-    for (const tag of item.tags) {
-      const key = tagKey(tag)
-      if (key && !byKey.has(key)) byKey.set(key, tag.trim())
-    }
-  }
-  return [...byKey.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  return distinctTagList(items.filter((item) => item.kind === kind).map((item) => item.tags))
 }
 
-/** Keep the items matching the include/exclude tag selections. Includes are
- *  OR (any selected tag matches — the pills widen, not narrow); an item
- *  carrying any excluded tag is dropped even if it also matches an include.
- *  Untagged items survive an exclude-only filter ("all movies besides disney"
- *  keeps the untagged ones) but not an include filter. Empty selections
- *  filter nothing. */
+/** Keep the items matching the include/exclude tag selections (shared
+ *  semantics — see tagMatcher in src/lib/tags.ts). */
 export function filterByTags(items: TierItem[], included: string[], excluded: string[]): TierItem[] {
   if (included.length === 0 && excluded.length === 0) return items
-  const wanted = new Set(included.map(tagKey))
-  const banned = new Set(excluded.map(tagKey))
-  return items.filter((item) => {
-    if (item.tags.some((tag) => banned.has(tagKey(tag)))) return false
-    return wanted.size === 0 || item.tags.some((tag) => wanted.has(tagKey(tag)))
-  })
+  const matches = tagMatcher(included, excluded)
+  return items.filter((item) => matches(item.tags))
 }
 
 /** One viewer's board: items per tier (in ranked order) + the two shelves. */

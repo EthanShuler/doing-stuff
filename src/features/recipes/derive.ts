@@ -1,5 +1,6 @@
 import type { Recipe } from '../../types'
 import { fuzzyMatch } from '../../lib/fuzzy'
+import { distinctTagList, tagMatcher } from '../../lib/tags'
 
 // Pure data-shaping for the recipes feature: parsing the light structure out
 // of the plain-text fields, plus the index's sort / search / tag filter.
@@ -35,27 +36,16 @@ export function sortRecipes(recipes: Recipe[]): Recipe[] {
   )
 }
 
-const tagKey = (tag: string) => tag.trim().toLowerCase()
-
 /** Every tag in use, deduped case-insensitively (first spelling seen wins)
  *  and sorted alphabetically. Drives the filter pills and the modal's
  *  suggestions. */
 export function distinctRecipeTags(recipes: Recipe[]): string[] {
-  const byKey = new Map<string, string>()
-  for (const recipe of recipes) {
-    for (const tag of recipe.tags) {
-      const key = tagKey(tag)
-      if (key && !byKey.has(key)) byKey.set(key, tag.trim())
-    }
-  }
-  return [...byKey.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  return distinctTagList(recipes.map((recipe) => recipe.tags))
 }
 
 /**
- * The index filter: fuzzy title search plus the tri-state tag pills (same
- * semantics as the tier boards — includes are OR and widen, an excluded tag
- * always hides its recipes, untagged recipes survive an exclude-only filter
- * but not an include filter).
+ * The index filter: fuzzy title search plus the tri-state tag pills (shared
+ * semantics — see tagMatcher in src/lib/tags.ts).
  */
 export function filterRecipes(
   recipes: Recipe[],
@@ -68,12 +58,8 @@ export function filterRecipes(
     result = result.filter((recipe) => fuzzyMatch(recipe.title, search))
   }
   if (included.length === 0 && excluded.length === 0) return result
-  const wanted = new Set(included.map(tagKey))
-  const banned = new Set(excluded.map(tagKey))
-  return result.filter((recipe) => {
-    if (recipe.tags.some((tag) => banned.has(tagKey(tag)))) return false
-    return wanted.size === 0 || recipe.tags.some((tag) => wanted.has(tagKey(tag)))
-  })
+  const matches = tagMatcher(included, excluded)
+  return result.filter((recipe) => matches(recipe.tags))
 }
 
 /** The card/list metadata line: "Serves 4 · 45 min" (whichever parts exist). */

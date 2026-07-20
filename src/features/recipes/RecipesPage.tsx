@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Box, Button, Group, SegmentedControl, Text, TextInput, UnstyledButton } from '@mantine/core'
+import { Box, Button, Group, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
 import { useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
-import { ACCENT, colors, fonts } from '../../theme'
+import { colors, fonts } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
-import { Pill } from '../../components/Pill'
+import { useTagFilter } from '../../lib/useTagFilter'
+import { TagFilterPills } from '../../components/TagFilterPills'
 import { EmptyCard } from '../../components/EmptyCard'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { Splash } from '../../components/Splash'
@@ -43,21 +44,9 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
   const [view, setView] = useState<View>('grid')
   const [search, setSearch] = useState('')
 
-  // Tri-state tag pills, same semantics as the tier boards: a click cycles
-  // off → include → exclude → off. Includes are OR; excludes always hide.
-  const [tagFilter, setTagFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  // Tri-state tag pills, shared with the tier boards (src/lib/useTagFilter).
+  const { tagFilter, includedTags, excludedTags, filterActive, toggleTag, clearTagFilter } = useTagFilter()
   const allTags = useMemo(() => distinctRecipeTags(store.recipes), [store.recipes])
-  const includedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'include')
-  const excludedTags = Object.keys(tagFilter).filter((t) => tagFilter[t] === 'exclude')
-  const filterActive = includedTags.length > 0 || excludedTags.length > 0
-  const toggleTag = (tag: string) =>
-    setTagFilter((prev) => {
-      const next = { ...prev }
-      if (prev[tag] === 'include') next[tag] = 'exclude'
-      else if (prev[tag] === 'exclude') delete next[tag]
-      else next[tag] = 'include'
-      return next
-    })
 
   const shown = useMemo(
     () => sortRecipes(filterRecipes(store.recipes, search, includedTags, excludedTags)),
@@ -198,26 +187,14 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
                 </Button>
               </Group>
 
-              {allTags.length > 0 && (
-                <Group gap={8} mt={16} wrap="wrap">
-                  <Pill label="All recipes" active={!filterActive} activeBg={ACCENT} onClick={() => setTagFilter({})} />
-                  {allTags.map((tag) => (
-                    <Pill
-                      key={tag.toLowerCase()}
-                      label={tag}
-                      active={tagFilter[tag] !== undefined}
-                      excluded={tagFilter[tag] === 'exclude'}
-                      activeBg={ACCENT}
-                      onClick={() => toggleTag(tag)}
-                    />
-                  ))}
-                  {filterActive && (
-                    <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                      tap a tag again to exclude it
-                    </Text>
-                  )}
-                </Group>
-              )}
+              <TagFilterPills
+                tags={allTags}
+                allLabel="All recipes"
+                tagFilter={tagFilter}
+                filterActive={filterActive}
+                onToggle={toggleTag}
+                onClear={clearTagFilter}
+              />
 
               {view === 'list' ? (
                 <RecipeList
