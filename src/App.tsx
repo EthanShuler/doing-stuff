@@ -12,6 +12,7 @@ import { TierListPage } from './features/tier-list/TierListPage'
 import { SpoonsPage } from './features/spoons/SpoonsPage'
 import { ParksPage } from './features/parks/ParksPage'
 import { RecipesPage } from './features/recipes/RecipesPage'
+import { MusicPracticePage } from './features/music-practice/MusicPracticePage'
 
 export default function App() {
   const { session, loading, configured } = useSession()
@@ -89,6 +90,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/cats"
             element={<ComingSoon title="Cat photo wall" blurb="A wall of our cats. Coming soon." />}
           />
+          <Route path="/music-practice" element={<MusicPracticePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>

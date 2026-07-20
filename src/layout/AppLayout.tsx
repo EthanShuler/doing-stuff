@@ -20,6 +20,7 @@ const FEATURES = [
   { label: 'Ice Cream', path: '/ice-cream', matches: ['/ice-cream'] },
   { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
   { label: 'Cats', path: '/cats', matches: ['/cats'] },
+  { label: 'Music Practice', path: '/music-practice', matches: ['/music-practice'] },
 ]
 
 const isActive = (matches: string[], pathname: string) =>
