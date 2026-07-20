@@ -59,6 +59,9 @@ export function ParkModal({
     setEditing(null)
   }, [park?.code])
 
+  // Hook, so it must sit above the early return below.
+  const { busy: saving, run: runSave } = useBusy()
+
   if (!park) return null
   const sorted = sortVisits(visits)
 
@@ -87,7 +90,6 @@ export function ParkModal({
     setEditing({ id: visit.id })
   }
 
-  const { busy: saving, run: runSave } = useBusy()
   const save = () =>
     runSave(async () => {
       if (!editing || draft.attendeeIds.length === 0) return
