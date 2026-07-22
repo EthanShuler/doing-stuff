@@ -241,6 +241,8 @@ export interface PracticeDay {
   /** Clockwise slot on the circle of fifths, 0 = C (see CIRCLE in the
    *  music-practice derive.ts). 0–11. */
   position: number
+  /** Tempo practiced that day, in BPM (DB `tempo`), or null if not recorded. */
+  tempo: number | null
   /** auth.users id of the member whose day this is (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp of when the row was written. */

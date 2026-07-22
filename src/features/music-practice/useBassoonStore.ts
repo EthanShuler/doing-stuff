@@ -18,6 +18,7 @@ type PracticeDayRow = {
   id: string
   practice_date: string
   position: number
+  tempo: number | null
   user_id: string
   created_at: string
 }
@@ -27,11 +28,12 @@ const toPracticeDay = (r: PracticeDayRow): PracticeDay => ({
   id: r.id,
   date: r.practice_date,
   position: r.position,
+  tempo: r.tempo,
   createdBy: r.user_id,
   createdAt: r.created_at,
 })
 
-const DAY_COLUMNS = 'id,practice_date,position,user_id,created_at'
+const DAY_COLUMNS = 'id,practice_date,position,tempo,user_id,created_at'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('mpd', 100)
@@ -47,8 +49,8 @@ function seed(): PracticeDay[] {
   // A couple of recent days so the wheel opens with a carry-forward hint and a
   // "last practiced" line, but today itself is unset (you pick it).
   return [
-    { id: 'mpd1', date: daysAgo(3), position: 0, createdBy: SEED_SELF_ID, createdAt: `${daysAgo(3)}T09:00:00Z` },
-    { id: 'mpd2', date: daysAgo(1), position: 1, createdBy: SEED_SELF_ID, createdAt: `${daysAgo(1)}T09:00:00Z` },
+    { id: 'mpd1', date: daysAgo(3), position: 0, tempo: 60, createdBy: SEED_SELF_ID, createdAt: `${daysAgo(3)}T09:00:00Z` },
+    { id: 'mpd2', date: daysAgo(1), position: 1, tempo: 72, createdBy: SEED_SELF_ID, createdAt: `${daysAgo(1)}T09:00:00Z` },
   ]
 }
 
@@ -58,9 +60,10 @@ export interface BassoonStore {
   /** Last failed write's message. Cleared when a new write starts, or via clearError. */
   error: string | null
   clearError: () => void
-  /** Set (or overwrite) today's key to a circle position. Records the error
-   *  without throwing — the wheel just snaps back on failure. */
-  setTodayKey: (position: number) => Promise<void>
+  /** Log (or overwrite) today's practice: a circle position + optional tempo
+   *  (BPM, or null). Records the error without throwing — the UI just snaps
+   *  back on failure. */
+  logDay: (position: number, tempo: number | null) => Promise<void>
 }
 
 export function useBassoonStore(spaceId: string | null, userId: string | null): BassoonStore {
@@ -105,19 +108,19 @@ export function useBassoonStore(spaceId: string | null, userId: string | null): 
   const daysRef = useRef(days)
   daysRef.current = days
 
-  const setTodayKey = useCallback(
-    async (position: number) => {
+  const logDay = useCallback(
+    async (position: number, tempo: number | null) => {
       const date = today()
       setError(null)
       if (supabase && spaceId && userId) {
         // Show the pick immediately, then reconcile with the server row (or
         // roll back to the pre-write snapshot on failure).
         const snapshot = daysRef.current
-        putDay({ id: `optimistic-${date}`, date, position, createdBy: userId, createdAt: new Date().toISOString() })
+        putDay({ id: `optimistic-${date}`, date, position, tempo, createdBy: userId, createdAt: new Date().toISOString() })
         const { data, error: err } = await supabase
           .from('music_practice_days')
           .upsert(
-            { space_id: spaceId, user_id: userId, practice_date: date, position },
+            { space_id: spaceId, user_id: userId, practice_date: date, position, tempo },
             { onConflict: 'user_id,practice_date' },
           )
           .select(DAY_COLUMNS)
@@ -130,17 +133,17 @@ export function useBassoonStore(spaceId: string | null, userId: string | null): 
         putDay(toPracticeDay(data as PracticeDayRow))
         return
       }
-      // Seed mode: keep the existing row's id if today was already picked.
+      // Seed mode: keep the existing row's id if today was already logged.
       setDays((prev) => {
         const existing = prev.find((d) => d.date === date)
         const row: PracticeDay = existing
-          ? { ...existing, position }
-          : { id: nextId(), date, position, createdBy: SEED_SELF_ID, createdAt: new Date().toISOString() }
+          ? { ...existing, position, tempo }
+          : { id: nextId(), date, position, tempo, createdBy: SEED_SELF_ID, createdAt: new Date().toISOString() }
         return [...prev.filter((d) => d.date !== date), row]
       })
     },
     [spaceId, userId, putDay],
   )
 
-  return { days, loading, error, clearError, setTodayKey }
+  return { days, loading, error, clearError, logDay }
 }

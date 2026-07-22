@@ -394,6 +394,9 @@ create table if not exists public.music_practice_days (
   practice_date date not null,
   -- Clockwise position on the circle of fifths, 0 = C.
   position      int not null check (position between 0 and 11),
+  -- Optional tempo practiced that day, in BPM (carried forward day-to-day in
+  -- the UI as a starting point). Null = no tempo recorded.
+  tempo         int check (tempo is null or tempo between 20 and 400),
   created_at    timestamptz not null default now(),
   -- One key per person per day — also the upsert conflict target.
   unique (user_id, practice_date)

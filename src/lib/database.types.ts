@@ -411,6 +411,7 @@ export interface Database {
           user_id: string
           practice_date: string
           position: number
+          tempo: number | null
           created_at: string
         }
         Insert: {
@@ -419,6 +420,7 @@ export interface Database {
           user_id?: string
           practice_date: string
           position: number
+          tempo?: number | null
           created_at?: string
         }
         Update: {
@@ -427,6 +429,7 @@ export interface Database {
           user_id?: string
           practice_date?: string
           position?: number
+          tempo?: number | null
           created_at?: string
         }
         Relationships: []

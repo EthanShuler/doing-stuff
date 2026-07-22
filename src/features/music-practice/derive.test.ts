@@ -4,6 +4,7 @@ import {
   CIRCLE,
   KEYS,
   SCALES_CHORDS,
+  daysDescending,
   isCirclePos,
   keyForDate,
   mostRecentDay,
@@ -14,7 +15,7 @@ import {
 let counter = 0
 function day(date: string, position: number): PracticeDay {
   counter += 1
-  return { id: `p${counter}`, date, position, createdBy: 'u1', createdAt: `${date}T09:00:00Z` }
+  return { id: `p${counter}`, date, position, tempo: null, createdBy: 'u1', createdAt: `${date}T09:00:00Z` }
 }
 
 describe('randomPractice', () => {
@@ -80,5 +81,10 @@ describe('daily-key helpers', () => {
     // On a day that IS logged, previousDay skips it to the one before.
     expect(previousDay(days, '2026-07-20')?.position).toBe(5)
     expect(previousDay(days, '2026-07-15')).toBeNull()
+  })
+
+  it('daysDescending orders logged days newest-first (history list order)', () => {
+    expect(daysDescending(days).map((d) => d.date)).toEqual(['2026-07-20', '2026-07-18', '2026-07-15'])
+    expect(daysDescending([])).toEqual([])
   })
 })

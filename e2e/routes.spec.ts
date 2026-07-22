@@ -59,6 +59,12 @@ test('/parks renders the park tracker map', async ({ page }) => {
   await expect(page.getByRole('button', { name: '+ Log visit' })).toBeVisible()
 })
 
+test('/music-practice renders the bassoon wheel', async ({ page }) => {
+  await page.goto('/music-practice')
+  await expect(page.getByText('Circle of Fifths')).toBeVisible()
+  await expect(page.getByRole('button', { name: /log today|update today|logged today/i })).toBeVisible()
+})
+
 test('placeholder routes render ComingSoon', async ({ page }) => {
   // exact — the header nav's "French Toast" button would match a loose search
   await page.goto('/french-toast')

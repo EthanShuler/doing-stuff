@@ -10,7 +10,8 @@ Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
 and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
-the **Recipes** feature; `/french-toast` is a placeholder
+the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
+`/french-toast` is a placeholder
 page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
@@ -180,6 +181,28 @@ component state keyed by recipe id, never stored — plus a faint
 "Added by X · date" byline (profiles join). Add/edit stay in a `ModalShell`
 modal; delete confirms and bounces an open detail page back to the index.
 
+**Music Practice** (`/music-practice`) — a personal practice tracker with an
+in-page **Bassoon / Piano** toggle. **Piano** is stateless: a "Randomize"
+button draws a random key + scale/chord from the reference tables in the
+music-practice `derive.ts` (no persistence). **Bassoon** is the only stored
+part: a **practice day** (`music_practice_days` table) is **per-person**
+(same split RLS as tier placements — members read all, write only their own),
+one row per calendar day, holding a **circle-of-fifths `position`** (0–11,
+clockwise from C — see `CIRCLE` in `derive.ts`) and an optional **`tempo`**
+(BPM). The Bassoon screen is an SVG circle-of-fifths wheel (three concentric
+bands: majors / key signatures / relative minors) with its own **Today /
+History** sub-toggle. Key interaction: **tapping a wedge only *selects*
+(local pending state) — nothing is written until the "Log today" button is
+pressed**, which upserts key + tempo for the day (the button reads "Log
+today" / "Update today" / "✓ Logged today" by state). Both the key and tempo
+**carry forward** from the last practiced day as the pre-filled starting
+point. **History** is a dated list of past days (date · key · tempo,
+newest-first via `daysDescending`). Deliberately **no realtime channel**
+(solo, rarely-simultaneous use — another device picks it up on next load) and
+no shared/together derivation. The store (`useBassoonStore`) follows the
+lighter data-seam pattern: Supabase CRUD scoped to space + user, or an
+in-memory seed when keyless.
+
 Shared Leaflet plumbing lives in `src/components/MapCanvas.tsx` (framed
 MapContainer + CARTO tiles, `Recenter`, `FitToPins`, a divIcon cache with
 `emojiIcon`) — all three feature maps (doing-stuff, spoons, parks) render
@@ -332,17 +355,18 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
-  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`, `recipes`.
+  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
+  `music_practice_days`.
   Plus the `spoons` and `recipes` **storage buckets** (public read, member-only
   writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
-  **`tier_placements` / `tier_item_reads`** (members read all, but
-  insert/update/delete require `user_id = auth.uid()` — rankings and book read
-  state are personal), and **`watchlist_items`** (members read all; writes to
-  BOOK rows additionally require `created_by = auth.uid()` — reading lists are
-  personal, other kinds' lists stay shared). Follow that pattern for any
-  future per-person opinion data.
+  **`tier_placements` / `tier_item_reads` / `music_practice_days`** (members
+  read all, but insert/update/delete require `user_id = auth.uid()` — rankings,
+  book read state, and daily practice are personal), and **`watchlist_items`**
+  (members read all; writes to BOOK rows additionally require
+  `created_by = auth.uid()` — reading lists are personal, other kinds' lists
+  stay shared). Follow that pattern for any future per-person opinion data.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via
@@ -453,11 +477,18 @@ src/
       RecipeList.tsx       dense A–Z rows (title, source, tags, serves/time)
       RecipeDetail.tsx     full recipe page: tap-to-cross-off, notes, byline
       RecipeModal.tsx      add/edit recipe (photo upload, textareas, tags)
+    music-practice/        personal practice tracker (Bassoon wheel + Piano)
+      MusicPracticePage.tsx  Bassoon / Piano toggle
+      Bassoon.tsx          circle-of-fifths SVG wheel: select → Log, tempo, history
+      Piano.tsx            stateless random key + scale/chord drawer
+      useBassoonStore.ts   data seam: music_practice_days CRUD (or seed; no realtime)
+      derive.ts            pure: CIRCLE wheel data, day helpers, Piano tables
+      derive.test.ts       vitest coverage for derive.ts
 e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
-                           tier-list, spoons, parks, recipes, mobile) — see
-                           playwright.config.ts
+                           tier-list, spoons, parks, recipes, music-practice,
+                           mobile) — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants
 ```

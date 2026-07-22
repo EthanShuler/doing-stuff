@@ -114,3 +114,9 @@ export function mostRecentDay(days: PracticeDay[], onOrBefore: string): Practice
 export function previousDay(days: PracticeDay[], date: string): PracticeDay | null {
   return mostRecentDay(days.filter((d) => d.date !== date), date)
 }
+
+/** Logged days newest-first — the order the Bassoon history list renders in.
+ *  ISO date strings sort lexicographically, so no Date math is needed. */
+export function daysDescending(days: PracticeDay[]): PracticeDay[] {
+  return [...days].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+}
