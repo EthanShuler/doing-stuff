@@ -375,6 +375,38 @@ create table if not exists public.recipes (
 create index if not exists recipes_space_idx on public.recipes (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Little guys: the collection of little guys (Smiskis and friends). Each row
+-- is one physical figurine — shared space data (uniform "space members all"
+-- policy below; either member can add or fix up a little guy), even though
+-- each guy belongs to ONE of you: `owner_id` is a member reference, not a
+-- permission (null = nobody in particular / shared). `source` is free text for
+-- who got it for you ("Meg, for my birthday") — deliberately not a member
+-- reference, since gifts come from outside the space too. The photo is
+-- uploaded to the public `little-guys` storage bucket (see the storage section
+-- at the end) and stored here as its public URL ('' = none; the UI shows a 🗿
+-- fallback).
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.little_guys (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  name        text not null,
+  image_url   text not null default '',
+  -- Who got it for you — free text ("Meg", "found him in Kyoto").
+  source      text not null default '',
+  -- Whose little guy he is. A member reference (null = nobody in particular);
+  -- `on delete set null` so a departing member doesn't take their guys along.
+  owner_id    uuid references auth.users (id) on delete set null,
+  -- Free text ("shy", "menace", "extremely tired").
+  personality text not null default '',
+  description text not null default '',
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists little_guys_space_idx on public.little_guys (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Music practice: the Bassoon circle-of-fifths daily key tracker. PERSONAL
 -- practice state — each row is ONE calendar day's chosen key for ONE person.
 -- `position` is the clockwise slot on the circle of fifths (0 = C, 1 = G, …,
@@ -515,6 +547,7 @@ alter table public.entry_repeats enable row level security;
 alter table public.spoons        enable row level security;
 alter table public.park_visits   enable row level security;
 alter table public.recipes       enable row level security;
+alter table public.little_guys   enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_reads  enable row level security;
@@ -599,6 +632,13 @@ create policy "space members all" on public.park_visits
 
 drop policy if exists "space members all" on public.recipes;
 create policy "space members all" on public.recipes
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+-- Little guys are shared even though each one has an owner: `owner_id` says
+-- whose figurine it is, not who may edit the row (either member can fix a typo
+-- or re-home a guy).
+drop policy if exists "space members all" on public.little_guys;
+create policy "space members all" on public.little_guys
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -711,7 +751,7 @@ grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
   public.tier_item_reads, public.watchlist_items, public.spoons, public.park_visits,
-  public.recipes, public.music_practice_days
+  public.recipes, public.music_practice_days, public.little_guys
   to authenticated;
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
@@ -732,7 +772,7 @@ begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
           'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items', 'spoons',
-          'park_visits', 'recipes']
+          'park_visits', 'recipes', 'little_guys']
   loop
     if not exists (
       select 1 from pg_publication_tables
@@ -819,6 +859,44 @@ create policy "members delete recipe photos" on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'recipes'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+-- ---------------------------------------------------------------------------
+-- Storage: the `little-guys` bucket holds little guy photos — same design as
+-- the `spoons` and `recipes` buckets above (public read via unguessable uuid
+-- paths, writes locked to the space members of the `<space_id>/` prefix,
+-- client downscale before upload).
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('little-guys', 'little-guys', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "members upload little guy photos" on storage.objects;
+create policy "members upload little guy photos" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'little-guys'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "members update little guy photos" on storage.objects;
+create policy "members update little guy photos" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'little-guys'
+    and public.is_space_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "members delete little guy photos" on storage.objects;
+create policy "members delete little guy photos" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'little-guys'
     and public.is_space_member(((storage.foldername(name))[1])::uuid)
   );
 

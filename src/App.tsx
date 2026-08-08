@@ -13,6 +13,7 @@ import { SpoonsPage } from './features/spoons/SpoonsPage'
 import { ParksPage } from './features/parks/ParksPage'
 import { RecipesPage } from './features/recipes/RecipesPage'
 import { MusicPracticePage } from './features/music-practice/MusicPracticePage'
+import { LittleGuysPage } from './features/little-guys/LittleGuysPage'
 
 export default function App() {
   const { session, loading, configured } = useSession()
@@ -78,6 +79,10 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           />
           <Route path="/parks" element={<ParksPage spaceId={spaceId} userId={userId} configured={configured} />} />
           <Route path="/spoons" element={<SpoonsPage spaceId={spaceId} configured={configured} />} />
+          <Route
+            path="/little-guys"
+            element={<LittleGuysPage spaceId={spaceId} userId={userId} configured={configured} />}
+          />
           <Route
             path="/board-games"
             element={<ComingSoon title="Board games" blurb="The board game collection and rankings, coming soon." />}

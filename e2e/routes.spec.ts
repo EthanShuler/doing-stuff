@@ -53,6 +53,12 @@ test('/spoons renders the spoon collection', async ({ page }) => {
   await expect(page.getByRole('button', { name: '+ Add spoon' })).toBeVisible()
 })
 
+test('/little-guys renders the little guy collection', async ({ page }) => {
+  await page.goto('/little-guys')
+  await expect(page.getByText('Bartholomew')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Add little guy' })).toBeVisible()
+})
+
 test('/parks renders the park tracker map', async ({ page }) => {
   await page.goto('/parks')
   await expect(page.locator('.leaflet-container')).toBeVisible()

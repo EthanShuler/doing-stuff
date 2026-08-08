@@ -229,6 +229,33 @@ export interface Recipe {
   createdAt: string
 }
 
+// --- Little guys (the Smiski-and-friends collection) --------------------------
+
+/** One little guy — one row in `little_guys`. Shared space data (either member
+ *  edits any), but each guy belongs to one of you: `ownerId` is whose he is,
+ *  not who may edit him. */
+export interface LittleGuy {
+  id: string
+  name: string
+  /** Public URL of the uploaded photo (little-guys storage bucket). '' = none —
+   *  cards show a 🗿 fallback. */
+  imageUrl: string
+  /** Who got him for you — free text ("Meg, for my birthday"). Not a member
+   *  reference: gifts come from outside the space too. '' = unknown. */
+  source: string
+  /** auth.users id of the member whose little guy he is; null = nobody in
+   *  particular (a shared desk guy). */
+  ownerId: string | null
+  /** Free text ("shy", "menace", "extremely tired"). '' = undecided. */
+  personality: string
+  /** Anything else worth saying about him. */
+  description: string
+  /** auth.users id of the member who logged him (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; the A–Z tiebreak. */
+  createdAt: string
+}
+
 // --- Music practice (the Bassoon circle-of-fifths tracker) --------------------
 
 /** One calendar day's chosen key for one person — a row in

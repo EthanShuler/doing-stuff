@@ -404,6 +404,45 @@ export interface Database {
         }
         Relationships: []
       }
+      little_guys: {
+        Row: {
+          id: string
+          space_id: string
+          name: string
+          image_url: string
+          source: string
+          owner_id: string | null
+          personality: string
+          description: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          name: string
+          image_url?: string
+          source?: string
+          owner_id?: string | null
+          personality?: string
+          description?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          name?: string
+          image_url?: string
+          source?: string
+          owner_id?: string | null
+          personality?: string
+          description?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       music_practice_days: {
         Row: {
           id: string

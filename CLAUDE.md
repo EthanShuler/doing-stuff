@@ -11,7 +11,7 @@ Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
 the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
-`/french-toast` is a placeholder
+`/little-guys` is the **Little Guys** feature; `/french-toast` is a placeholder
 page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
@@ -121,6 +121,24 @@ with an in-page **Collection / Map** toggle: a photo card grid (newest first,
 undated last, 🥄 fallback) and a Leaflet map of circular photo pins that
 fit-bounds to the collection on open — same-place spoons fan out a few meters
 (deterministically, in `derive.ts`) so every pin stays clickable.
+
+**Little Guys** (`/little-guys`) — the collection of little guys (Smiskis and
+friends). A **little guy** (`little_guys` table, shared space data, uniform
+RLS) has a required **name** and everything else optional: an uploaded
+**photo** (the public `little-guys` Storage bucket — same design as spoons and
+recipes, via the shared `src/lib/photos.ts`; '' shows a 🗿 fallback), a
+free-text **source** (who got him for you — *not* a member reference, since
+gifts come from outside the space), an **owner** (`owner_id`, a member
+reference; null = "nobody in particular"), a short free-text **personality**
+("shy", "a menace"), and a longer **description**. The owner says *whose* he
+is, not who may edit him: the rows are shared, so either member can log or fix
+up any guy. One route: an A–Z photo card grid (name · personality · owner)
+with fuzzy name search (`src/lib/fuzzy.ts`) and an **owner pill row** (All /
+each member in join order / Nobody in particular, each with its count — the
+last pill appears only when some guy is ownerless). Adding and editing happen
+in one modal, which defaults a new guy's owner to the signed-in member;
+deleting confirms and takes his photo with him. Deliberately no dates, no map,
+no wishlist — a shelf, not a log.
 
 **Parks** (`/parks`) — the 63-national-parks tracker. The parks themselves are
 a **static in-repo list** (the parks feature's `parks.ts`: NPS park code as the
@@ -356,9 +374,9 @@ schema in `supabase/schema.sql` is already applied to the current project.
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
   `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
-  `music_practice_days`.
-  Plus the `spoons` and `recipes` **storage buckets** (public read, member-only
-  writes via policies on `storage.objects`).
+  `music_practice_days`, `little_guys`.
+  Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
+  read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_reads` / `music_practice_days`** (members
@@ -456,6 +474,14 @@ src/
       SpoonGrid.tsx        photo card grid + SpoonPhoto (🥄 fallback)
       SpoonMap.tsx         Leaflet map: circular photo pins, fit-bounds framing
       SpoonModal.tsx       add/edit spoon (photo upload, place, date, story)
+    little-guys/           the little guy (Smiski) collection — one photo grid
+      LittleGuysPage.tsx   owns the store, search + owner pills, modal state
+      useLittleGuyStore.ts data seam: little_guys CRUD + ordered members (or seed)
+      photos.ts            little-guys bucket upload/delete (lib/photos.ts wrapper)
+      derive.ts            pure sort, search + owner filter, owner pills/labels
+      derive.test.ts       vitest coverage for derive.ts
+      LittleGuyGrid.tsx    photo card grid + LittleGuyPhoto (🗿 fallback)
+      LittleGuyModal.tsx   add/edit guy (photo upload, owner picker, personality)
     parks/                 the 63-national-parks tracker (map + list)
       ParksPage.tsx        owns the store, Map/List toggle, stats strip, modals
       parks.ts             static dataset: the 63 parks (code, region, coords…)
@@ -487,8 +513,8 @@ src/
 e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
-                           tier-list, spoons, parks, recipes, music-practice,
-                           mobile) — see playwright.config.ts
+                           tier-list, spoons, little-guys, parks, recipes,
+                           music-practice, mobile) — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants
 ```

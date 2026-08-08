@@ -16,6 +16,7 @@ const FEATURES = [
   { label: 'French Toast', path: '/french-toast', matches: ['/french-toast'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
+  { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },
   { label: 'Board Games', path: '/board-games', matches: ['/board-games'] },
   { label: 'Ice Cream', path: '/ice-cream', matches: ['/ice-cream'] },
   { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
