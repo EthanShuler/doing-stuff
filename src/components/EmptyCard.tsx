@@ -19,7 +19,7 @@ export function EmptyCard({
     <Box
       mt={mt}
       ta="center"
-      bg="#fff"
+      bg={colors.surface}
       p="56px 24px"
       style={{ border: `1px dashed ${colors.dashedBorder}`, borderRadius: 16 }}
     >

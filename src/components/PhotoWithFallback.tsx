@@ -37,6 +37,8 @@ export function PhotoWithFallback({
       src={imageUrl}
       alt={alt}
       onError={() => setBrokenUrl(imageUrl)}
+      loading="lazy"
+      decoding="async"
       style={{ width: '100%', height, objectFit: 'cover', display: 'block' }}
     />
   )

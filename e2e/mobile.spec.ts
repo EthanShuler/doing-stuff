@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test'
 
 test('burger opens the drawer; navigating closes it', async ({ page }) => {
   await page.goto('/')
-  const drawerLink = page.locator('.mantine-AppShell-navbar').getByText('Movies', { exact: true })
+  const drawerLink = page.locator('.mantine-AppShell-navbar').getByText('Tier Lists', { exact: true })
   await expect(drawerLink).not.toBeInViewport()
 
   await page.getByRole('button', { name: 'Toggle navigation' }).click()

@@ -29,6 +29,12 @@ export async function setRating(scope: Locator, stars: number) {
   await scope.locator('.mantine-Rating-root label').nth(stars - 1).click({ force: true })
 }
 
+/** Pick a board from the tier page's in-page list picker. The pill label is
+ *  "<emoji> <name>", so match the tail rather than the exact text. */
+export async function pickList(page: Page, name: string) {
+  await page.getByRole('button', { name: new RegExp(`${name}$`) }).click()
+}
+
 /** The tier board's row for one tier ('S'…'F') — via BoardView's data hook. */
 export function tierRow(page: Page, tier: string): Locator {
   return page.locator(`[data-board-row="${tier}"]`)

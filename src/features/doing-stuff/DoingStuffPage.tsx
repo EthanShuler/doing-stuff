@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Box } from '@mantine/core'
 import { useNavigate } from 'react-router'
 import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../types'
@@ -7,14 +7,19 @@ import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWi
 import { currentYearMonth, today } from '../../lib/format'
 import { useBusy } from '../../lib/useBusy'
 import type { YearMonth } from '../../lib/format'
-import { colors, fonts } from '../../theme'
+import { useConfirm } from '../../components/ConfirmModal'
 import { FloatingBanner } from '../../components/FloatingBanner'
+import { PageFrame, PAGE_MAX_WIDTH } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { Dashboard } from './Dashboard'
 import { EntryModal } from './EntryModal'
 import { RepeatModal } from './RepeatModal'
 import { ManageModal } from './ManageModal'
-import { MapView } from './MapView'
+
+// Leaflet (JS + its stylesheet) is a big dependency only the map screen
+// needs, so it loads on demand. Module scope: a lazy() per render would
+// remount the map — and refit its bounds — on every state change.
+const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })))
 import { CalendarView } from './CalendarView'
 import { Wishlist } from './Wishlist'
 import { HeaderActions } from './HeaderActions'
@@ -55,6 +60,7 @@ interface DoingStuffPageProps {
 export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStuffPageProps) {
   const store = useActivityStore(spaceId, userId)
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const setScreen = (next: Screen) => navigate(SCREEN_PATHS[next])
 
   // View state (not persisted).
@@ -171,13 +177,22 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
     })
 
   const confirmDeleteEntry = () =>
-    window.confirm('Delete this entry? Any repeats logged on it are deleted too.')
+    confirm({ title: 'Delete this entry?', message: 'Any repeats logged on it are deleted too.' })
 
-  const deleteRow = (id: string) => {
-    if (!confirmDeleteEntry()) return
+  const deleteRow = async (id: string) => {
+    if (!(await confirmDeleteEntry())) return
     store.deleteEntry(id).catch(() => {
       // Failure surfaces via the store.error banner.
     })
+  }
+
+  // Wishes are shared data and a wish is easy to mis-tap next to the 📍
+  // button, so removing one asks first — same as entries.
+  const deleteWish = async (id: string) => {
+    const wish = store.wishlist.find((w) => w.id === id)
+    if (!(await confirm({ title: 'Remove this wish?', message: wish ? `"${wish.text}" comes off the list for both of you.` : undefined })))
+      return
+    store.deleteWishlistItem(id)
   }
 
   const deleteEditingEntry = async () => {
@@ -185,7 +200,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
       closeModal()
       return
     }
-    if (!confirmDeleteEntry()) return
+    if (!(await confirmDeleteEntry())) return
     try {
       await store.deleteEntry(editingId)
       closeModal()
@@ -201,9 +216,8 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
     : ''
 
   // Gate on the first data load (live mode only; the space resolves in App).
-  if (configured && store.loading) {
-    return <Splash text="Loading your space…" mih="60vh" />
-  }
+  // The control bar below renders either way — only the content waits.
+  const loadingData = configured && store.loading
 
   return (
     <>
@@ -216,10 +230,11 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
         onDismiss={store.clearNotice}
       />
 
-      <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        {/* The control bar keeps a constant width so the nav doesn't shift
-            between screens; only the content below may widen (the map). */}
-        <Box maw={1200} mx="auto">
+      {/* The map screen is the only one allowed to outgrow the reading
+          column; its control bar stays at PAGE_MAX_WIDTH so the chrome
+          doesn't shift when you switch screens. */}
+      <PageFrame maw={screen === 'map' ? 1600 : PAGE_MAX_WIDTH}>
+        <Box maw={PAGE_MAX_WIDTH} mx="auto">
           <HeaderActions
             screen={screen}
             onScreenChange={setScreen}
@@ -228,57 +243,63 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
           />
         </Box>
 
-        <Box maw={screen === 'map' ? 1600 : 1200} mx="auto">
-          {screen === 'wishlist' ? (
-            <Wishlist
-              items={wishlistItems}
-              onCheck={checkWish}
-              onUncheck={store.unlinkWishlistItem}
-              onAdd={store.addWishlistItem}
-              onEdit={store.updateWishlistItem}
-              onSetAddress={store.setWishlistAddress}
-              onDelete={store.deleteWishlistItem}
-            />
-          ) : screen === 'map' ? (
-            <MapView
-              home={store.home}
-              categories={store.categories}
-              markers={markers}
-              onEditEntry={openEdit}
-            />
-          ) : screen === 'calendar' ? (
-            <CalendarView
-              categories={store.categories}
-              filterCategoryId={filterCategoryId}
-              onFilter={setFilterCategoryId}
-              days={calendarGrid}
-              month={calendarMonth}
-              onMonthChange={setCalendarMonth}
-              onToday={() => setCalendarMonth(currentYearMonth())}
-              onNewEntry={openAdd}
-              onEditEntry={openEdit}
-            />
-          ) : (
-            <Dashboard
-              stats={stats}
-              categories={store.categories}
-              rows={rows}
-              filterCategoryId={filterCategoryId}
-              search={search}
-              sort={sort}
-              view={view}
-              onFilter={setFilterCategoryId}
-              onSearch={setSearch}
-              onSort={setSort}
-              onView={setView}
-              onAdd={openAdd}
-              onEdit={openEdit}
-              onDelete={deleteRow}
-              onRepeat={openRepeat}
-            />
-          )}
-        </Box>
-      </Box>
+        {loadingData ? (
+          <Splash text="Loading your space…" mih="40vh" />
+        ) : (
+          <>
+            {screen === 'wishlist' ? (
+              <Wishlist
+                items={wishlistItems}
+                onCheck={checkWish}
+                onUncheck={store.unlinkWishlistItem}
+                onAdd={store.addWishlistItem}
+                onEdit={store.updateWishlistItem}
+                onSetAddress={store.setWishlistAddress}
+                onDelete={deleteWish}
+              />
+            ) : screen === 'map' ? (
+              <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
+                <MapView
+                  home={store.home}
+                  categories={store.categories}
+                  markers={markers}
+                  onEditEntry={openEdit}
+                />
+              </Suspense>
+            ) : screen === 'calendar' ? (
+              <CalendarView
+                categories={store.categories}
+                filterCategoryId={filterCategoryId}
+                onFilter={setFilterCategoryId}
+                days={calendarGrid}
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                onToday={() => setCalendarMonth(currentYearMonth())}
+                onNewEntry={openAdd}
+                onEditEntry={openEdit}
+              />
+            ) : (
+              <Dashboard
+                stats={stats}
+                categories={store.categories}
+                rows={rows}
+                filterCategoryId={filterCategoryId}
+                search={search}
+                sort={sort}
+                view={view}
+                onFilter={setFilterCategoryId}
+                onSearch={setSearch}
+                onSort={setSort}
+                onView={setView}
+                onAdd={openAdd}
+                onEdit={openEdit}
+                onDelete={(id) => void deleteRow(id)}
+                onRepeat={openRepeat}
+              />
+            )}
+          </>
+        )}
+      </PageFrame>
 
       <EntryModal
         opened={modal === 'entry'}

@@ -5,10 +5,15 @@ Guidance for working in this repo. Read this before making changes.
 ## What this is
 
 **cajubinile.com** — a shared personal site for two people, split into features
-behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
-Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
+behind a persistent Mantine AppShell header (brand link + feature nav +
+sign-out). The nav is **one item per feature, not per route** — seven of them,
+collapsing into the burger drawer below Mantine's `md` breakpoint; the four
+tier-list routes share a single "Tier Lists" item and are chosen in-page with
+the `ListPicker` pill row. The three unbuilt placeholder routes are off the nav
+but still resolve. Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
-and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
+`/ice-cream`, and `/lists/:id` (a space-defined board) are the **Tier Lists**
+feature; `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
 the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
 `/little-guys` is the **Little Guys** feature; `/french-toast` is a placeholder
@@ -41,15 +46,38 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`) — drag-n-drop
-S/A/B/C/D/F boards. The domain model splits pool from opinion:
+**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`, `/lists/:id`) —
+drag-n-drop S/A/B/C/D/F boards. Five routes, ONE header nav item: which board
+you're on is chosen in-page by the `ListPicker` pill row (four built-ins, then
+the space's own lists, then "+ New list" and — on a custom board — a faint
+"Edit list"). The domain model splits pool from opinion:
 
-- **Tier item** (`tier_items`) — a movie, show, book, or ice cream flavor in the
-  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'` column, a
-  title, a hand-pasted poster/cover `image_url`, a nullable `watched_on` date —
-  when we finished it; defaults to today on a board add or watchlist check-off.
-  Movies/TV only — books leave it null and use per-person read records instead,
-  and ice cream never shows a date: `watched_on` is just its shared
+- **Custom list** (`tier_lists`) — a board the space defines from the UI
+  ("Bugs", "Fruits"), shared data with the uniform RLS: either member can
+  create, re-word, or delete one. Behavior is **fixed to the ice-cream
+  template** (shared pool, S–F tiers, a "Not <past>" shelf, a shared
+  to-<verb> list, hand-pasted image URLs, no search provider, no visible
+  dates), so the row carries only WORDS — `name`, `emoji`, singular `noun`,
+  `verb`, `past` — which `customCopy()` in the tier-list `copy.ts` templates
+  into a full `KindCopy`. Its items and to-do rows carry `kind = 'custom'`
+  plus a `list_id` FK, so **deleting a list is one statement** and Postgres
+  cascades the items (and every member's placements/completions of them) and
+  the list's to-do rows; the store mirrors that with `pruneList()`.
+  App-side a board is one **`ListKey`**: a `TierKind` or `` `list:${id}` ``
+  (`TierKind` itself stays a closed 4-member union). `copyFor(key, lists)`
+  resolves either into wording — and never throws for a list row that's gone,
+  so a partner's tab survives the beat between a realtime DELETE and the
+  `<Navigate>` back to `/movies`. Reading lists stay a book-only concept, so
+  the per-person watchlist RLS needed no change.
+- **Tier item** (`tier_items`) — a movie, show, book, ice cream flavor, or
+  custom-list item in the
+  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'|'custom'`
+  column plus a nullable `list_id`, a
+  title, a hand-pasted poster/cover `image_url`, a nullable `done_on` date —
+  the SHARED "we finished it" date; defaults to today on a board add or
+  watchlist check-off.
+  Movies/TV only — books leave it null and use per-person completions instead,
+  and ice cream never shows a date: `done_on` is just its shared
   tried/not-tried marker, managed by dragging on/off the Not tried shelf
   (`usesDates: false` in the tier-list `copy.ts` hides the modal's date
   field) — and free-text
@@ -74,13 +102,16 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   members **read** everyone's placements but
   **write only their own** — the partner's board is read-only at the security
   boundary, not just in the UI.
-- **Read record** (`tier_item_reads`) — **one person's** "I've read this" for a
-  BOOK item (a `read_on` date, upsert on `unique (item_id, user_id)`). Movies/TV
-  are watched together so their date is shared on the item; books are read
-  separately, so each member marks their own — the same book can be ranked on
-  one board and Unread on the other. `datesArePersonal()` in the tier-list
-  `derive.ts` is the behavior switch: for books, shelf drags and the modal's
-  date field write the viewer's own read row and never touch `watched_on`.
+- **Completion** (`tier_item_completions`) — **one person's** "I'm done with
+  this" for an item; today only BOOKS use it (a `done_on` date, upsert on
+  `unique (item_id, user_id)` — deliberately the same column name as the
+  shared `tier_items.done_on`, so the shared and personal sides read in
+  parallel). Movies/TV are watched together so their date is shared on the
+  item; books are read separately, so each member marks their own — the same
+  book can be ranked on one board and Unread on the other.
+  `datesArePersonal()` in the tier-list `derive.ts` is the behavior switch:
+  for books, shelf drags and the modal's date field write the viewer's own
+  completion row and never touch the item's shared `done_on`.
   Same split RLS as placements (read everyone's, write only your own).
 - **Watchlist item** (`watchlist_items`) — a "want to watch/read/try" entry
   per kind (UI label: Watchlist, Reading list for books, or To-try list for
@@ -93,13 +124,14 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   them, drag-to-reorder in `Watchlist.tsx`, top = watch/read/try next; new
   rows append at max + 1, and checked-off rows sink below the queue (keeping
   their slot, so unchecking restores it). Checking one off
-  creates the tier item — dated today: the shared `watched_on` for movies/TV
-  and ice cream, the *checker's own read record* for books — carrying the
+  creates the tier item — dated today: the shared `done_on` for movies/TV
+  and ice cream, the *checker's own completion row* for books — carrying the
   image and creator onto it, and links via `tier_item_id`
   (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
-All four routes render the same `TierListPage` (kind prop), so the store —
-holding every kind plus all users' placements and read records — survives
+All five routes render the same `TierListPage` (a `kind` prop for a built-in,
+the URL's list id for `/lists/:id`), so the store —
+holding every kind plus all users' placements and completions — survives
 kind switches. A
 You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
 (`TierBoard`), the partner's is the same layout with no drag wiring
@@ -224,7 +256,10 @@ in-memory seed when keyless.
 Shared Leaflet plumbing lives in `src/components/MapCanvas.tsx` (framed
 MapContainer + CARTO tiles, `Recenter`, `FitToPins`, a divIcon cache with
 `emojiIcon`) — all three feature maps (doing-stuff, spoons, parks) render
-through it; new maps should too.
+through it; new maps should too. Each of those three map components is
+`React.lazy`-loaded at its page's module scope with a `Suspense` around just
+the map branch, so Leaflet (JS **and** its stylesheet) only downloads for
+someone who actually opens a map — keep that shape for a new one.
 
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
 paper), ported from the Claude Design "Compass" direction.
@@ -241,12 +276,20 @@ paper), ported from the Claude Design "Compass" direction.
   `index.html` as the SPA fallback, so deep links work with no extra config.
 - **Mantine v9** (`@mantine/core`) for UI components. The earthy look lives in
   two files: `src/theme.ts` (raw palette, fonts, category swatches, named color
-  tokens + `warmBorder(alpha)` — the source of truth) and `src/mantineTheme.ts`
+  tokens including `colors.surface` / `colors.onAccent`, the `shadows` /
+  `radii` / `text` scales, and `warmBorder(alpha)` — the source of truth) and
+  `src/mantineTheme.ts`
   (translates it into a Mantine theme so components inherit it, including the
   custom Button variants `secondary` / `chip` and the SegmentedControl chip
   styling). Style with Mantine props plus inline style objects referencing
-  `theme.ts` — no raw color literals in components. **No Tailwind, no CSS
-  files** — `index.css` stays empty; Mantine's stylesheet provides the reset.
+  `theme.ts` — no raw color literals in components. Reach for the named tokens
+  (`colors.surface`, `shadows.card`, `radii.card`, `text.small`) rather than
+  re-typing a literal, and don't pass `radius` to a Mantine Button — the
+  theme's `defaultRadius` already is 10. **No Tailwind, no CSS files** —
+  `index.css` holds exactly one rule set, the `[data-hover-card]` hover /
+  focus-visible treatment that inline styles can't express (its values are
+  hand-copies of `warmBorder(0.3)` / `shadows.hover` / `ACCENT`); Mantine's
+  stylesheet provides the reset. Anything else belongs in the theme.
 - **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles).
 - **@dnd-kit** (`core` + `sortable` + `utilities`) for the tier-list drag-n-drop.
   Multi-container pattern: each tier row is a droppable + `SortableContext`;
@@ -273,6 +316,15 @@ paper), ported from the Claude Design "Compass" direction.
   tables must be in the `supabase_realtime` publication (see `schema.sql`).
 - **Hosting target: Cloudflare Pages** (build `npm run build`, output `dist`).
   Deliberately not Vercel.
+- **Load budget.** The routes and the three maps are lazy chunks, and
+  `vite.config.ts` splits `vendor-react` / `-mantine` / `-leaflet` / `-dnd` /
+  `-supabase` out of the app code (mostly for deploy-to-deploy cache
+  stability). `index.html` preconnects to the font, poster/cover, and Supabase
+  origins. Every `<img>` gets
+  `loading="lazy" decoding="async"`, and poster/cover `src`s are shrunk to the
+  rendered box at render time (`src/lib/imageUrl.ts`) — **stored URLs are
+  never rewritten**, since `photos.ts` parses them back. Keep new `<img>`s and
+  new heavy dependencies to the same rules.
 
 ## Commands
 
@@ -294,7 +346,11 @@ run `npm run build` (or `npm run typecheck`) and `npm test`.
 
 **Playwright** (`e2e/`, config in `playwright.config.ts`) covers the browser
 flows: every route hard-loads, nav/back, store survival across screen
-switches, entry-modal gating, tier-board derivation, and the mobile drawer.
+switches, entry-modal gating, tier-board derivation, the list picker,
+creating / renaming / deleting a custom list, the
+mobile drawer, and that no route scrolls sideways at 390px
+(`mobile-overflow.spec.ts` — its name must keep matching the mobile project's
+`testMatch`).
 It boots its own Vite server on a dedicated port with the Supabase keys
 blanked, so it always runs against the deterministic in-memory seed — safe to
 run anytime, no backend touched. Mantine interaction helpers (Select combobox,
@@ -325,8 +381,10 @@ behind identical action signatures, so components never branch on which mode is
 active. Actions are `async`. Entry and repeat actions **throw** on failure (the
 modal stays open and `store.error` surfaces the reason); category / activity /
 wishlist / home actions record the error without throwing. `store.error` clears
-when a new write starts or when the banner is clicked; `store.notice` is a
-non-fatal warning (e.g. an un-geocodable address), dismissed via `clearNotice`.
+when a new write starts or via the banner's ✕ (the banner body itself isn't
+clickable — it sits over an open modal, where a stray click shouldn't dismiss
+it); `store.notice` is a non-fatal warning (e.g. an un-geocodable address),
+dismissed via `clearNotice`.
 
 In live mode the store also subscribes to **Supabase Realtime** (one channel per
 space) so the partner's edits appear without a reload: INSERT/UPDATE events are
@@ -338,8 +396,16 @@ special-casing. A dropped-then-rejoined channel refetches the full snapshot
 (`fetchAll`/`applySnapshot`) to cover anything missed while offline. Keyless
 seed mode skips all of this.
 
+The snapshot is fetched **on channel join, not on mount**: `useSpaceSync`
+subscribes first and runs `fetchAll` when the channel reports `SUBSCRIBED`, so
+the read provably follows the join (nothing can slip between the two) and each
+page mount costs one round of queries instead of two. Realtime is never a gate
+on seeing data — a `CHANNEL_ERROR`/`TIMED_OUT` before the first load, or a
+1.5 s fallback timer if no status arrives at all, loads anyway; `loading`
+flips false once that first load settles either way.
+
 This load/realtime plumbing is shared: `src/data/spaceSync.ts` owns
-`useSpaceSync` (initial snapshot + channel + reconnect-refetch), `syncTable`
+`useSpaceSync` (subscribe → snapshot on join → reconnect-refetch), `syncTable`
 (one table's INSERT/UPDATE/DELETE handlers), `upsertById`/`removeById`, the
 profile row mapper, and `idFactory` for seed-mode ids. A new feature's store
 supplies only its row mappers, `fetchAll`, a `wire` callback, actions, and
@@ -372,19 +438,22 @@ schema in `supabase/schema.sql` is already applied to the current project.
 `supabase/schema.sql` is the source of truth for the database. Key points:
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
-  `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
-  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
+  `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
+  `tier_item_completions`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
   `music_practice_days`, `little_guys`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
-  **`tier_placements` / `tier_item_reads` / `music_practice_days`** (members
+  **`tier_placements` / `tier_item_completions` / `music_practice_days`** (members
   read all, but insert/update/delete require `user_id = auth.uid()` — rankings,
   book read state, and daily practice are personal), and **`watchlist_items`**
   (members read all; writes to BOOK rows additionally require
   `created_by = auth.uid()` — reading lists are personal, other kinds' lists
   stay shared). Follow that pattern for any future per-person opinion data.
+  **`tier_lists` is uniform/shared** — a custom list belongs to the space, and
+  its rows are `kind 'custom'`, never `'book'`, so they stay outside that
+  per-person carve-out.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via
@@ -408,6 +477,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 ```
 src/
   App.tsx                  gate (auth → space) → BrowserRouter → AppLayout → routes
+                           (the 7 feature pages are React.lazy at module scope)
   types.ts                 domain types (mirror DB columns)
   theme.ts                 earthy palette, fonts, shared colors, swatchFor()
   mantineTheme.ts          Mantine theme override mirroring theme.ts
@@ -416,8 +486,10 @@ src/
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     fuzzy.ts               fuzzyMatch() subsequence title search (Log + recipes)
+    text.ts                firstGrapheme() — one-emoji fields (activities, lists)
     geocode.ts             Nominatim address → lat/lng (on save only)
     image.ts               client-side photo downscale (≤1200px JPEG) for uploads
+    imageUrl.ts            posterSrc() render-time TMDB/Open Library size rewrite
     photos.ts              shared Storage bucket photo upload / best-effort delete
     profile.ts             displayNameFor() — profile → short display label
     tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
@@ -432,10 +504,15 @@ src/
     AuthScreen.tsx         login / sign-up (no-op without keys)
     CategoryPills.tsx      "All" + per-category filter pill row
     ComingSoon.tsx         placeholder page for unbuilt features
+    ConfirmModal.tsx       ConfirmProvider / useConfirm / useConfirmOpen
+    ControlBar.tsx         every page's top row: left controls, right action, rule
     EmptyCard.tsx          dashed empty-state card
     FloatingBanner.tsx     fixed dismissible error/notice banner
     MapCanvas.tsx          shared Leaflet frame: tiles, Recenter, FitToPins, icon cache
-    ModalShell.tsx         shared Mantine modal chrome
+    ModalFooter.tsx        modal action row: Delete link / Cancel / primary
+    ModalShell.tsx         shared Mantine modal chrome (title, size, confirm-aware)
+    PageFrame.tsx          PAGE_MAX_WIDTH + each page's padded, centered column
+    PhotoCard.tsx          PhotoCardGrid + PhotoCard (spoons / guys / recipes)
     Pill.tsx               category filter pill
     Splash.tsx             centered loading/fatal message
     Stars.tsx              read-only rating display
@@ -454,12 +531,15 @@ src/
       ManageModal.tsx      categories & activities editor + home base
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
-    tier-list/             movie/TV/book/ice-cream tier boards (kind prop per route)
+    tier-list/             movie/TV/book/ice-cream + custom boards (one per route)
       TierListPage.tsx     owns the store, You/Partner toggle, item modal state
-      useTierListStore.ts  data seam: pool + placements + reads CRUD (or seed fallback)
-      derive.ts            pure board building, moveItem, positions, datesArePersonal
+      useTierListStore.ts  data seam: lists + pool + placements + completions CRUD
+      derive.ts            board building, moveItem, list keys, pruneList
       derive.test.ts       vitest coverage for derive.ts
-      copy.ts              per-kind wording: watch/read, Watchlist/Reading list, emoji
+      copy.ts              per-kind wording + customCopy/copyFor for custom lists
+      copy.test.ts         vitest coverage for copy.ts
+      ListPicker.tsx       in-page pill row selecting which board you're on
+      ListModal.tsx        create / re-word / delete a space-defined list
       TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
       BoardView.tsx        pure board layout (tier rows + unranked/unread shelves)
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
@@ -514,9 +594,11 @@ e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
                            tier-list, spoons, little-guys, parks, recipes,
-                           music-practice, mobile) — see playwright.config.ts
+                           music-practice, mobile, mobile-overflow)
+                           — see playwright.config.ts
 supabase/
-  schema.sql               tables + RLS + grants
+  schema.sql               tables + RLS + grants (the source of truth)
+  migrations/*.sql         dated deltas to paste into the SQL Editor on a live DB
 ```
 
 New features get their own `src/features/<name>/` directory with their own
@@ -535,9 +617,24 @@ and `src/lib/`.
   deleting an activity drops its entries; deleting a category drops its
   activities and their entries; deleting an entry drops its repeats and reopens
   any wish linked to it. Preserve the local mirroring when adding tables.
-- **Destructive deletes confirm first.** Entry, activity, and category deletion
-  go through `window.confirm` (the message spells out what cascades). Keep this
-  for anything else that destroys logged data.
+- **Destructive deletes confirm first.** Every one of them goes through
+  `useConfirm()` (`src/components/ConfirmModal.tsx`, provider mounted in
+  `main.tsx`): `if (!(await confirm({ title, message }))) return`. It resolves
+  false on Cancel, Escape, and the overlay, and it stacks above an open modal
+  (ModalShell yields the focus trap and the escape key while one is up, and the
+  provider owns the Escape key so a later-mounted modal can't swallow the same
+  press). Never `window.confirm`. Keep this for anything that destroys logged
+  or shared data — entries, repeats, categories, activities, wishes, tier
+  items, watchlist rows, spoons, little guys, recipes, park visits.
+- **Every feature page wears the same shell.** `PageFrame` (padding + the
+  centered `PAGE_MAX_WIDTH` column) wraps the page; `ControlBar` is its top row
+  (`left` = toggles/filters/counts, `right` = the primary action) above the
+  dotted rule. The first-load gate replaces **only the content below the bar**
+  — `{loading ? <Splash mih="40vh"/> : content}` — so the chrome never
+  disappears and reappears; anything derived from the data that would flash a
+  wrong-looking value (the parks scoreboard, the little-guys count) hides with
+  it. Photo grids go through `PhotoCardGrid` / `PhotoCard`, and modal action
+  rows through `ModalFooter`.
 - **Dates are local, not UTC.** `today()` and the calendar build ISO strings
   from local date parts. Don't reintroduce `toISOString()` for dates — it shifts
   evenings to tomorrow for anyone west of UTC.

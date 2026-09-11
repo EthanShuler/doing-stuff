@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Group, Select, Title } from '@mantine/core'
+import { Button, Group, Select } from '@mantine/core'
 import { ModalShell } from '../../components/ModalShell'
 import { today } from '../../lib/format'
 import { useBusy } from '../../lib/useBusy'
@@ -52,11 +52,7 @@ export function LogVisitModal({
     })
 
   return (
-    <ModalShell opened={opened} onClose={onClose} width={520}>
-      <Title order={3} fz={28} mb={22}>
-        Log a visit
-      </Title>
-
+    <ModalShell opened={opened} onClose={onClose} size="md" title="Log a visit">
       <Select
         label="Park"
         data={PARK_OPTIONS}
@@ -71,10 +67,10 @@ export function LogVisitModal({
       <VisitFields draft={draft} members={members} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
 
       <Group justify="flex-end" gap={10} mt={22}>
-        <Button variant="secondary" onClick={onClose} radius={10}>
+        <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={() => void save()} disabled={!canSave} loading={saving} radius={10}>
+        <Button onClick={() => void save()} disabled={!canSave} loading={saving}>
           Log visit
         </Button>
       </Group>

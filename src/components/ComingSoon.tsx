@@ -9,7 +9,7 @@ export function ComingSoon({ title, blurb }: { title: string; blurb: string }) {
       <Box
         maw={520}
         mx="auto"
-        bg="#fff"
+        bg={colors.surface}
         p="64px 32px"
         style={{ border: `1px dashed ${colors.dashedBorder}`, borderRadius: 16 }}
       >

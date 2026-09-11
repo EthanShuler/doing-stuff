@@ -21,12 +21,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { TierKind, WatchlistItem } from '../../types'
-import { ACCENT, colors, fonts } from '../../theme'
+import type { WatchlistItem } from '../../types'
+import { ACCENT, colors, fonts, shadows } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { EmptyCard } from '../../components/EmptyCard'
 import { positionBetween } from './derive'
-import { KIND_COPY } from './copy'
 import type { KindCopy } from './copy'
 import { MediaImage } from './TierCard'
 
@@ -34,12 +33,14 @@ interface WatchlistProps {
   /** Already sorted for display (see sortWatchlist): the open queue on top —
    *  position order, top = next up — then the checked-off rows. */
   items: WatchlistItem[]
-  kind: TierKind
-  /** Date per TIER item id — a checked wish looks its own up via `tierItemId`
-   *  (the wish row has no date). For movies/TV that's the shared watched date;
-   *  for books the page passes the VIEWER's own read dates, so a book the
-   *  partner checked off shows dateless here until you read it too. */
-  watchedDates: ReadonlyMap<string, string | null>
+  /** The list's wording (KIND_COPY for a built-in, customCopy for a list). */
+  copy: KindCopy
+  /** Done date per TIER item id — a checked wish looks its own up via
+   *  `tierItemId` (the wish row has no date). For movies/TV that's the item's
+   *  shared date; for books the page passes the VIEWER's own completion dates,
+   *  so a book the partner checked off shows dateless here until you read it
+   *  too. */
+  doneDates: ReadonlyMap<string, string | null>
   /** Check off an open item — creates the tier item and drops it on the board. */
   onCheck: (item: WatchlistItem) => void
   /** Reopen a checked item (the tier item it made stays on the board). */
@@ -59,7 +60,7 @@ function WatchRow({
   item,
   copy,
   done,
-  watchedOn,
+  doneOn,
   lifted,
   onCheck,
   onUncheck,
@@ -69,7 +70,7 @@ function WatchRow({
   item: WatchlistItem
   copy: KindCopy
   done: boolean
-  watchedOn: string | null
+  doneOn: string | null
   /** Floating in the DragOverlay: bigger shadow + slight tilt. */
   lifted?: boolean
   onCheck: (item: WatchlistItem) => void
@@ -79,13 +80,13 @@ function WatchRow({
 }) {
   return (
     <Paper
-      bg="#fff"
+      bg={colors.surface}
       withBorder
       p="12px 16px"
       style={{
         borderColor: colors.cardBorder,
         borderRadius: 12,
-        boxShadow: lifted ? '0 12px 28px rgba(40,30,20,0.28)' : undefined,
+        boxShadow: lifted ? shadows.lifted : undefined,
         transform: lifted ? 'rotate(1deg)' : undefined,
       }}
     >
@@ -129,8 +130,8 @@ function WatchRow({
           )}
           {done && (
             <Text fz={12} c={colors.muted} mt={2} style={{ fontFamily: fonts.sans }}>
-              {copy.usesDates && watchedOn
-                ? `${copy.pastCap} ${formatDate(watchedOn)} — on your tier board, go rank it.`
+              {copy.usesDates && doneOn
+                ? `${copy.pastCap} ${formatDate(doneOn)} — on your tier board, go rank it.`
                 : copy.onBoardNote}
             </Text>
           )}
@@ -176,8 +177,8 @@ function SortableRow(props: Parameters<typeof WatchRow>[0]) {
  *  tier pool (the page owns that action + the add/edit modal). */
 export function Watchlist({
   items,
-  kind,
-  watchedDates,
+  copy,
+  doneDates,
   onCheck,
   onUncheck,
   onEdit,
@@ -185,8 +186,6 @@ export function Watchlist({
   onMove,
   onRenormalize,
 }: WatchlistProps) {
-  const copy = KIND_COPY[kind]
-
   const open = items.filter((w) => w.tierItemId === null)
   const done = items.filter((w) => w.tierItemId !== null)
   const openById = new Map(open.map((w) => [w.id, w]))
@@ -251,7 +250,7 @@ export function Watchlist({
     item,
     copy,
     done: isDone,
-    watchedOn: item.tierItemId ? watchedDates.get(item.tierItemId) ?? null : null,
+    doneOn: item.tierItemId ? doneDates.get(item.tierItemId) ?? null : null,
     onCheck,
     onUncheck,
     onEdit,

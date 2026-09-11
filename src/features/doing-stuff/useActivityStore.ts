@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Activity, Category, Entry, EntryDraft, Home, Profile, Repeat, WishlistItem } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
+import { firstGrapheme } from '../../lib/text'
 import { resolveCoordsWithNotice } from '../../lib/geocode'
 import { PROFILE_COLUMNS, SEED_PROFILES, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
@@ -158,18 +159,6 @@ const SPACE_HOME_COLUMNS = 'home_address,home_lat,home_lng'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('x', 100)
-
-// Keep just the first grapheme so a pin shows one icon — grapheme-aware so it
-// doesn't split emoji ZWJ sequences (e.g. 👨‍👩‍👧) or surrogate pairs.
-function firstGrapheme(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
-    const first = new Intl.Segmenter().segment(trimmed)[Symbol.iterator]().next().value
-    return first ? first.segment : trimmed
-  }
-  return [...trimmed][0] ?? trimmed
-}
 
 export interface ActivityStore {
   categories: Category[]

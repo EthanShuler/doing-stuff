@@ -81,27 +81,67 @@ export interface WishlistItem {
   lng: number | null
 }
 
-// --- Tier lists (movies + TV + books + ice cream) -----------------------------
+// --- Tier lists (movies + TV + books + ice cream + custom lists) --------------
 
+/** The four BUILT-IN boards, each with its own route and its own wording in
+ *  the tier-list copy.ts. Stays a closed union — a space-defined list is a
+ *  `TierList` row, not a new kind here. */
 export type TierKind = 'movie' | 'tv' | 'book' | 'ice-cream'
+
+/**
+ * Which board a pool item or watchlist row belongs to: one of the four
+ * built-ins, or `list:<tier_lists.id>` for a space-defined one. This is the
+ * app-side key only — in the DB it's a `kind` column ('custom' for a custom
+ * list) plus a nullable `list_id`; the tier-list derive.ts converts
+ * (`keyOf` / `kindColumn` / `listIdOf`).
+ */
+export type ListKey = TierKind | `list:${string}`
+
+/**
+ * A space-defined tier list ("Bugs", "Fruits") — one row in `tier_lists`.
+ * Shared space data like the item pool: either member can create, rename, or
+ * delete one, and deleting cascades its items (and everyone's rankings of
+ * them) plus its to-try list. Behavior is fixed to the ice-cream template —
+ * shared pool, S–F tiers, a "Not <past>" shelf, a shared to-<verb> list, no
+ * dates in the UI — so the row only carries WORDS (see customCopy in the
+ * tier-list copy.ts).
+ */
+export interface TierList {
+  id: string
+  /** Display name, as typed: "Fruits". */
+  name: string
+  /** Single emoji for the picker pill and the card fallback. '' = 🏷️. */
+  emoji: string
+  /** Lowercase singular noun used inline: "Add a fruit". */
+  noun: string
+  /** Infinitive: "to-try list", "Add a fruit to try". */
+  verb: string
+  /** Past participle, lowercase: the "Not tried" shelf. */
+  past: string
+  /** auth.users id of the member who created it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; orders the picker pills. */
+  createdAt: string
+}
 
 /** The fixed tier ladder — not user-editable. */
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
 
-/** A movie, show, book, or ice cream in the space's SHARED pool — one row in
- *  `tier_items`. */
+/** A movie, show, book, ice cream, or custom-list item in the space's SHARED
+ *  pool — one row in `tier_items`. */
 export interface TierItem {
   id: string
-  kind: TierKind
+  /** Which board it's on (a built-in kind, or `list:<id>` — see ListKey). */
+  kind: ListKey
   title: string
   /** Poster/cover image URL, pasted by hand. '' = none (card shows a fallback). */
   imageUrl: string
-  /** ISO date ("YYYY-MM-DD") we finished watching it; null when unknown (legacy
-   *  rows). Movies/TV only — books are read separately, so their dates live
-   *  per person in TierRead and this stays null. Ice cream shows no dates in
-   *  the UI, but reuses this as its shared "tried it" marker (null = not
-   *  tried; any date = tried). */
-  watchedOn: string | null
+  /** The SHARED "we finished this" date, ISO ("YYYY-MM-DD"); null when unknown
+   *  (legacy rows). Movies/TV only — books are read separately, so their dates
+   *  live per person in TierCompletion and this stays null. Ice cream shows no
+   *  dates in the UI, but reuses this as its shared "tried it" marker (null =
+   *  not tried; any date = tried). */
+  doneOn: string | null
   /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
   tags: string[]
   /** Who made it — author for books, director for movies, etc. (per-kind label
@@ -114,17 +154,19 @@ export interface TierItem {
 }
 
 /**
- * One person's "I've read this" record for a BOOK pool item — one row in
- * `tier_item_reads`. The pool is shared but reading isn't: each member marks
- * their own copy read, so a book can sit ranked on one board and on the Unread
- * shelf of the other. Absence of a row = that member hasn't read it.
+ * ONE PERSON'S "I'm done with this" record for a pool item — one row in
+ * `tier_item_completions`. Today only books use it: the pool is shared but
+ * reading isn't, so each member marks their own copy read and a book can sit
+ * ranked on one board and on the Unread shelf of the other. Absence of a row =
+ * that member hasn't finished it. (The shared counterpart is `TierItem.doneOn`
+ * — same meaning, one date for the space; `datesArePersonal()` picks.)
  */
-export interface TierRead {
+export interface TierCompletion {
   id: string
   itemId: string
   userId: string
   /** ISO date this member finished it. */
-  readOn: string
+  doneOn: string
 }
 
 /**
@@ -149,7 +191,8 @@ export interface TierPlacement {
  */
 export interface WatchlistItem {
   id: string
-  kind: TierKind
+  /** Which list it's on (a built-in kind, or `list:<id>` — see ListKey). */
+  kind: ListKey
   title: string
   /** Optional poster/cover URL; carried onto the tier card when checked off. '' = none. */
   imageUrl: string

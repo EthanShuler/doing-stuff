@@ -87,10 +87,22 @@ export function syncTable<Row extends object, T extends { id: string }>(
  * The load-and-sync lifecycle every store shares (live mode only; no-op
  * without keys or before the space resolves):
  *
- *   1. Fetch the initial snapshot and apply it.
- *   2. Open one realtime channel, wired up by the caller.
- *   3. On a rejoin after a drop (laptop sleep, network blip), refetch the
- *      snapshot to cover anything missed while disconnected.
+ *   1. Open one realtime channel, wired up by the caller, and subscribe.
+ *   2. Fetch the snapshot when the channel reports SUBSCRIBED. Reading only
+ *      after the join is what makes the handoff race-free: anything written
+ *      before the read is in the snapshot, anything after it arrives as an
+ *      event. Doing it in this order means ONE fetch, not the two (mount +
+ *      join) an eager initial load would cost.
+ *   3. Every later SUBSCRIBED is a rejoin after a drop (laptop sleep,
+ *      network blip), so it refetches to cover the gap. applySnapshot is
+ *      idempotent, so overlapping loads are harmless — an `inFlight` guard
+ *      collapses them anyway.
+ *
+ * Realtime is a nice-to-have, never a gate on seeing your data: if the
+ * channel errors or times out before the first load, we fetch regardless,
+ * and a 1.5s timer fetches anyway if no status has arrived at all (a slow
+ * or hung websocket must not hold the page blank). `loading` flips false
+ * once that first load settles, successfully or not.
  *
  * `fetchAll`, `applySnapshot`, and `wire` must be referentially stable
  * (useCallback) — they're effect dependencies.
@@ -117,47 +129,33 @@ export function useSpaceSync<Snapshot>({
    *  the channel. */
   wire: (channel: RealtimeChannel, spaceFilter: string) => RealtimeChannel
 }) {
-  // Initial load.
-  useEffect(() => {
-    if (!supabase || !spaceId) return
-    let cancelled = false
-
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const snap = await fetchAll()
-        if (!cancelled && snap) applySnapshot(snap)
-      } catch (err) {
-        if (!cancelled) setError(errorMessage(err))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [spaceId, fetchAll, applySnapshot, setLoading, setError])
-
-  // Realtime: stream the partner's changes into local state so their edits
-  // appear without a reload. Requires the tables to be in the
-  // `supabase_realtime` publication (see schema.sql). DB cascades arrive as
-  // their own events, so wires need no special-casing for them.
+  // One effect: subscribe, then load off the join. Realtime also streams the
+  // partner's changes into local state so their edits appear without a
+  // reload — that requires the tables to be in the `supabase_realtime`
+  // publication (see schema.sql). DB cascades arrive as their own events, so
+  // wires need no special-casing for them.
   useEffect(() => {
     if (!supabase || !spaceId) return
     const client = supabase
     let cancelled = false
+    /** Collapses overlapping loads (e.g. the fallback timer racing a join). */
+    let inFlight = false
+    /** A load requested while one was already running — re-run once, so a
+     *  join that lands mid-fetch still gets a read that provably follows it. */
+    let queued = false
+    /** The first load is the one `loading` is about; later ones are refreshes. */
+    let loadedOnce = false
 
-    const channel = wire(client.channel(`${channelPrefix}:${spaceId}`), `space_id=eq.${spaceId}`)
+    setLoading(true)
+    setError(null)
 
-    channel.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return
-      // Refetch on every join. On the first, a write landing between the
-      // initial snapshot's server-side read and the channel joining would be
-      // in neither; later joins mean the socket dropped and rejoined. Either
-      // way a fresh snapshot covers the gap — applySnapshot is idempotent, so
-      // overlapping the initial load is harmless.
+    const load = () => {
+      if (cancelled) return
+      if (inFlight) {
+        queued = true
+        return
+      }
+      inFlight = true
       fetchAll()
         .then((snap) => {
           if (!cancelled && snap) applySnapshot(snap)
@@ -165,11 +163,46 @@ export function useSpaceSync<Snapshot>({
         .catch((err) => {
           if (!cancelled) setError(errorMessage(err))
         })
+        .finally(() => {
+          inFlight = false
+          if (cancelled) return
+          // Whether or not it worked, the page stops waiting on it.
+          if (!loadedOnce) {
+            loadedOnce = true
+            setLoading(false)
+          }
+          if (queued) {
+            queued = false
+            load()
+          }
+        })
+    }
+
+    const channel = wire(client.channel(`${channelPrefix}:${spaceId}`), `space_id=eq.${spaceId}`)
+
+    channel.subscribe((status) => {
+      if (cancelled) return
+      if (status === 'SUBSCRIBED') {
+        // Every join loads: the first one is the initial snapshot (read after
+        // the join, so nothing can slip between the two), later ones cover
+        // whatever was missed while the socket was down.
+        load()
+      } else if (!loadedOnce && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')) {
+        // Realtime unavailable — show the data anyway rather than a blank page.
+        load()
+      }
     })
+
+    // Backstop: a websocket that neither joins nor reports an error would
+    // otherwise hold the first paint forever.
+    const fallback = setTimeout(() => {
+      if (!loadedOnce) load()
+    }, 1500)
 
     return () => {
       cancelled = true
+      clearTimeout(fallback)
       client.removeChannel(channel)
     }
-  }, [spaceId, channelPrefix, fetchAll, applySnapshot, setError, wire])
+  }, [spaceId, channelPrefix, fetchAll, applySnapshot, setLoading, setError, wire])
 }

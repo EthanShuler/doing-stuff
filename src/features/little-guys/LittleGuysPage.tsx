@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Box, Button, Group, Text, TextInput, UnstyledButton } from '@mantine/core'
+import { Button, Group, Text, TextInput, UnstyledButton } from '@mantine/core'
 import type { LittleGuy } from '../../types'
-import { ACCENT, colors, fonts } from '../../theme'
+import { ACCENT, colors, fonts, text } from '../../theme'
 import { supabase } from '../../lib/supabase'
 import { useBusy } from '../../lib/useBusy'
 import { SEED_SELF_ID } from '../../data/spaceSync'
+import { useConfirm } from '../../components/ConfirmModal'
+import { ControlBar } from '../../components/ControlBar'
 import { EmptyCard } from '../../components/EmptyCard'
 import { FloatingBanner } from '../../components/FloatingBanner'
+import { PageFrame } from '../../components/PageFrame'
 import { Pill } from '../../components/Pill'
 import { Splash } from '../../components/Splash'
 import { useLittleGuyStore } from './useLittleGuyStore'
@@ -30,6 +33,7 @@ export function LittleGuysPage({
   configured: boolean
 }) {
   const store = useLittleGuyStore(spaceId)
+  const confirm = useConfirm()
   const [search, setSearch] = useState('')
   const [owner, setOwner] = useState<OwnerFilter>(OWNER_ALL)
 
@@ -101,7 +105,7 @@ export function LittleGuysPage({
       closeModal()
       return
     }
-    if (!window.confirm('Delete this little guy? His photo is removed too.')) return
+    if (!(await confirm({ title: 'Delete this little guy?', message: 'His photo is removed too.' }))) return
     try {
       await store.deleteLittleGuy(editingId)
       closeModal()
@@ -110,9 +114,9 @@ export function LittleGuysPage({
     }
   }
 
-  if (configured && store.loading) {
-    return <Splash text="Loading your space…" mih="60vh" />
-  }
+  // The shelf waits on the first load; the control bar (minus its derived
+  // count line) stays.
+  const loadingData = configured && store.loading
 
   const searching = search.trim().length > 0
   const filtering = searching || owner !== OWNER_ALL
@@ -122,17 +126,10 @@ export function LittleGuysPage({
       <title>Little Guys · cajubinile.com</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
 
-      <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        <Box maw={1100} mx="auto">
-          <Group
-            justify="space-between"
-            align="center"
-            gap={12}
-            wrap="wrap"
-            pb={18}
-            style={{ borderBottom: `1px dotted ${colors.rule}` }}
-          >
-            <Group gap={12} align="center" wrap="wrap">
+      <PageFrame>
+        <ControlBar
+          left={
+            <>
               <TextInput
                 value={search}
                 onChange={(event) => setSearch(event.currentTarget.value)}
@@ -151,45 +148,51 @@ export function LittleGuysPage({
                 }
                 w={220}
               />
-              <Text fz={12.5} c={colors.faint} style={{ fontFamily: fonts.mono }}>
-                {countLine(store.guys)}
-              </Text>
-            </Group>
-            <Button onClick={openAdd} radius={10}>
-              + Add little guy
-            </Button>
-          </Group>
+              {!loadingData && (
+                <Text fz={text.small} c={colors.faint} style={{ fontFamily: fonts.mono }}>
+                  {countLine(store.guys)}
+                </Text>
+              )}
+            </>
+          }
+          right={<Button onClick={openAdd}>+ Add little guy</Button>}
+        />
 
-          {/* Whose guys to show. Only rendered once there's more than the "All"
-              pill to choose between (a solo space with no owners set). */}
-          {ownerPills.length > 1 && (
-            <Group gap={8} mt={16} wrap="wrap">
-              {ownerPills.map((option) => (
-                <Pill
-                  key={option.value}
-                  label={`${option.label} ${option.count}`}
-                  active={owner === option.value}
-                  activeBg={ACCENT}
-                  onClick={() => setOwner(option.value)}
+        {loadingData ? (
+          <Splash text="Loading your space…" mih="40vh" />
+        ) : (
+          <>
+            {/* Whose guys to show. Only rendered once there's more than the
+                "All" pill to choose between (a solo space, no owners set). */}
+            {ownerPills.length > 1 && (
+              <Group gap={8} mt={16} wrap="wrap">
+                {ownerPills.map((option) => (
+                  <Pill
+                    key={option.value}
+                    label={`${option.label} ${option.count}`}
+                    active={owner === option.value}
+                    activeBg={ACCENT}
+                    onClick={() => setOwner(option.value)}
+                  />
+                ))}
+              </Group>
+            )}
+
+            {shown.length === 0 ? (
+              filtering ? (
+                <EmptyCard title="Nobody here" blurb="No little guy fits that search and that shelf." />
+              ) : (
+                <EmptyCard
+                  title="No little guys yet"
+                  blurb="Add the first one — a name is all it takes; his photo and personality can come later."
                 />
-              ))}
-            </Group>
-          )}
-
-          {shown.length === 0 ? (
-            filtering ? (
-              <EmptyCard title="Nobody here" blurb="No little guy fits that search and that shelf." />
+              )
             ) : (
-              <EmptyCard
-                title="No little guys yet"
-                blurb="Add the first one — a name is all it takes; his photo and personality can come later."
-              />
-            )
-          ) : (
-            <LittleGuyGrid guys={shown} members={members} onEdit={openEdit} />
-          )}
-        </Box>
-      </Box>
+              <LittleGuyGrid guys={shown} members={members} onEdit={openEdit} />
+            )}
+          </>
+        )}
+      </PageFrame>
 
       <LittleGuyModal
         opened={modalOpen}

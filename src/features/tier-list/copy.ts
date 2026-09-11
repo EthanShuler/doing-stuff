@@ -1,13 +1,14 @@
-import type { TierKind } from '../../types'
+import type { ListKey, TierKind, TierList } from '../../types'
+import { listIdOf } from './derive'
 
 /**
  * Per-kind wording + iconography, so the components stay kind-agnostic.
  * Movies and TV are "watched" (one shared date on the pool item — we watch
- * together); books are "read", and read state is per person (see
- * `tier_item_reads`); ice cream is "tried" — shared like movies/TV, but with
- * no visible date (the shared `watched_on` is just its tried/not-tried
- * marker). The reading list is also per person — each member keeps their own
- * (see `listIsPersonal`). `datesArePersonal()` / `listIsPersonal()` in
+ * together); books are "read", and read state is per person (a
+ * `tier_item_completions` row); ice cream is "tried" — shared like movies/TV,
+ * but with no visible date (the item's shared `done_on` is just its
+ * tried/not-tried marker). The reading list is also per person — each member
+ * keeps their own (see `listIsPersonal`). `datesArePersonal()` / `listIsPersonal()` in
  * derive.ts are the behavior switches — this file is just the words.
  */
 export interface KindCopy {
@@ -139,4 +140,63 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     onBoardNote: 'On your tier board — go rank it.',
     attribution: '',
   },
+}
+
+// --- Space-defined lists ------------------------------------------------------
+// A custom list has no entry above: its behavior is fixed to the ice-cream
+// template (shared pool, no visible dates, a shared to-<verb> list, hand-pasted
+// image URLs, no search provider) and its WORDS come from the `tier_lists` row.
+// So the copy is templated here rather than stored.
+
+/** Capitalize a lowercase participle for a sentence start ("tried" → "Tried"). */
+const capitalize = (word: string): string => (word ? word[0].toUpperCase() + word.slice(1) : word)
+
+/** Fallback emoji for a list whose row left it blank. */
+const LIST_EMOJI = '🏷️'
+
+/** Build one custom list's wording from its row. */
+export function customCopy(list: TierList): KindCopy {
+  const { name, noun, verb, past } = list
+  const listLabel = `To-${verb} list`
+  return {
+    pageTitle: name,
+    // Custom lists follow ice cream: the shared done date is only a
+    // done/not-done marker, managed by dragging on and off the shelf.
+    usesDates: false,
+    noun,
+    emoji: list.emoji || LIST_EMOJI,
+    // No provider knows what's on this list, so there's no example title to
+    // suggest — the placeholder falls back to a plain prompt.
+    example: '',
+    imageLabel: 'Photo URL',
+    creatorLabel: 'Source',
+    listLabel,
+    shelfLabel: `Not ${past}`,
+    verb,
+    past,
+    pastCap: capitalize(past),
+    dateLabel: `${capitalize(past)} on`,
+    boardHint: `New ${noun}s land on both of your unranked shelves — drag one to Not ${past} if you haven't ${past} it yet.`,
+    listHint: 'Check it off later and it joins both of your unranked shelves.',
+    listEmptyTitle: `Nothing to ${verb} yet`,
+    listEmptyBlurb: `Add a ${noun} you both want to ${verb}. Check it off and it lands on your tier board, ready to rank.`,
+    onBoardNote: 'On your tier board — go rank it.',
+    attribution: '',
+  }
+}
+
+/**
+ * The wording for whichever board is showing. Built-in keys read KIND_COPY;
+ * a `list:<id>` key templates its row. A key whose row is missing — a partner
+ * deleted the list a moment ago, and the realtime DELETE landed before the
+ * page redirected — yields neutral placeholder copy instead of throwing, so
+ * that render survives until the <Navigate> fires.
+ */
+export function copyFor(key: ListKey, lists: TierList[]): KindCopy {
+  const listId = listIdOf(key)
+  if (!listId) return KIND_COPY[key as TierKind]
+  const list = lists.find((l) => l.id === listId)
+  return customCopy(
+    list ?? { id: listId, name: 'List', emoji: '', noun: 'item', verb: 'try', past: 'tried', createdBy: null, createdAt: '' },
+  )
 }

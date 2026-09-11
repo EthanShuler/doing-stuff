@@ -4,8 +4,8 @@ import { Box, Text } from '@mantine/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
-import { colors, fonts } from '../../theme'
-import { KIND_COPY } from './copy'
+import { colors, fonts, shadows, text } from '../../theme'
+import { posterSrc } from '../../lib/imageUrl'
 
 /** Card footprint — constant so tier rows pack densely and wrap cleanly. */
 export const CARD_WIDTH = 76
@@ -22,6 +22,7 @@ export function MediaImage({
   height,
   radius = 0,
   emojiSize = 26,
+  srcWidth,
 }: {
   imageUrl: string
   title: string
@@ -31,6 +32,10 @@ export function MediaImage({
   height: number
   radius?: number
   emojiSize?: number
+  /** Rendered width in CSS px, used to ask the CDN for a right-sized file
+   *  (see posterSrc). Defaults to a numeric `width`, else the card width —
+   *  pass it explicitly whenever `width` is a percentage. */
+  srcWidth?: number
 }) {
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
   if (!imageUrl || brokenUrl === imageUrl) {
@@ -52,12 +57,16 @@ export function MediaImage({
       </Box>
     )
   }
+  // The rewritten src is a render-time detail; `brokenUrl` stays keyed on the
+  // STORED url so the retry-on-new-link behaviour doesn't depend on sizing.
   return (
     <img
-      src={imageUrl}
+      src={posterSrc(imageUrl, srcWidth ?? (typeof width === 'number' ? width : CARD_WIDTH))}
       alt={title}
       onError={() => setBrokenUrl(imageUrl)}
       draggable={false}
+      loading="lazy"
+      decoding="async"
       style={{ width, height, objectFit: 'cover', borderRadius: radius, flexShrink: 0, display: 'block' }}
     />
   )
@@ -67,10 +76,15 @@ export function MediaImage({
  *  the DragOverlay; SortableCard wraps it with the drag wiring. */
 export function CardVisual({
   item,
+  emoji,
   lifted,
   onClick,
 }: {
   item: TierItem
+  /** Board emoji shown when the item has no image — passed in rather than
+   *  looked up, since a space-defined list's emoji lives on its row (see
+   *  copyFor in copy.ts), not in a static table. */
+  emoji: string
   /** Floating in the DragOverlay: bigger shadow + slight tilt. */
   lifted?: boolean
   onClick?: () => void
@@ -78,13 +92,13 @@ export function CardVisual({
   return (
     <Box
       w={CARD_WIDTH}
-      bg="#fff"
+      bg={colors.surface}
       onClick={onClick}
       style={{
         border: `1px solid ${colors.cardBorder}`,
         borderRadius: 8,
         overflow: 'hidden',
-        boxShadow: lifted ? '0 12px 28px rgba(40,30,20,0.28)' : '0 1px 3px rgba(40,30,20,0.08)',
+        boxShadow: lifted ? shadows.lifted : shadows.card,
         transform: lifted ? 'rotate(2deg)' : undefined,
         cursor: onClick ? 'pointer' : undefined,
         userSelect: 'none',
@@ -93,12 +107,13 @@ export function CardVisual({
       <MediaImage
         imageUrl={item.imageUrl}
         title={item.title}
-        emoji={KIND_COPY[item.kind].emoji}
+        emoji={emoji}
         width="100%"
         height={POSTER_HEIGHT}
+        srcWidth={CARD_WIDTH}
       />
       <Text
-        fz={10.5}
+        fz={text.tiny}
         lh={1.25}
         fw={600}
         c={colors.ink}
@@ -130,7 +145,15 @@ export function CardVisual({
 
 /** A draggable/sortable card on your own board. Click (under the sensor's
  *  4px activation distance) opens the edit modal instead of starting a drag. */
-export function SortableCard({ item, onClick }: { item: TierItem; onClick?: () => void }) {
+export function SortableCard({
+  item,
+  emoji,
+  onClick,
+}: {
+  item: TierItem
+  emoji: string
+  onClick?: () => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style: CSSProperties = {
@@ -144,7 +167,7 @@ export function SortableCard({ item, onClick }: { item: TierItem; onClick?: () =
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <CardVisual item={item} onClick={onClick} />
+      <CardVisual item={item} emoji={emoji} onClick={onClick} />
     </div>
   )
 }

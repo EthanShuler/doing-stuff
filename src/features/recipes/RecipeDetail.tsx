@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Anchor, Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
 import type { Profile, Recipe } from '../../types'
-import { colors, fieldLabelStyle, fonts } from '../../theme'
+import { colors, fieldLabelStyle, fonts, text } from '../../theme'
 import { formatDateWithYear, localDateOf } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { ingredientLines, servingsTimeLine, stepBlocks } from './derive'
@@ -82,7 +82,7 @@ export function RecipeDetail({
           {recipe.tags.map((tag) => (
             <Text
               key={tag.toLowerCase()}
-              fz={11.5}
+              fz={text.caption}
               c={colors.inkFaded}
               px={9}
               py={2}
@@ -119,7 +119,7 @@ export function RecipeDetail({
                   py={5}
                   style={{
                     fontFamily: fonts.sans,
-                    fontSize: 14.5,
+                    fontSize: text.lead,
                     lineHeight: 1.45,
                     color: crossed ? colors.faint : colors.ink,
                     textDecoration: crossed ? 'line-through' : 'none',
@@ -129,7 +129,7 @@ export function RecipeDetail({
                 </UnstyledButton>
               )
             })}
-            <Text fz={11.5} c={colors.faint} mt={8} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+            <Text fz={text.caption} c={colors.faint} mt={8} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
               Tap an ingredient once it's in.
             </Text>
           </Box>
@@ -166,7 +166,7 @@ export function RecipeDetail({
                       {index + 1}
                     </Text>
                     <Text
-                      fz={14.5}
+                      fz={text.lead}
                       c={colors.inkFaded}
                       lh={1.55}
                       style={{
@@ -192,7 +192,7 @@ export function RecipeDetail({
       </Group>
 
       {recipe.notes && (
-        <Box mt={28} maw={640} p="14px 18px" bg="#fff" style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 12 }}>
+        <Box mt={28} maw={640} p="14px 18px" bg={colors.surface} style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 12 }}>
           <Text component="span" style={fieldLabelStyle}>
             Our notes
           </Text>

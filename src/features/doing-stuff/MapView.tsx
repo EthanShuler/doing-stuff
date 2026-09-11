@@ -80,7 +80,7 @@ export function MapView({ home, categories, markers, onEditEntry }: MapViewProps
               label="Wishlist"
               active={filter === 'wishlist'}
               activeBg={ACCENT}
-              dotColor={filter === 'wishlist' ? '#fff' : ACCENT}
+              dotColor={filter === 'wishlist' ? colors.onAccent : ACCENT}
               onClick={() => setFilter('wishlist')}
             />
           )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, FileButton, Group, Text, Textarea, TextInput, Title, UnstyledButton } from '@mantine/core'
-import { colors, DANGER, fonts } from '../../theme'
+import { Box, Button, FileButton, Group, Text, Textarea, TextInput, UnstyledButton } from '@mantine/core'
+import { colors, fonts, radii, text } from '../../theme'
+import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 import type { SpoonDraft } from './useSpoonStore'
 import { SpoonPhoto } from './SpoonGrid'
@@ -53,11 +54,7 @@ export function SpoonModal({
   }
 
   return (
-    <ModalShell opened={opened} onClose={onClose} width={520}>
-      <Title order={3} fz={28} mb={22}>
-        {isEditing ? 'Edit spoon' : 'Add a spoon'}
-      </Title>
-
+    <ModalShell opened={opened} onClose={onClose} size="md" title={isEditing ? 'Edit spoon' : 'Add a spoon'}>
       <Group gap={20} align="flex-start" wrap="nowrap">
         <Box flex={1}>
           <TextInput
@@ -93,7 +90,7 @@ export function SpoonModal({
             minRows={2}
             mb={6}
           />
-          <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans }}>
+          <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>
             The place is looked up on save to pin the spoon on the map — a city is plenty.
           </Text>
         </Box>
@@ -101,7 +98,7 @@ export function SpoonModal({
         {/* Photo column: preview + upload. Keyed on the URL so a replacement
             retries a broken image. */}
         <Box w={150} style={{ flexShrink: 0 }}>
-          <Box key={draft.imageUrl} mt={4} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${colors.cardBorder}` }}>
+          <Box key={draft.imageUrl} mt={4} style={{ borderRadius: radii.card, overflow: 'hidden', border: `1px solid ${colors.cardBorder}` }}>
             <SpoonPhoto imageUrl={draft.imageUrl} name={draft.name} height={150} />
           </Box>
           <FileButton onChange={(file) => void pickPhoto(file)} accept="image/*">
@@ -116,7 +113,7 @@ export function SpoonModal({
               onClick={() => onChange({ imageUrl: '' })}
               w="100%"
               mt={6}
-              style={{ fontFamily: fonts.sans, fontSize: 12, fontWeight: 600, color: colors.muted, textAlign: 'center' }}
+              style={{ fontFamily: fonts.sans, fontSize: text.caption, fontWeight: 600, color: colors.muted, textAlign: 'center' }}
             >
               Remove photo
             </UnstyledButton>
@@ -124,24 +121,15 @@ export function SpoonModal({
         </Box>
       </Group>
 
-      <Group justify="space-between" align="center" gap={10} mt={26}>
-        {isEditing && (
-          <UnstyledButton
-            onClick={onDelete}
-            style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
-          >
-            Delete spoon
-          </UnstyledButton>
-        )}
-        <Group gap={10} ml="auto">
-          <Button variant="secondary" onClick={onClose} radius={10}>
-            Cancel
-          </Button>
-          <Button onClick={onSave} disabled={!canSave || uploading} loading={saving} radius={10}>
-            {isEditing ? 'Save changes' : 'Add spoon'}
-          </Button>
-        </Group>
-      </Group>
+      <ModalFooter
+        onCancel={onClose}
+        onConfirm={onSave}
+        confirmLabel={isEditing ? 'Save changes' : 'Add spoon'}
+        confirmDisabled={!canSave || uploading}
+        loading={saving}
+        onDelete={isEditing ? onDelete : undefined}
+        deleteLabel="Delete spoon"
+      />
     </ModalShell>
   )
 }

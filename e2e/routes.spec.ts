@@ -47,6 +47,19 @@ test('/ice-cream renders the ice cream board', async ({ page }) => {
   await expect(page.getByText('Mint chocolate chip')).toBeVisible()
 })
 
+test('/lists/:id renders a space-defined board', async ({ page }) => {
+  // Seed list l1 is "Fruits" (🍎 / fruit / try / tried).
+  await page.goto('/lists/l1')
+  await expect(page.getByText('Mango')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Add fruit' })).toBeVisible()
+})
+
+test('an unknown list id redirects to /movies', async ({ page }) => {
+  await page.goto('/lists/nope')
+  await expect(page).toHaveURL('/movies')
+  await expect(page.getByText('Spirited Away')).toBeVisible()
+})
+
 test('/spoons renders the spoon collection', async ({ page }) => {
   await page.goto('/spoons')
   await expect(page.getByText('Eiffel Tower')).toBeVisible()
@@ -72,7 +85,7 @@ test('/music-practice renders the bassoon wheel', async ({ page }) => {
 })
 
 test('placeholder routes render ComingSoon', async ({ page }) => {
-  // exact — the header nav's "French Toast" button would match a loose search
+  // Off the nav since Phase 2, but the route (and its page) still resolve.
   await page.goto('/french-toast')
   await expect(page.getByText('French toast', { exact: true })).toBeVisible()
 })

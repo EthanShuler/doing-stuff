@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Anchor, Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
-import { colors, DANGER, fonts } from '../../theme'
+import { Anchor, Box, Button, Group, Text } from '@mantine/core'
+import { colors, fonts, text } from '../../theme'
+import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
+import { useConfirm } from '../../components/ConfirmModal'
 import { formatDateWithYear, today } from '../../lib/format'
 import { useBusy } from '../../lib/useBusy'
 import type { ParkVisit } from '../../types'
@@ -13,7 +15,7 @@ import { VisitFields } from './VisitFields'
 
 const eyebrowStyle = {
   fontFamily: fonts.mono,
-  fontSize: 11,
+  fontSize: text.tiny,
   letterSpacing: '0.18em',
   textTransform: 'uppercase' as const,
 }
@@ -59,8 +61,9 @@ export function ParkModal({
     setEditing(null)
   }, [park?.code])
 
-  // Hook, so it must sit above the early return below.
+  // Hooks, so they must sit above the early return below.
   const { busy: saving, run: runSave } = useBusy()
+  const confirm = useConfirm()
 
   if (!park) return null
   const sorted = sortVisits(visits)
@@ -104,7 +107,7 @@ export function ParkModal({
 
   const deleteEditingVisit = async () => {
     if (!editing?.id) return
-    if (!window.confirm('Delete this visit? The park stays — just this trip goes.')) return
+    if (!(await confirm({ title: 'Delete this visit?', message: 'The park stays — just this trip goes.' }))) return
     try {
       await onDelete(editing.id)
       setEditing(null)
@@ -114,17 +117,25 @@ export function ParkModal({
   }
 
   return (
-    <ModalShell opened onClose={onClose} width={560}>
-      <Text c="clay.6" mb={6} style={eyebrowStyle}>
-        {park.region} · {park.states} · est. {park.established}
-      </Text>
-      <Title order={3} fz={28} mb={8}>
-        {park.name}
-      </Title>
-      <Text fz={14} c={colors.inkFaded} lh={1.5} mb={6} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
+    <ModalShell
+      opened
+      onClose={onClose}
+      size="lg"
+      // The where/when eyebrow rides in the heading so it stays glued to the
+      // park's name (and names the dialog alongside it).
+      title={
+        <>
+          <Text component="span" display="block" c="clay.6" mb={6} style={eyebrowStyle}>
+            {park.region} · {park.states} · est. {park.established}
+          </Text>
+          {park.name}
+        </>
+      }
+    >
+      <Text fz={text.body} c={colors.inkFaded} lh={1.5} mb={6} mt={-14} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
         {park.blurb}
       </Text>
-      <Anchor href={park.npsUrl} target="_blank" rel="noreferrer" fz={12} c={colors.muted} fw={600}>
+      <Anchor href={park.npsUrl} target="_blank" rel="noreferrer" fz={text.caption} c={colors.muted} fw={600}>
         nps.gov ↗
       </Anchor>
 
@@ -134,24 +145,15 @@ export function ParkModal({
             {editing.id ? 'Edit visit' : 'Log a visit'}
           </Text>
           <VisitFields draft={draft} members={members} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
-          <Group justify="space-between" align="center" gap={10} mt={22}>
-            {editing.id && (
-              <UnstyledButton
-                onClick={() => void deleteEditingVisit()}
-                style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
-              >
-                Delete visit
-              </UnstyledButton>
-            )}
-            <Group gap={10} ml="auto">
-              <Button variant="secondary" onClick={() => setEditing(null)} radius={10}>
-                Cancel
-              </Button>
-              <Button onClick={() => void save()} disabled={draft.attendeeIds.length === 0} loading={saving} radius={10}>
-                {editing.id ? 'Save changes' : 'Log visit'}
-              </Button>
-            </Group>
-          </Group>
+          <ModalFooter
+            onCancel={() => setEditing(null)}
+            onConfirm={() => void save()}
+            confirmLabel={editing.id ? 'Save changes' : 'Log visit'}
+            confirmDisabled={draft.attendeeIds.length === 0}
+            loading={saving}
+            onDelete={editing.id ? () => void deleteEditingVisit() : undefined}
+            deleteLabel="Delete visit"
+          />
         </Box>
       ) : (
         <>
@@ -160,7 +162,7 @@ export function ParkModal({
               Visits
             </Text>
             {sorted.length === 0 && (
-              <Text fz={13} c={colors.muted} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
+              <Text fz={text.small} c={colors.muted} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
                 Not visited yet — it's on the list.
               </Text>
             )}
@@ -175,16 +177,16 @@ export function ParkModal({
                 style={{ borderBottom: `1px dotted ${colors.dotted}` }}
               >
                 <Box>
-                  <Text fz={14} fw={600} c={colors.ink}>
+                  <Text fz={text.body} fw={600} c={colors.ink}>
                     {visit.date ? formatDateWithYear(visit.date) : 'Sometime, long ago'}
-                    <Text component="span" fz={13} fw={500} c={colors.muted}>
+                    <Text component="span" fz={text.small} fw={500} c={colors.muted}>
                       {'  ·  '}
                       {attendeeNames(visit, members) || '—'}
                       {visit.separate && ', separately'}
                     </Text>
                   </Text>
                   {visit.notes && (
-                    <Text fz={13} c={colors.inkFaded} mt={3} lh={1.45}>
+                    <Text fz={text.small} c={colors.inkFaded} mt={3} lh={1.45}>
                       {visit.notes}
                     </Text>
                   )}
@@ -197,10 +199,10 @@ export function ParkModal({
           </Box>
 
           <Group justify="flex-end" gap={10} mt={24}>
-            <Button variant="secondary" onClick={onClose} radius={10}>
+            <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={openAdd} radius={10}>
+            <Button onClick={openAdd}>
               + Log a visit
             </Button>
           </Group>

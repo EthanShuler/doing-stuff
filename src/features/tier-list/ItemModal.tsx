@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Group, TagsInput, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
-import type { TierItem, TierKind } from '../../types'
-import { colors, DANGER, fonts } from '../../theme'
+import { Box, Group, TagsInput, Text, TextInput, UnstyledButton } from '@mantine/core'
+import { useDebouncedValue } from '@mantine/hooks'
+import type { ListKey, TierItem } from '../../types'
+import { colors, fonts, radii, shadows, text } from '../../theme'
+import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 import { isTmdbConfigured, searchTmdb } from '../../lib/tmdb'
 import { searchOpenLibrary } from '../../lib/openLibrary'
-import { KIND_COPY } from './copy'
+import type { KindCopy } from './copy'
 import { CardVisual } from './TierCard'
 
 /** The draft backing the add/edit item modal. */
@@ -14,11 +16,11 @@ export interface ItemDraft {
   imageUrl: string
   /** ISO date it was finished; '' = not yet (the item sits on the unwatched/
    *  unread shelf until it's dated or dragged into a tier). For movies/TV this
-   *  is the shared watched date; for books it's the EDITOR's own read date;
+   *  is the item's shared done date; for books it's the EDITOR's own one;
    *  dateless kinds (ice cream) show no field and just pass the existing
    *  tried marker through unchanged. Board items only — list items aren't
    *  started yet, so the field is hidden. */
-  watchedOn: string
+  doneOn: string
   /** Shared filter labels ("disney", "fantasy"). Board items only. */
   tags: string[]
   /** Who made it — author/director/etc. (label per kind in copy.ts). Both
@@ -42,6 +44,7 @@ interface Suggestion {
 export function ItemModal({
   opened,
   kind,
+  copy,
   draft,
   isEditing,
   variant = 'board',
@@ -53,7 +56,12 @@ export function ItemModal({
   onClose,
 }: {
   opened: boolean
-  kind: TierKind
+  /** The board this item belongs to. Only used to pick a search provider —
+   *  a custom list matches none, so it gets hand entry (the same as ice
+   *  cream). All wording comes from `copy`. */
+  kind: ListKey
+  /** The board's wording (KIND_COPY for a built-in, customCopy for a list). */
+  copy: KindCopy
   draft: ItemDraft
   isEditing: boolean
   /** 'board' adds straight to the tier pool; 'watchlist' adds a "want to watch"
@@ -68,7 +76,6 @@ export function ItemModal({
   onDelete: () => void
   onClose: () => void
 }) {
-  const copy = KIND_COPY[kind]
   const noun = copy.noun
   const canSave = Boolean(draft.title.trim())
   const isWatchlist = variant === 'watchlist'
@@ -145,13 +152,16 @@ export function ItemModal({
   const saveLabel = isEditing ? 'Save changes' : isWatchlist ? `Add to ${copy.listLabel.toLowerCase()}` : `Add ${noun}`
   const deleteLabel = isWatchlist ? `Remove from ${copy.listLabel.toLowerCase()}` : `Delete ${noun}`
 
-  // Live preview of the card exactly as it will render on the board.
+  // Live preview of the card exactly as it will render on the board. The
+  // image URL is debounced so typing or pasting a link fires one request when
+  // you stop, not one per keystroke.
+  const [previewUrl] = useDebouncedValue(draft.imageUrl.trim(), 400)
   const previewItem: TierItem = {
     id: 'preview',
     kind,
     title: draft.title.trim() || 'Title…',
-    imageUrl: draft.imageUrl.trim(),
-    watchedOn: null,
+    imageUrl: previewUrl,
+    doneOn: null,
     tags: [],
     creator: draft.creator.trim(),
     createdBy: null,
@@ -159,11 +169,7 @@ export function ItemModal({
   }
 
   return (
-    <ModalShell opened={opened} onClose={onClose}>
-      <Title order={3} fz={28} mb={22}>
-        {heading}
-      </Title>
-
+    <ModalShell opened={opened} onClose={onClose} title={heading}>
       <Group gap={20} align="flex-start" wrap="nowrap">
         <Box flex={1}>
           <Box pos="relative" mb={18}>
@@ -175,7 +181,8 @@ export function ItemModal({
                 setShowSuggestions(true)
               }}
               onBlur={() => setShowSuggestions(false)}
-              placeholder={`e.g. ${copy.example}`}
+              // A custom list has no example title to suggest.
+              placeholder={copy.example ? `e.g. ${copy.example}` : `Name of the ${noun}`}
               data-autofocus
               autoComplete="off"
             />
@@ -187,10 +194,10 @@ export function ItemModal({
                   left: 0,
                   right: 0,
                   zIndex: 30,
-                  background: '#fff',
+                  background: colors.surface,
                   border: `1px solid ${colors.cardBorder}`,
-                  borderRadius: 10,
-                  boxShadow: '0 10px 28px rgba(40,30,20,0.18)',
+                  borderRadius: radii.chip,
+                  boxShadow: shadows.popover,
                   overflowY: 'auto',
                   maxHeight: 264,
                 }}
@@ -213,6 +220,8 @@ export function ItemModal({
                       <img
                         src={result.thumbUrl}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         style={{ width: 30, height: 44, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
                       />
                     ) : (
@@ -233,11 +242,11 @@ export function ItemModal({
                       </Box>
                     )}
                     <Box>
-                      <Text fz={13} fw={600} c={colors.ink} lh={1.3}>
+                      <Text fz={text.small} fw={600} c={colors.ink} lh={1.3}>
                         {result.title}
                       </Text>
                       {result.meta && (
-                        <Text fz={11.5} c={colors.faint}>
+                        <Text fz={text.caption} c={colors.faint}>
                           {result.meta}
                         </Text>
                       )}
@@ -270,8 +279,8 @@ export function ItemModal({
                 <TextInput
                   label={copy.dateLabel}
                   type="date"
-                  value={draft.watchedOn}
-                  onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
+                  value={draft.doneOn}
+                  onChange={(e) => onChange({ doneOn: e.currentTarget.value })}
                   mb={18}
                 />
               )}
@@ -285,35 +294,27 @@ export function ItemModal({
               />
             </>
           )}
-          <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans }}>
+          <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>
             {hint}
             {searchEnabled && ` ${copy.attribution}`}
           </Text>
         </Box>
-        {/* Keyed on the URL so pasting a new link retries a broken image. */}
-        <Box key={draft.imageUrl.trim()} mt={4}>
-          <CardVisual item={previewItem} />
+        {/* No key: MediaImage already remembers "broken" per URL, so a new
+            link retries on its own without remounting the whole card. */}
+        <Box mt={4}>
+          <CardVisual item={previewItem} emoji={copy.emoji} />
         </Box>
       </Group>
 
-      <Group justify="space-between" align="center" gap={10} mt={26}>
-        {isEditing && (
-          <UnstyledButton
-            onClick={onDelete}
-            style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
-          >
-            {deleteLabel}
-          </UnstyledButton>
-        )}
-        <Group gap={10} ml="auto">
-          <Button variant="secondary" onClick={onClose} radius={10}>
-            Cancel
-          </Button>
-          <Button onClick={onSave} disabled={!canSave} loading={saving} radius={10}>
-            {saveLabel}
-          </Button>
-        </Group>
-      </Group>
+      <ModalFooter
+        onCancel={onClose}
+        onConfirm={onSave}
+        confirmLabel={saveLabel}
+        confirmDisabled={!canSave}
+        loading={saving}
+        onDelete={isEditing ? onDelete : undefined}
+        deleteLabel={deleteLabel}
+      />
     </ModalShell>
   )
 }

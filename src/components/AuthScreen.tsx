@@ -109,7 +109,7 @@ function AuthForm({
     <Paper
       component="form"
       action={submit}
-      bg="#fff"
+      bg={colors.surface}
       radius={14}
       p={24}
       withBorder
