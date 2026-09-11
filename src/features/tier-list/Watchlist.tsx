@@ -21,12 +21,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { TierKind, WatchlistItem } from '../../types'
+import type { WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts, shadows } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { EmptyCard } from '../../components/EmptyCard'
 import { positionBetween } from './derive'
-import { KIND_COPY } from './copy'
 import type { KindCopy } from './copy'
 import { MediaImage } from './TierCard'
 
@@ -34,7 +33,8 @@ interface WatchlistProps {
   /** Already sorted for display (see sortWatchlist): the open queue on top —
    *  position order, top = next up — then the checked-off rows. */
   items: WatchlistItem[]
-  kind: TierKind
+  /** The list's wording (KIND_COPY for a built-in, customCopy for a list). */
+  copy: KindCopy
   /** Done date per TIER item id — a checked wish looks its own up via
    *  `tierItemId` (the wish row has no date). For movies/TV that's the item's
    *  shared date; for books the page passes the VIEWER's own completion dates,
@@ -177,7 +177,7 @@ function SortableRow(props: Parameters<typeof WatchRow>[0]) {
  *  tier pool (the page owns that action + the add/edit modal). */
 export function Watchlist({
   items,
-  kind,
+  copy,
   doneDates,
   onCheck,
   onUncheck,
@@ -186,8 +186,6 @@ export function Watchlist({
   onMove,
   onRenormalize,
 }: WatchlistProps) {
-  const copy = KIND_COPY[kind]
-
   const open = items.filter((w) => w.tierItemId === null)
   const done = items.filter((w) => w.tierItemId !== null)
   const openById = new Map(open.map((w) => [w.id, w]))

@@ -136,3 +136,54 @@ test('watchlist tab lists open wishes; books call it Reading list', async ({ pag
   await expect(page.getByText('Babel')).not.toBeVisible()
   await expect(page.getByText(/Drag to reorder/)).not.toBeVisible()
 })
+
+// --- custom lists ------------------------------------------------------------
+// Seed list l1 is "Fruits": Mango tried + ranked S by Avery, Durian untried
+// (→ Not tried), Honeycrisp apple tried but unranked, and one open wish
+// (Rambutan) on its To-try list.
+
+test('the picker reaches a space-defined board without leaving the page', async ({ page }) => {
+  await page.goto('/movies')
+  await pickList(page, 'Fruits')
+  await expect(page).toHaveURL('/lists/l1')
+
+  await expect(tierRow(page, 'S').getByText('Mango')).toBeVisible()
+  await expect(boardShelf(page, 'unranked').getByText('Honeycrisp apple')).toBeVisible()
+  // A custom list follows the ice-cream template: a "Not <past>" shelf.
+  await expect(boardShelf(page, 'unwatched').getByText('Not tried')).toBeVisible()
+  await expect(boardShelf(page, 'unwatched').getByText('Durian')).toBeVisible()
+
+  // Its list tab is worded from the row too, and no date field appears.
+  await pickSegment(page, 'To-try list')
+  await expect(page.getByText('Rambutan')).toBeVisible()
+})
+
+test('create, rename, and delete a custom list', async ({ page }) => {
+  await page.goto('/movies')
+
+  // Create → lands on the new empty board, worded from the draft.
+  await page.getByRole('button', { name: '+ New list' }).click()
+  await expect(page.getByRole('heading', { name: 'New list' })).toBeVisible()
+  await page.getByLabel('Name').fill('Bugs')
+  await page.getByLabel('Singular noun').fill('bug')
+  await page.getByRole('button', { name: 'Create list' }).click()
+
+  await expect(page).toHaveURL(/\/lists\//)
+  await expect(page.getByRole('button', { name: '+ Add bug' })).toBeVisible()
+
+  // Rename → the picker pill follows.
+  await page.getByRole('button', { name: 'Edit list' }).click()
+  await expect(page.getByRole('heading', { name: 'Edit list' })).toBeVisible()
+  await page.getByLabel('Name').fill('Beetles')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByRole('button', { name: /Beetles$/ })).toBeVisible()
+
+  // Delete → the themed confirm modal, then a bounce back to /movies.
+  await page.getByRole('button', { name: 'Edit list' }).click()
+  await page.getByRole('button', { name: 'Delete list' }).click()
+  await expect(page.getByText('Delete the "Beetles" list for both of you?')).toBeVisible()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+
+  await expect(page).toHaveURL('/movies')
+  await expect(page.getByRole('button', { name: /Beetles$/ })).toHaveCount(0)
+})

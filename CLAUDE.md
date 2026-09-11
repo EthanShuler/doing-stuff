@@ -12,7 +12,8 @@ tier-list routes share a single "Tier Lists" item and are chosen in-page with
 the `ListPicker` pill row. The three unbuilt placeholder routes are off the nav
 but still resolve. Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
-and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
+`/ice-cream`, and `/lists/:id` (a space-defined board) are the **Tier Lists**
+feature; `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
 the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
 `/little-guys` is the **Little Guys** feature; `/french-toast` is a placeholder
@@ -45,11 +46,33 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`) — drag-n-drop
-S/A/B/C/D/F boards. The domain model splits pool from opinion:
+**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`, `/lists/:id`) —
+drag-n-drop S/A/B/C/D/F boards. Five routes, ONE header nav item: which board
+you're on is chosen in-page by the `ListPicker` pill row (four built-ins, then
+the space's own lists, then "+ New list" and — on a custom board — a faint
+"Edit list"). The domain model splits pool from opinion:
 
-- **Tier item** (`tier_items`) — a movie, show, book, or ice cream flavor in the
-  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'` column, a
+- **Custom list** (`tier_lists`) — a board the space defines from the UI
+  ("Bugs", "Fruits"), shared data with the uniform RLS: either member can
+  create, re-word, or delete one. Behavior is **fixed to the ice-cream
+  template** (shared pool, S–F tiers, a "Not <past>" shelf, a shared
+  to-<verb> list, hand-pasted image URLs, no search provider, no visible
+  dates), so the row carries only WORDS — `name`, `emoji`, singular `noun`,
+  `verb`, `past` — which `customCopy()` in the tier-list `copy.ts` templates
+  into a full `KindCopy`. Its items and to-do rows carry `kind = 'custom'`
+  plus a `list_id` FK, so **deleting a list is one statement** and Postgres
+  cascades the items (and every member's placements/completions of them) and
+  the list's to-do rows; the store mirrors that with `pruneList()`.
+  App-side a board is one **`ListKey`**: a `TierKind` or `` `list:${id}` ``
+  (`TierKind` itself stays a closed 4-member union). `copyFor(key, lists)`
+  resolves either into wording — and never throws for a list row that's gone,
+  so a partner's tab survives the beat between a realtime DELETE and the
+  `<Navigate>` back to `/movies`. Reading lists stay a book-only concept, so
+  the per-person watchlist RLS needed no change.
+- **Tier item** (`tier_items`) — a movie, show, book, ice cream flavor, or
+  custom-list item in the
+  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'|'custom'`
+  column plus a nullable `list_id`, a
   title, a hand-pasted poster/cover `image_url`, a nullable `done_on` date —
   the SHARED "we finished it" date; defaults to today on a board add or
   watchlist check-off.
@@ -106,7 +129,8 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   image and creator onto it, and links via `tier_item_id`
   (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
-All four routes render the same `TierListPage` (kind prop), so the store —
+All five routes render the same `TierListPage` (a `kind` prop for a built-in,
+the URL's list id for `/lists/:id`), so the store —
 holding every kind plus all users' placements and completions — survives
 kind switches. A
 You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
@@ -322,7 +346,8 @@ run `npm run build` (or `npm run typecheck`) and `npm test`.
 
 **Playwright** (`e2e/`, config in `playwright.config.ts`) covers the browser
 flows: every route hard-loads, nav/back, store survival across screen
-switches, entry-modal gating, tier-board derivation, the list picker, the
+switches, entry-modal gating, tier-board derivation, the list picker,
+creating / renaming / deleting a custom list, the
 mobile drawer, and that no route scrolls sideways at 390px
 (`mobile-overflow.spec.ts` — its name must keep matching the mobile project's
 `testMatch`).
@@ -413,7 +438,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 `supabase/schema.sql` is the source of truth for the database. Key points:
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
-  `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
+  `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
   `tier_item_completions`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
   `music_practice_days`, `little_guys`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
@@ -426,6 +451,9 @@ schema in `supabase/schema.sql` is already applied to the current project.
   (members read all; writes to BOOK rows additionally require
   `created_by = auth.uid()` — reading lists are personal, other kinds' lists
   stay shared). Follow that pattern for any future per-person opinion data.
+  **`tier_lists` is uniform/shared** — a custom list belongs to the space, and
+  its rows are `kind 'custom'`, never `'book'`, so they stay outside that
+  per-person carve-out.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via
@@ -458,6 +486,7 @@ src/
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     fuzzy.ts               fuzzyMatch() subsequence title search (Log + recipes)
+    text.ts                firstGrapheme() — one-emoji fields (activities, lists)
     geocode.ts             Nominatim address → lat/lng (on save only)
     image.ts               client-side photo downscale (≤1200px JPEG) for uploads
     imageUrl.ts            posterSrc() render-time TMDB/Open Library size rewrite
@@ -502,13 +531,15 @@ src/
       ManageModal.tsx      categories & activities editor + home base
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
-    tier-list/             movie/TV/book/ice-cream tier boards (kind prop per route)
+    tier-list/             movie/TV/book/ice-cream + custom boards (one per route)
       TierListPage.tsx     owns the store, You/Partner toggle, item modal state
-      useTierListStore.ts  data seam: pool + placements + reads CRUD (or seed fallback)
-      derive.ts            pure board building, moveItem, positions, datesArePersonal
+      useTierListStore.ts  data seam: lists + pool + placements + completions CRUD
+      derive.ts            board building, moveItem, list keys, pruneList
       derive.test.ts       vitest coverage for derive.ts
-      copy.ts              per-kind wording: watch/read, Watchlist/Reading list, emoji
+      copy.ts              per-kind wording + customCopy/copyFor for custom lists
+      copy.test.ts         vitest coverage for copy.ts
       ListPicker.tsx       in-page pill row selecting which board you're on
+      ListModal.tsx        create / re-word / delete a space-defined list
       TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
       BoardView.tsx        pure board layout (tier rows + unranked/unread shelves)
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
@@ -566,7 +597,8 @@ e2e/
                            music-practice, mobile, mobile-overflow)
                            — see playwright.config.ts
 supabase/
-  schema.sql               tables + RLS + grants
+  schema.sql               tables + RLS + grants (the source of truth)
+  migrations/*.sql         dated deltas to paste into the SQL Editor on a live DB
 ```
 
 New features get their own `src/features/<name>/` directory with their own

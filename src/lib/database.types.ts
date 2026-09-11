@@ -140,11 +140,48 @@ export interface Database {
         }
         Relationships: []
       }
+      tier_lists: {
+        Row: {
+          id: string
+          space_id: string
+          name: string
+          emoji: string
+          noun: string
+          verb: string
+          past: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          name: string
+          emoji?: string
+          noun: string
+          verb?: string
+          past?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          name?: string
+          emoji?: string
+          noun?: string
+          verb?: string
+          past?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       tier_items: {
         Row: {
           id: string
           space_id: string
           kind: string
+          list_id: string | null
           title: string
           image_url: string
           done_on: string | null
@@ -157,6 +194,7 @@ export interface Database {
           id?: string
           space_id: string
           kind: string
+          list_id?: string | null
           title: string
           image_url?: string
           done_on?: string | null
@@ -169,6 +207,7 @@ export interface Database {
           id?: string
           space_id?: string
           kind?: string
+          list_id?: string | null
           title?: string
           image_url?: string
           done_on?: string | null
@@ -241,6 +280,7 @@ export interface Database {
           id: string
           space_id: string
           kind: string
+          list_id: string | null
           title: string
           image_url: string
           creator: string
@@ -253,6 +293,7 @@ export interface Database {
           id?: string
           space_id: string
           kind: string
+          list_id?: string | null
           title: string
           image_url?: string
           creator?: string
@@ -265,6 +306,7 @@ export interface Database {
           id?: string
           space_id?: string
           kind?: string
+          list_id?: string | null
           title?: string
           image_url?: string
           creator?: string

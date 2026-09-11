@@ -7,11 +7,16 @@ import {
   distinctTags,
   filterByTags,
   findContainer,
+  keyOf,
+  kindColumn,
+  listIdOf,
   listIsPersonal,
+  listKeyFor,
   moveItem,
   nextWatchlistPosition,
   normalizeTags,
   positionBetween,
+  pruneList,
   renormalizedPositions,
   sortWatchlist,
   tierSwatch,
@@ -240,6 +245,10 @@ describe('datesArePersonal', () => {
     expect(datesArePersonal('tv')).toBe(false)
     expect(datesArePersonal('ice-cream')).toBe(false)
   })
+
+  it('is false for a custom list — they follow the ice-cream template', () => {
+    expect(datesArePersonal('list:l1')).toBe(false)
+  })
 })
 
 describe('listIsPersonal', () => {
@@ -248,6 +257,75 @@ describe('listIsPersonal', () => {
     expect(listIsPersonal('movie')).toBe(false)
     expect(listIsPersonal('tv')).toBe(false)
     expect(listIsPersonal('ice-cream')).toBe(false)
+  })
+
+  it('is false for a custom list — its to-do list is shared', () => {
+    expect(listIsPersonal('list:l1')).toBe(false)
+  })
+})
+
+// --- list keys ---------------------------------------------------------------
+
+describe('list key helpers', () => {
+  it('round-trips a list id through its key', () => {
+    const key = listKeyFor('abc-123')
+    expect(key).toBe('list:abc-123')
+    expect(listIdOf(key)).toBe('abc-123')
+  })
+
+  it('reports no list id for a built-in kind', () => {
+    expect(listIdOf('movie')).toBeNull()
+    expect(listIdOf('ice-cream')).toBeNull()
+  })
+
+  it('maps a key onto the row’s kind column', () => {
+    expect(kindColumn('movie')).toBe('movie')
+    expect(kindColumn('ice-cream')).toBe('ice-cream')
+    expect(kindColumn('list:l1')).toBe('custom')
+  })
+
+  it('rebuilds a key from the row’s two columns', () => {
+    expect(keyOf('movie', null)).toBe('movie')
+    expect(keyOf('custom', 'l1')).toBe('list:l1')
+  })
+
+  it('kindColumn + listIdOf round-trip through keyOf', () => {
+    for (const key of ['movie', 'tv', 'book', 'ice-cream', 'list:l1'] as const) {
+      expect(keyOf(kindColumn(key), listIdOf(key))).toBe(key)
+    }
+  })
+})
+
+// --- deriveBoard: a custom list (ice-cream behavior, keyed by list id) ---------
+
+describe('deriveBoard for a custom list', () => {
+  it('filters by the list key, ignoring other boards', () => {
+    const mine = item({ kind: 'list:l1', doneOn: '2026-06-09' })
+    const theirs = item({ kind: 'list:l2', doneOn: '2026-06-09' })
+    const flavor = item({ kind: 'ice-cream', doneOn: '2026-06-09' })
+    const board = deriveBoard([mine, theirs, flavor], [], [], 'u1', 'list:l1')
+    expect(board.unranked).toEqual([mine])
+  })
+
+  it('splits on the SHARED done date and ignores completions', () => {
+    const done = item({ kind: 'list:l1', doneOn: '2026-06-09' })
+    const notYet = item({ kind: 'list:l1', doneOn: null })
+    const board = deriveBoard(
+      [done, notYet],
+      [],
+      [completion({ itemId: notYet.id, userId: 'u1' })],
+      'u1',
+      'list:l1',
+    )
+    expect(board.unranked).toEqual([done])
+    expect(board.unwatched).toEqual([notYet])
+  })
+
+  it('a placement wins over a missing done date', () => {
+    const a = item({ kind: 'list:l1', doneOn: null })
+    const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'A' })], [], 'u1', 'list:l1')
+    expect(board.tiers.A).toEqual([a])
+    expect(board.unwatched).toEqual([])
   })
 })
 
@@ -467,6 +545,49 @@ describe('nextWatchlistPosition', () => {
 
   it('starts an empty list at 1', () => {
     expect(nextWatchlistPosition([], 'movie')).toBe(1)
+  })
+
+  it('queues a custom list separately from the built-ins', () => {
+    const items = [wish({ kind: 'movie', position: 9 }), wish({ kind: 'list:l1', position: 2 })]
+    expect(nextWatchlistPosition(items, 'list:l1')).toBe(3)
+  })
+})
+
+// --- deleting a list ----------------------------------------------------------
+
+describe('pruneList', () => {
+  it('removes the list’s items, their placements and completions, and its wishes', () => {
+    const mine = item({ kind: 'list:l1' })
+    const alsoMine = item({ kind: 'list:l1' })
+    const other = item({ kind: 'movie' })
+    const state = {
+      items: [mine, alsoMine, other],
+      placements: [
+        placement({ itemId: mine.id, userId: 'u1' }),
+        placement({ itemId: mine.id, userId: 'u2' }),
+        placement({ itemId: other.id, userId: 'u1' }),
+      ],
+      completions: [completion({ itemId: alsoMine.id }), completion({ itemId: other.id })],
+      watchlist: [wish({ kind: 'list:l1' }), wish({ kind: 'movie' })],
+    }
+    const next = pruneList(state, 'l1')
+    expect(next.items).toEqual([other])
+    expect(next.placements.map((p) => p.itemId)).toEqual([other.id])
+    expect(next.completions.map((c) => c.itemId)).toEqual([other.id])
+    expect(next.watchlist.map((w) => w.kind)).toEqual(['movie'])
+  })
+
+  it('leaves another list alone', () => {
+    const keep = item({ kind: 'list:l2' })
+    const next = pruneList({ items: [keep], placements: [], completions: [], watchlist: [] }, 'l1')
+    expect(next.items).toEqual([keep])
+  })
+
+  it('never mutates the input', () => {
+    const state = { items: [item({ kind: 'list:l1' })], placements: [], completions: [], watchlist: [] }
+    const before = state.items.length
+    pruneList(state, 'l1')
+    expect(state.items.length).toBe(before)
   })
 })
 

@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest'
+import type { TierList } from '../../types'
+import { KIND_COPY, copyFor, customCopy } from './copy'
+
+const list = (over: Partial<TierList> = {}): TierList => ({
+  id: 'l1',
+  name: 'Fruits',
+  emoji: '🍎',
+  noun: 'fruit',
+  verb: 'try',
+  past: 'tried',
+  createdBy: 'u1',
+  createdAt: '2026-06-09T09:00:00Z',
+  ...over,
+})
+
+describe('customCopy', () => {
+  it('templates the shelf and list labels from the list’s words', () => {
+    const copy = customCopy(list())
+    expect(copy.pageTitle).toBe('Fruits')
+    expect(copy.noun).toBe('fruit')
+    expect(copy.shelfLabel).toBe('Not tried')
+    expect(copy.listLabel).toBe('To-try list')
+    expect(copy.pastCap).toBe('Tried')
+  })
+
+  it('reads naturally with other grammar', () => {
+    const copy = customCopy(list({ name: 'Cheeses', noun: 'cheese', verb: 'eat', past: 'eaten' }))
+    expect(copy.shelfLabel).toBe('Not eaten')
+    expect(copy.listLabel).toBe('To-eat list')
+    expect(copy.pastCap).toBe('Eaten')
+    expect(copy.listEmptyTitle).toBe('Nothing to eat yet')
+    expect(copy.listEmptyBlurb).toContain('a cheese you both want to eat')
+  })
+
+  it('follows the ice-cream template: no dates, no search provider, no example', () => {
+    const copy = customCopy(list())
+    expect(copy.usesDates).toBe(false)
+    expect(copy.attribution).toBe('')
+    // No provider knows this list's titles, so the modal has nothing to
+    // suggest as a placeholder.
+    expect(copy.example).toBe('')
+  })
+
+  it('falls back to a generic emoji when the row leaves it blank', () => {
+    expect(customCopy(list({ emoji: '' })).emoji).toBe('🏷️')
+    expect(customCopy(list({ emoji: '🐛' })).emoji).toBe('🐛')
+  })
+})
+
+describe('copyFor', () => {
+  it('passes built-in keys straight through to KIND_COPY', () => {
+    expect(copyFor('movie', [])).toBe(KIND_COPY.movie)
+    expect(copyFor('book', [list()])).toBe(KIND_COPY.book)
+    expect(copyFor('ice-cream', [])).toBe(KIND_COPY['ice-cream'])
+  })
+
+  it('templates a custom key from its row', () => {
+    expect(copyFor('list:l1', [list()]).pageTitle).toBe('Fruits')
+  })
+
+  it('yields safe placeholder copy for a list whose row is gone', () => {
+    // The partner deleted the list a moment ago and the realtime DELETE landed
+    // before the page redirected — this render must not throw.
+    const copy = copyFor('list:deleted', [list()])
+    expect(copy.pageTitle).toBe('List')
+    expect(copy.shelfLabel).toBe('Not tried')
+    expect(copy.emoji).toBe('🏷️')
+  })
+})

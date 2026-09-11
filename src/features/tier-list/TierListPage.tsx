@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { Button, SegmentedControl, Text } from '@mantine/core'
-import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
+import type { ListKey, Tier, TierItem, TierKind, WatchlistItem } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
@@ -13,8 +14,8 @@ import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
-import { datesArePersonal, deriveBoard, distinctTags, filterByTags, listIsPersonal, sortWatchlist } from './derive'
-import { KIND_COPY } from './copy'
+import { datesArePersonal, deriveBoard, distinctTags, filterByTags, listIdOf, listIsPersonal, listKeyFor, sortWatchlist } from './derive'
+import { copyFor } from './copy'
 import { TierBoard } from './TierBoard'
 import { BoardView } from './BoardView'
 import { CardVisual } from './TierCard'
@@ -22,6 +23,8 @@ import { Watchlist } from './Watchlist'
 import { ItemModal } from './ItemModal'
 import type { ItemDraft } from './ItemModal'
 import { ListPicker } from './ListPicker'
+import { ListModal, draftFromList, emptyListDraft } from './ListModal'
+import type { ListDraft } from './ListModal'
 
 type Mode = 'board' | 'watchlist'
 
@@ -37,22 +40,30 @@ const emptyDraft = (variant: Mode): ItemDraft => ({
 })
 
 interface TierListPageProps {
-  kind: TierKind
+  /** The built-in board this route renders. Omitted for `/lists/:id`, where
+   *  the list id in the URL names the board instead. */
+  kind?: TierKind
   spaceId: string | null
   userId: string | null
   configured: boolean
 }
 
-/** The movie/TV/book tier lists. All three routes render this same component
- *  (same tree position), so the store — and its realtime channel — survives
- *  switching kinds; only the `kind` prop changes and the board re-derives. */
+/** Every tier-list route — the four built-ins and `/lists/:id` — renders this
+ *  same component in the same tree slot, so the store (and its realtime
+ *  channel) survives switching boards; only the key changes and the board
+ *  re-derives. */
 export function TierListPage({ kind, spaceId, userId, configured }: TierListPageProps) {
   const store = useTierListStore(spaceId, userId)
   const confirm = useConfirm()
-  const copy = KIND_COPY[kind]
+  const navigate = useNavigate()
+  const { id: routeListId } = useParams()
+  // Which board is showing: a built-in kind from the route, or the custom
+  // list named in the URL.
+  const key: ListKey = kind ?? listKeyFor(routeListId ?? '')
+  const copy = copyFor(key, store.lists)
   const noun = copy.noun
-  // Books track "have I read it" per person; movies/TV share one watched date.
-  const personal = datesArePersonal(kind)
+  // Books track "have I read it" per person; everything else shares one date.
+  const personal = datesArePersonal(key)
 
   // Board (tier ranking) vs. Watchlist/Reading list (things we want to get
   // to). Both live in the same tab; the store survives the switch just like
@@ -73,6 +84,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<ItemDraft>(() => emptyDraft('board'))
 
+  // The list modal (create / re-word a space-defined list) is separate: it
+  // edits the BOARD, not an item on it.
+  const [listModalOpen, setListModalOpen] = useState(false)
+  const [listDraft, setListDraft] = useState<ListDraft>(emptyListDraft)
+  const [editingList, setEditingList] = useState(false)
+
   // The watchlist for this kind: the open queue first (position order — drag
   // to reorder, top = next up), then checked-off ones. Reading lists (books)
   // are per person — show only the viewer's own rows; the other lists are
@@ -81,10 +98,10 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     () =>
       sortWatchlist(
         store.watchlist.filter(
-          (w) => w.kind === kind && (!listIsPersonal(kind) || w.createdBy === store.selfId),
+          (w) => w.kind === key && (!listIsPersonal(key) || w.createdBy === store.selfId),
         ),
       ),
-    [store.watchlist, kind, store.selfId],
+    [store.watchlist, key, store.selfId],
   )
 
   // Date per tier item id, for the checked-off watchlist rows (the wish itself
@@ -95,8 +112,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     () =>
       personal
         ? new Map(store.completions.filter((r) => r.userId === store.selfId).map((r) => [r.itemId, r.doneOn]))
-        : new Map(store.items.filter((item) => item.kind === kind).map((item) => [item.id, item.doneOn])),
-    [personal, store.completions, store.selfId, store.items, kind],
+        : new Map(store.items.filter((item) => item.kind === key).map((item) => [item.id, item.doneOn])),
+    [personal, store.completions, store.selfId, store.items, key],
   )
 
   // Tag filter (shared tri-state pills — see src/lib/useTagFilter). While any
@@ -104,21 +121,22 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   // drops between visible neighbors would land at arbitrary positions
   // relative to the hidden cards.
   const { tagFilter, includedTags, excludedTags, filterActive, toggleTag, clearTagFilter } = useTagFilter()
-  useEffect(() => clearTagFilter(), [kind])
-  // All four routes render this same component, so a kind switch (browser
-  // back/forward — the header nav is behind the overlay) must drop an open
-  // modal: saving a movie draft onto /tv would file it under the wrong kind,
-  // and a book edit saved on a movie route would flip its date semantics.
+  useEffect(() => clearTagFilter(), [key])
+  // Every board renders this same component, so a board switch (a picker pill,
+  // or browser back/forward) must drop an open modal: saving a movie draft
+  // onto /tv would file it under the wrong board, and a book edit saved on a
+  // movie route would flip its date semantics.
   useEffect(() => {
     setModalOpen(false)
     setEditingId(null)
-  }, [kind])
-  const kindTags = useMemo(() => distinctTags(store.items, kind), [store.items, kind])
+    setListModalOpen(false)
+  }, [key])
+  const kindTags = useMemo(() => distinctTags(store.items, key), [store.items, key])
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
-    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, kind),
-    [store.items, tagFilter, store.placements, store.completions, viewerId, kind],
+    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, key),
+    [store.items, tagFilter, store.placements, store.completions, viewerId, key],
   )
 
   // Your placement position per item — neighbor lookup when a drop lands.
@@ -166,11 +184,11 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       try {
         if (modalVariant === 'watchlist') {
           if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl, draft.creator)
-          else await store.addWatchlistItem(kind, draft.title, draft.imageUrl, draft.creator)
+          else await store.addWatchlistItem(key, draft.title, draft.imageUrl, draft.creator)
         } else {
           const dateOn = draft.doneOn || null
-          if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
-          else await store.addItem(kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+          if (editingId) await store.updateItem(editingId, key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+          else await store.addItem(key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
         }
         closeModal()
       } catch {
@@ -215,9 +233,72 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     }
   }
 
+  // --- The list itself (the board's own name and words) ---
+
+  const activeList = store.lists.find((l) => l.id === listIdOf(key)) ?? null
+
+  const openNewList = () => {
+    setEditingList(false)
+    setListDraft(emptyListDraft())
+    setListModalOpen(true)
+  }
+
+  const openEditList = () => {
+    if (!activeList) return
+    setEditingList(true)
+    setListDraft(draftFromList(activeList))
+    setListModalOpen(true)
+  }
+
+  const { busy: savingList, run: runSaveList } = useBusy()
+  const saveList = () =>
+    runSaveList(async () => {
+      if (!listDraft.name.trim() || !listDraft.noun.trim()) return
+      try {
+        if (editingList && activeList) {
+          await store.updateList(activeList.id, listDraft)
+          setListModalOpen(false)
+        } else {
+          const created = await store.addList(listDraft)
+          setListModalOpen(false)
+          // Land on the new board right away — it's empty and waiting.
+          navigate(`/lists/${created.id}`)
+        }
+      } catch {
+        // Write failed — keep the modal open; store.error shows the reason.
+      }
+    })
+
+  const deleteActiveList = async () => {
+    if (!activeList) return
+    const ok = await confirm({
+      title: `Delete the "${activeList.name}" list for both of you?`,
+      message: `Every ${activeList.noun} on it, everyone's rankings of them, and its to-${activeList.verb} list are removed too.`,
+    })
+    if (!ok) return
+    try {
+      await store.deleteList(activeList.id)
+      setListModalOpen(false)
+      // The <Navigate> guard below bounces this route to /movies once the
+      // list row is gone.
+    } catch {
+      // Keep the modal open on failure.
+    }
+  }
+
   // Gate on the first data load (live mode only; the space resolves in App).
   // The picker and control bar stay put; only the board waits.
   const loadingData = configured && store.loading
+
+  // A `list:<id>` key with no matching row means the list never existed, or
+  // the partner just deleted the one you were looking at. Checked AFTER the
+  // loading gate so a hard load of /lists/:id in live mode waits for the
+  // snapshot instead of bouncing on an empty store; in seed mode the data is
+  // there from the first render, so it bounces immediately.
+  const missingList = listIdOf(key) !== null && activeList === null
+  if (missingList && !loadingData) {
+    return <Navigate to="/movies" replace />
+  }
 
   return (
     <>
@@ -227,7 +308,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       <PageFrame>
         {/* Which list you're looking at — the four boards used to be four
             header nav items. */}
-        <ListPicker activeKey={kind} />
+        <ListPicker
+          lists={store.lists}
+          activeKey={key}
+          onNew={openNewList}
+          onEdit={openEditList}
+        />
 
         <ControlBar
           left={
@@ -280,14 +366,14 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
 
             {mode === 'watchlist' ? (
               <>
-                {listIsPersonal(kind) && partner && (
+                {listIsPersonal(key) && partner && (
                   <Text fz={text.small} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
                     Your {copy.listLabel.toLowerCase()} — {partnerName} keeps their own.
                   </Text>
                 )}
                 <Watchlist
                   items={watchItems}
-                  kind={kind}
+                  copy={copy}
                   doneDates={doneDates}
                   onCheck={(item) => {
                     void store.checkOffWatchlistItem(item)
@@ -314,7 +400,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 </Text>
                 <BoardView
                   board={board}
-                  renderCard={(item) => <CardVisual key={item.id} item={item} />}
+                  renderCard={(item) => <CardVisual key={item.id} item={item} emoji={copy.emoji} />}
                   shelfHint={`${partnerName} hasn't ranked everything yet.`}
                   unwatchedHint={`Nothing waiting to be ${copy.past}.`}
                   unwatchedLabel={copy.shelfLabel}
@@ -329,7 +415,9 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 </Text>
                 <BoardView
                   board={board}
-                  renderCard={(item) => <CardVisual key={item.id} item={item} onClick={() => openEdit(item)} />}
+                  renderCard={(item) => (
+                    <CardVisual key={item.id} item={item} emoji={copy.emoji} onClick={() => openEdit(item)} />
+                  )}
                   shelfHint={`No unranked ${noun}s match this filter.`}
                   unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this filter.`}
                   unwatchedLabel={copy.shelfLabel}
@@ -358,6 +446,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                   void (personal ? store.setDoneOn(itemId, null) : store.setSharedDoneOn(itemId, null))
                 }}
                 onCardClick={openEdit}
+                cardEmoji={copy.emoji}
                 shelfHint={
                   board.unranked.length === 0 &&
                   board.unwatched.length === 0 &&
@@ -373,9 +462,21 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         )}
       </PageFrame>
 
+      <ListModal
+        opened={listModalOpen}
+        draft={listDraft}
+        isEditing={editingList}
+        onChange={(patch) => setListDraft((prev) => ({ ...prev, ...patch }))}
+        saving={savingList}
+        onSave={saveList}
+        onDelete={deleteActiveList}
+        onClose={() => setListModalOpen(false)}
+      />
+
       <ItemModal
         opened={modalOpen}
-        kind={kind}
+        kind={key}
+        copy={copy}
         draft={draft}
         isEditing={editingId !== null}
         variant={modalVariant}

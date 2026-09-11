@@ -55,6 +55,7 @@ export function TierBoard({
   onMarkDone,
   onMarkUndone,
   onCardClick,
+  cardEmoji,
   shelfHint,
   unwatchedHint,
   unwatchedLabel,
@@ -73,6 +74,8 @@ export function TierBoard({
   /** A card was dropped on the unwatched/unread shelf — clear that date. */
   onMarkUndone: (itemId: string) => void
   onCardClick: (item: TierItem) => void
+  /** Fallback emoji for an imageless card — the board's, from copyFor. */
+  cardEmoji: string
   shelfHint?: string
   unwatchedHint?: string
   unwatchedLabel?: string
@@ -225,11 +228,11 @@ export function TierBoard({
         unwatchedHint={unwatchedHint}
         unwatchedLabel={unwatchedLabel}
         renderCard={(item: TierItem, _container: ContainerId) => (
-          <SortableCard key={item.id} item={item} onClick={() => onCardClick(item)} />
+          <SortableCard key={item.id} item={item} emoji={cardEmoji} onClick={() => onCardClick(item)} />
         )}
       />
       {createPortal(
-        <DragOverlay>{activeItem ? <CardVisual item={activeItem} lifted /> : null}</DragOverlay>,
+        <DragOverlay>{activeItem ? <CardVisual item={activeItem} emoji={cardEmoji} lifted /> : null}</DragOverlay>,
         document.body,
       )}
     </DndContext>

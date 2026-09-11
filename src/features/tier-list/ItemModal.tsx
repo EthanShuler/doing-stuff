@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Box, Group, TagsInput, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
-import type { TierItem, TierKind } from '../../types'
+import type { ListKey, TierItem } from '../../types'
 import { colors, fonts, radii, shadows, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 import { isTmdbConfigured, searchTmdb } from '../../lib/tmdb'
 import { searchOpenLibrary } from '../../lib/openLibrary'
-import { KIND_COPY } from './copy'
+import type { KindCopy } from './copy'
 import { CardVisual } from './TierCard'
 
 /** The draft backing the add/edit item modal. */
@@ -44,6 +44,7 @@ interface Suggestion {
 export function ItemModal({
   opened,
   kind,
+  copy,
   draft,
   isEditing,
   variant = 'board',
@@ -55,7 +56,12 @@ export function ItemModal({
   onClose,
 }: {
   opened: boolean
-  kind: TierKind
+  /** The board this item belongs to. Only used to pick a search provider —
+   *  a custom list matches none, so it gets hand entry (the same as ice
+   *  cream). All wording comes from `copy`. */
+  kind: ListKey
+  /** The board's wording (KIND_COPY for a built-in, customCopy for a list). */
+  copy: KindCopy
   draft: ItemDraft
   isEditing: boolean
   /** 'board' adds straight to the tier pool; 'watchlist' adds a "want to watch"
@@ -70,7 +76,6 @@ export function ItemModal({
   onDelete: () => void
   onClose: () => void
 }) {
-  const copy = KIND_COPY[kind]
   const noun = copy.noun
   const canSave = Boolean(draft.title.trim())
   const isWatchlist = variant === 'watchlist'
@@ -176,7 +181,8 @@ export function ItemModal({
                 setShowSuggestions(true)
               }}
               onBlur={() => setShowSuggestions(false)}
-              placeholder={`e.g. ${copy.example}`}
+              // A custom list has no example title to suggest.
+              placeholder={copy.example ? `e.g. ${copy.example}` : `Name of the ${noun}`}
               data-autofocus
               autoComplete="off"
             />
@@ -296,7 +302,7 @@ export function ItemModal({
         {/* No key: MediaImage already remembers "broken" per URL, so a new
             link retries on its own without remounting the whole card. */}
         <Box mt={4}>
-          <CardVisual item={previewItem} />
+          <CardVisual item={previewItem} emoji={copy.emoji} />
         </Box>
       </Group>
 

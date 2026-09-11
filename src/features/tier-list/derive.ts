@@ -1,4 +1,4 @@
-import type { Tier, TierItem, TierKind, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
+import type { ListKey, Tier, TierItem, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
@@ -10,6 +10,29 @@ export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
  *  unwatched (for books: unread) shelf. */
 export type ContainerId = Tier | 'unranked' | 'unwatched'
 
+// --- List keys ---------------------------------------------------------------
+// A board is identified app-side by a ListKey: one of the four built-in kinds,
+// or `list:<tier_lists.id>`. The DB stores that as two columns — `kind`
+// ('custom' for a space-defined list) and a nullable `list_id` — so these four
+// converters are the only place the two shapes meet.
+
+/** The key for a space-defined list's board. */
+export const listKeyFor = (listId: string): ListKey => `list:${listId}`
+
+/** The `tier_lists.id` behind a key, or null for a built-in kind. */
+export const listIdOf = (key: ListKey): string | null =>
+  key.startsWith('list:') ? key.slice('list:'.length) : null
+
+/** What goes in the row's `kind` column: the built-in kind, or 'custom'. */
+export const kindColumn = (key: ListKey): string => (listIdOf(key) ? 'custom' : key)
+
+/** Rebuild a key from a row's two columns (the mapper's side of kindColumn /
+ *  listIdOf). A 'custom' row without a list_id can't happen — the DB CHECK
+ *  ties them together — but if one ever did it would key to a board nobody
+ *  can route to, which is the safe direction. */
+export const keyOf = (kind: string, listId: string | null): ListKey =>
+  listId ? listKeyFor(listId) : (kind as ListKey)
+
 /**
  * Whether a kind's "done with it" date belongs to one person rather than the
  * shared item. Movies and TV are watched together, so `TierItem.doneOn` (the
@@ -18,16 +41,18 @@ export type ContainerId = Tier | 'unranked' | 'unwatched'
  * tried together — shared like movies/TV — but shows no dates in the UI:
  * `doneOn` is just its tried/not-tried marker (see `usesDates` in copy.ts).
  */
-export const datesArePersonal = (kind: TierKind): boolean => kind === 'book'
+export const datesArePersonal = (key: ListKey): boolean => key === 'book'
 
 /**
  * Whether a kind's "want to" list belongs to one person rather than the space.
  * Movies, TV, and ice cream are watched/tried together, so their watchlists
  * are shared; books are read separately, so each member keeps their own
  * reading list — the UI shows only rows whose `createdBy` is the viewer, and
- * RLS lets only the owner write a book's row.
+ * RLS lets only the owner write a book's row. Custom lists are never personal
+ * (they follow the ice-cream template), which is also why the book-only
+ * watchlist RLS needs no change for them.
  */
-export const listIsPersonal = (kind: TierKind): boolean => kind === 'book'
+export const listIsPersonal = (key: ListKey): boolean => key === 'book'
 
 /** Palette index per tier — a classic hot→cool ramp through the theme swatches. */
 const TIER_COLOR_INDEX: Record<Tier, number> = { S: 5, A: 1, B: 3, C: 0, D: 4, F: 2 }
@@ -59,8 +84,8 @@ export function normalizeTags(tags: string[]): string[] {
 /** Every tag in use on one kind's items, deduped case-insensitively (first
  *  spelling seen wins) and sorted alphabetically. Drives the filter pills and
  *  the item modal's suggestions. */
-export function distinctTags(items: TierItem[], kind: TierKind): string[] {
-  return distinctTagList(items.filter((item) => item.kind === kind).map((item) => item.tags))
+export function distinctTags(items: TierItem[], key: ListKey): string[] {
+  return distinctTagList(items.filter((item) => item.kind === key).map((item) => item.tags))
 }
 
 /** Keep the items matching the include/exclude tag selections (shared
@@ -93,13 +118,13 @@ export function deriveBoard(
   placements: TierPlacement[],
   completions: TierCompletion[],
   viewerId: string | null,
-  kind: TierKind,
+  key: ListKey,
 ): Board {
   const placementByItem = new Map<string, TierPlacement>()
   for (const p of placements) {
     if (p.userId === viewerId) placementByItem.set(p.itemId, p)
   }
-  const personal = datesArePersonal(kind)
+  const personal = datesArePersonal(key)
   const completedItems = new Set<string>()
   if (personal) {
     for (const r of completions) {
@@ -114,7 +139,7 @@ export function deriveBoard(
   const unwatched: TierItem[] = []
 
   for (const item of items) {
-    if (item.kind !== kind) continue
+    if (item.kind !== key) continue
     const placement = placementByItem.get(item.id)
     const dated = personal ? completedItems.has(item.id) : item.doneOn !== null
     if (placement) tiers[placement.tier].push({ item, placement })
@@ -233,10 +258,37 @@ export function sortWatchlist(items: WatchlistItem[]): WatchlistItem[] {
 }
 
 /** Position that appends a new wish at the bottom of one kind's queue. */
-export function nextWatchlistPosition(items: WatchlistItem[], kind: TierKind): number {
+export function nextWatchlistPosition(items: WatchlistItem[], key: ListKey): number {
   let max = 0
   for (const w of items) {
-    if (w.kind === kind && w.position > max) max = w.position
+    if (w.kind === key && w.position > max) max = w.position
   }
   return max + 1
+}
+
+// --- Deleting a list ---------------------------------------------------------
+
+/**
+ * Drop everything belonging to one custom list from a store snapshot — the
+ * local mirror of the DB cascade (`tier_lists` → `tier_items` → placements /
+ * completions, and `tier_lists` → `watchlist_items`). Rows on other boards
+ * are untouched; the list row itself is removed by the caller.
+ */
+export function pruneList<
+  S extends {
+    items: TierItem[]
+    placements: TierPlacement[]
+    completions: TierCompletion[]
+    watchlist: WatchlistItem[]
+  },
+>(state: S, listId: string): S {
+  const key = listKeyFor(listId)
+  const gone = new Set(state.items.filter((item) => item.kind === key).map((item) => item.id))
+  return {
+    ...state,
+    items: state.items.filter((item) => item.kind !== key),
+    placements: state.placements.filter((p) => !gone.has(p.itemId)),
+    completions: state.completions.filter((c) => !gone.has(c.itemId)),
+    watchlist: state.watchlist.filter((w) => w.kind !== key),
+  }
 }

@@ -6,7 +6,6 @@ import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
 import { colors, fonts, shadows, text } from '../../theme'
 import { posterSrc } from '../../lib/imageUrl'
-import { KIND_COPY } from './copy'
 
 /** Card footprint — constant so tier rows pack densely and wrap cleanly. */
 export const CARD_WIDTH = 76
@@ -77,10 +76,15 @@ export function MediaImage({
  *  the DragOverlay; SortableCard wraps it with the drag wiring. */
 export function CardVisual({
   item,
+  emoji,
   lifted,
   onClick,
 }: {
   item: TierItem
+  /** Board emoji shown when the item has no image — passed in rather than
+   *  looked up, since a space-defined list's emoji lives on its row (see
+   *  copyFor in copy.ts), not in a static table. */
+  emoji: string
   /** Floating in the DragOverlay: bigger shadow + slight tilt. */
   lifted?: boolean
   onClick?: () => void
@@ -103,7 +107,7 @@ export function CardVisual({
       <MediaImage
         imageUrl={item.imageUrl}
         title={item.title}
-        emoji={KIND_COPY[item.kind].emoji}
+        emoji={emoji}
         width="100%"
         height={POSTER_HEIGHT}
         srcWidth={CARD_WIDTH}
@@ -141,7 +145,15 @@ export function CardVisual({
 
 /** A draggable/sortable card on your own board. Click (under the sensor's
  *  4px activation distance) opens the edit modal instead of starting a drag. */
-export function SortableCard({ item, onClick }: { item: TierItem; onClick?: () => void }) {
+export function SortableCard({
+  item,
+  emoji,
+  onClick,
+}: {
+  item: TierItem
+  emoji: string
+  onClick?: () => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style: CSSProperties = {
@@ -155,7 +167,7 @@ export function SortableCard({ item, onClick }: { item: TierItem; onClick?: () =
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <CardVisual item={item} onClick={onClick} />
+      <CardVisual item={item} emoji={emoji} onClick={onClick} />
     </div>
   )
 }
