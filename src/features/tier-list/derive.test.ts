@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TierItem, TierPlacement, TierRead, WatchlistItem } from '../../types'
+import type { TierItem, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
 import {
   TIERS,
   datesArePersonal,
@@ -28,9 +28,9 @@ function item(over: Partial<TierItem> = {}): TierItem {
     kind: 'movie',
     title: `Item ${seq}`,
     imageUrl: '',
-    // Watched by default — a null watchedOn diverts unplaced items to the
+    // Done by default — a null doneOn diverts unplaced items to the
     // unwatched shelf, which the shelf-split tests exercise explicitly.
-    watchedOn: '2026-06-15',
+    doneOn: '2026-06-15',
     tags: [],
     creator: '',
     createdBy: 'u1',
@@ -44,9 +44,9 @@ function placement(over: Partial<TierPlacement> = {}): TierPlacement {
   return { id: `p${seq}`, itemId: 'i1', userId: 'u1', tier: 'A', position: 1, ...over }
 }
 
-function read(over: Partial<TierRead> = {}): TierRead {
+function completion(over: Partial<TierCompletion> = {}): TierCompletion {
   seq += 1
-  return { id: `r${seq}`, itemId: 'i1', userId: 'u1', readOn: '2026-06-20', ...over }
+  return { id: `r${seq}`, itemId: 'i1', userId: 'u1', doneOn: '2026-06-20', ...over }
 }
 
 function wish(over: Partial<WatchlistItem> = {}): WatchlistItem {
@@ -119,23 +119,23 @@ describe('deriveBoard', () => {
   })
 
   it('splits unplaced items between the shelves by watched date', () => {
-    const watched = item({ watchedOn: '2026-06-01' })
-    const undated = item({ watchedOn: null })
+    const watched = item({ doneOn: '2026-06-01' })
+    const undated = item({ doneOn: null })
     const board = deriveBoard([watched, undated], [], [], 'u1', 'movie')
     expect(board.unranked).toEqual([watched])
     expect(board.unwatched).toEqual([undated])
   })
 
   it('a placement wins over a missing watched date', () => {
-    const a = item({ watchedOn: null })
+    const a = item({ doneOn: null })
     const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'B' })], [], 'u1', 'movie')
     expect(board.tiers.B).toEqual([a])
     expect(board.unwatched).toEqual([])
   })
 
   it('sorts the unwatched shelf by createdAt (oldest first)', () => {
-    const newer = item({ watchedOn: null, createdAt: '2026-06-02T00:00:00Z' })
-    const older = item({ watchedOn: null, createdAt: '2026-06-01T00:00:00Z' })
+    const newer = item({ doneOn: null, createdAt: '2026-06-02T00:00:00Z' })
+    const older = item({ doneOn: null, createdAt: '2026-06-01T00:00:00Z' })
     const board = deriveBoard([newer, older], [], [], 'u1', 'movie')
     expect(board.unwatched.map((i) => i.id)).toEqual([older.id, newer.id])
   })
@@ -156,49 +156,49 @@ describe('deriveBoard', () => {
 
 describe('deriveBoard for books', () => {
   it('a book with no read record for the viewer sits on the unread shelf', () => {
-    const a = item({ kind: 'book', watchedOn: null })
+    const a = item({ kind: 'book', doneOn: null })
     const board = deriveBoard([a], [], [], 'u1', 'book')
     expect(board.unwatched).toEqual([a])
     expect(board.unranked).toEqual([])
   })
 
   it("the partner's read record does not mark it read for me", () => {
-    const a = item({ kind: 'book', watchedOn: null })
-    const board = deriveBoard([a], [], [read({ itemId: a.id, userId: 'u2' })], 'u1', 'book')
+    const a = item({ kind: 'book', doneOn: null })
+    const board = deriveBoard([a], [], [completion({ itemId: a.id, userId: 'u2' })], 'u1', 'book')
     expect(board.unwatched).toEqual([a])
     expect(board.unranked).toEqual([])
   })
 
   it('my own read record moves it to my unranked shelf', () => {
-    const a = item({ kind: 'book', watchedOn: null })
-    const board = deriveBoard([a], [], [read({ itemId: a.id, userId: 'u1' })], 'u1', 'book')
+    const a = item({ kind: 'book', doneOn: null })
+    const board = deriveBoard([a], [], [completion({ itemId: a.id, userId: 'u1' })], 'u1', 'book')
     expect(board.unranked).toEqual([a])
     expect(board.unwatched).toEqual([])
   })
 
-  it('each viewer splits the same pool by their own reads', () => {
-    const a = item({ kind: 'book', watchedOn: null })
-    const reads = [read({ itemId: a.id, userId: 'u2' })]
-    expect(deriveBoard([a], [], reads, 'u2', 'book').unranked).toEqual([a])
-    expect(deriveBoard([a], [], reads, 'u1', 'book').unwatched).toEqual([a])
+  it('each viewer splits the same pool by their own completions', () => {
+    const a = item({ kind: 'book', doneOn: null })
+    const comps = [completion({ itemId: a.id, userId: 'u2' })]
+    expect(deriveBoard([a], [], comps, 'u2', 'book').unranked).toEqual([a])
+    expect(deriveBoard([a], [], comps, 'u1', 'book').unwatched).toEqual([a])
   })
 
   it('ignores the shared watched date for books', () => {
-    const a = item({ kind: 'book', watchedOn: '2026-06-01' })
+    const a = item({ kind: 'book', doneOn: '2026-06-01' })
     const board = deriveBoard([a], [], [], 'u1', 'book')
     expect(board.unwatched).toEqual([a])
   })
 
   it('a placement wins over a missing read record', () => {
-    const a = item({ kind: 'book', watchedOn: null })
+    const a = item({ kind: 'book', doneOn: null })
     const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'B' })], [], 'u1', 'book')
     expect(board.tiers.B).toEqual([a])
     expect(board.unwatched).toEqual([])
   })
 
   it('movies ignore read records — the shared watched date still rules', () => {
-    const a = item({ kind: 'movie', watchedOn: null })
-    const board = deriveBoard([a], [], [read({ itemId: a.id, userId: 'u1' })], 'u1', 'movie')
+    const a = item({ kind: 'movie', doneOn: null })
+    const board = deriveBoard([a], [], [completion({ itemId: a.id, userId: 'u1' })], 'u1', 'movie')
     expect(board.unwatched).toEqual([a])
   })
 })
@@ -206,27 +206,27 @@ describe('deriveBoard for books', () => {
 // --- deriveBoard: ice cream (shared tried state, no visible dates) --------------
 
 describe('deriveBoard for ice cream', () => {
-  it('an untried flavor (null watchedOn) sits on the Not tried shelf', () => {
-    const a = item({ kind: 'ice-cream', watchedOn: null })
+  it('an untried flavor (null doneOn) sits on the Not tried shelf', () => {
+    const a = item({ kind: 'ice-cream', doneOn: null })
     const board = deriveBoard([a], [], [], 'u1', 'ice-cream')
     expect(board.unwatched).toEqual([a])
     expect(board.unranked).toEqual([])
   })
 
   it('the tried marker is shared — both viewers see it off the shelf', () => {
-    const a = item({ kind: 'ice-cream', watchedOn: '2026-06-07' })
+    const a = item({ kind: 'ice-cream', doneOn: '2026-06-07' })
     expect(deriveBoard([a], [], [], 'u1', 'ice-cream').unranked).toEqual([a])
     expect(deriveBoard([a], [], [], 'u2', 'ice-cream').unranked).toEqual([a])
   })
 
   it('ignores read records — only the shared marker rules', () => {
-    const a = item({ kind: 'ice-cream', watchedOn: null })
-    const board = deriveBoard([a], [], [read({ itemId: a.id, userId: 'u1' })], 'u1', 'ice-cream')
+    const a = item({ kind: 'ice-cream', doneOn: null })
+    const board = deriveBoard([a], [], [completion({ itemId: a.id, userId: 'u1' })], 'u1', 'ice-cream')
     expect(board.unwatched).toEqual([a])
   })
 
   it('a placement wins over a missing tried marker', () => {
-    const a = item({ kind: 'ice-cream', watchedOn: null })
+    const a = item({ kind: 'ice-cream', doneOn: null })
     const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'S' })], [], 'u1', 'ice-cream')
     expect(board.tiers.S).toEqual([a])
     expect(board.unwatched).toEqual([])
@@ -306,7 +306,7 @@ describe('filterByTags', () => {
 describe('findContainer', () => {
   const a = item()
   const b = item()
-  const c = item({ watchedOn: null })
+  const c = item({ doneOn: null })
   const board = deriveBoard([a, b, c], [placement({ itemId: a.id, tier: 'C' })], [], 'u1', 'movie')
 
   it('resolves container ids to themselves', () => {
@@ -330,7 +330,7 @@ describe('moveItem', () => {
   const a = item()
   const b = item()
   const c = item()
-  const d = item({ watchedOn: null })
+  const d = item({ doneOn: null })
   const board = deriveBoard(
     [a, b, c, d],
     [

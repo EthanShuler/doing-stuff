@@ -172,12 +172,14 @@ create table if not exists public.tier_items (
   title       text not null,
   -- Poster/cover image, pasted as a URL ('' = none; the card shows a fallback).
   image_url   text not null default '',
-  -- The day we finished watching it (shared, like the item itself). Null =
-  -- unknown; the client defaults it to today on add / watchlist check-off.
-  -- Movies/TV only — books are read separately, so their dates are per person
-  -- in `tier_item_reads` and this column stays null. Ice cream shows no dates
-  -- in the UI but reuses this as its shared tried/not-tried marker.
-  watched_on  date,
+  -- The day we finished it (SHARED, like the item itself). Null = unknown;
+  -- the client defaults it to today on add / watchlist check-off. Movies/TV
+  -- only — books are read separately, so their dates are per person in
+  -- `tier_item_completions.done_on` (same column name on purpose) and this
+  -- stays null. Ice cream shows no dates in the UI but reuses this as its
+  -- shared tried/not-tried marker. Renamed from `watched_on` on 2026-09-11 —
+  -- see the migration note at the end of this section.
+  done_on     date,
   -- Free-text labels ("disney", "fantasy", "childhood reads") for filtering
   -- the boards. Shared like the item itself — they describe it, not an
   -- opinion of it. On an existing DB, apply with:
@@ -206,19 +208,19 @@ create table if not exists public.tier_placements (
   unique (item_id, user_id)
 );
 
--- Per-person read state for BOOK items. Movies/TV are watched together, so
--- their date is the shared `watched_on` above; books are read separately, so
--- each member records their own finish date here. Absence of a row = that
--- member hasn't read it (the book sits on their Unread shelf). Opinion data
--- like placements → same split RLS below (members read all, write only their
--- own rows).
-create table if not exists public.tier_item_reads (
+-- PER-PERSON completion state — today only BOOK items use it. Movies/TV are
+-- watched together, so their date is the shared `done_on` above; books are
+-- read separately, so each member records their own finish date here. Absence
+-- of a row = that member hasn't finished it (the book sits on their Unread
+-- shelf). Opinion data like placements → same split RLS below (members read
+-- all, write only their own rows).
+create table if not exists public.tier_item_completions (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
   item_id     uuid not null references public.tier_items (id) on delete cascade,
   user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
   -- The day this member finished it.
-  read_on     date not null,
+  done_on     date not null,
   created_at  timestamptz not null default now(),
   -- One read record per person per item — also the upsert conflict target.
   unique (item_id, user_id)
@@ -227,8 +229,20 @@ create table if not exists public.tier_item_reads (
 create index if not exists tier_items_space_idx      on public.tier_items (space_id);
 create index if not exists tier_placements_space_idx on public.tier_placements (space_id);
 create index if not exists tier_placements_item_idx  on public.tier_placements (item_id);
-create index if not exists tier_item_reads_space_idx on public.tier_item_reads (space_id);
-create index if not exists tier_item_reads_item_idx  on public.tier_item_reads (item_id);
+create index if not exists tier_item_completions_space_idx on public.tier_item_completions (space_id);
+create index if not exists tier_item_completions_item_idx  on public.tier_item_completions (item_id);
+
+-- Migration (2026-09-11): the per-person date table was `tier_item_reads`
+-- (book-specific in name only) and the shared one `tier_items.watched_on`.
+-- Both now read in parallel as `done_on`. On an existing DB, run once:
+--   alter table public.tier_item_reads rename to tier_item_completions;
+--   alter table public.tier_item_completions rename column read_on to done_on;
+--   alter index if exists tier_item_reads_space_idx rename to tier_item_completions_space_idx;
+--   alter index if exists tier_item_reads_item_idx  rename to tier_item_completions_item_idx;
+--   alter table public.tier_items rename column watched_on to done_on;
+-- A table rename keeps the rows, constraints, RLS policies (their names are
+-- unchanged — still "members read reads" and friends) and the table's
+-- `supabase_realtime` publication membership, which follows the OID.
 
 -- ---------------------------------------------------------------------------
 -- Watchlist (movies + TV + books + ice cream): a list of things we want to
@@ -550,7 +564,7 @@ alter table public.recipes       enable row level security;
 alter table public.little_guys   enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
-alter table public.tier_item_reads  enable row level security;
+alter table public.tier_item_completions enable row level security;
 alter table public.watchlist_items  enable row level security;
 alter table public.music_practice_days enable row level security;
 
@@ -667,23 +681,25 @@ drop policy if exists "delete own placements" on public.tier_placements;
 create policy "delete own placements" on public.tier_placements
   for delete using (user_id = auth.uid());
 
--- Read records are per-person like placements: members read everyone's (the
--- partner's Unread shelf renders from theirs), but write only their own.
-drop policy if exists "members read reads" on public.tier_item_reads;
-create policy "members read reads" on public.tier_item_reads
+-- Completions are per-person like placements: members read everyone's (the
+-- partner's Unread shelf renders from theirs), but write only their own. The
+-- policy NAMES still say "reads" — a table rename carries policies along, so
+-- renaming them too would mean extra migration statements for no gain.
+drop policy if exists "members read reads" on public.tier_item_completions;
+create policy "members read reads" on public.tier_item_completions
   for select using (public.is_space_member(space_id));
 
-drop policy if exists "insert own reads" on public.tier_item_reads;
-create policy "insert own reads" on public.tier_item_reads
+drop policy if exists "insert own reads" on public.tier_item_completions;
+create policy "insert own reads" on public.tier_item_completions
   for insert with check (public.is_space_member(space_id) and user_id = auth.uid());
 
-drop policy if exists "update own reads" on public.tier_item_reads;
-create policy "update own reads" on public.tier_item_reads
+drop policy if exists "update own reads" on public.tier_item_completions;
+create policy "update own reads" on public.tier_item_completions
   for update using (user_id = auth.uid())
   with check (public.is_space_member(space_id) and user_id = auth.uid());
 
-drop policy if exists "delete own reads" on public.tier_item_reads;
-create policy "delete own reads" on public.tier_item_reads
+drop policy if exists "delete own reads" on public.tier_item_completions;
+create policy "delete own reads" on public.tier_item_completions
   for delete using (user_id = auth.uid());
 
 -- Watchlists: movie/TV/ice-cream rows are shared (any member writes); book
@@ -750,7 +766,7 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_items, public.tier_placements,
-  public.tier_item_reads, public.watchlist_items, public.spoons, public.park_visits,
+  public.tier_item_completions, public.watchlist_items, public.spoons, public.park_visits,
   public.recipes, public.music_practice_days, public.little_guys
   to authenticated;
 grant select, update on public.profiles to authenticated;
@@ -771,7 +787,7 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_items', 'tier_placements', 'tier_item_reads', 'watchlist_items', 'spoons',
+          'tier_items', 'tier_placements', 'tier_item_completions', 'watchlist_items', 'spoons',
           'park_visits', 'recipes', 'little_guys']
   loop
     if not exists (

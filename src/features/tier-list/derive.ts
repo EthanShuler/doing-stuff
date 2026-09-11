@@ -1,4 +1,4 @@
-import type { Tier, TierItem, TierKind, TierPlacement, TierRead, WatchlistItem } from '../../types'
+import type { Tier, TierItem, TierKind, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
@@ -11,12 +11,12 @@ export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
 export type ContainerId = Tier | 'unranked' | 'unwatched'
 
 /**
- * Whether a kind's watched/read dates belong to one person rather than the
- * shared item. Movies and TV are watched together, so `watchedOn` lives on the
- * pool item; books are read separately, so each member's date is their own
- * TierRead row and the shared date is ignored. Ice cream is tried together —
- * shared like movies/TV — but shows no dates in the UI: `watchedOn` is just
- * its tried/not-tried marker (see `usesDates` in copy.ts).
+ * Whether a kind's "done with it" date belongs to one person rather than the
+ * shared item. Movies and TV are watched together, so `TierItem.doneOn` (the
+ * shared date) is the truth; books are read separately, so each member's date
+ * is their own TierCompletion row and the shared one is ignored. Ice cream is
+ * tried together — shared like movies/TV — but shows no dates in the UI:
+ * `doneOn` is just its tried/not-tried marker (see `usesDates` in copy.ts).
  */
 export const datesArePersonal = (kind: TierKind): boolean => kind === 'book'
 
@@ -82,16 +82,16 @@ export interface Board {
  * Build one person's board for one kind. Items the viewer hasn't placed land
  * on a shelf — the unwatched/unread shelf when they have no date, otherwise
  * the unranked shelf (both oldest first, so new additions appear at the end).
- * "Have a date" is per kind: movies/TV read the shared `watchedOn`; books look
- * for the VIEWER's own read row, so the same book can be ranked on one board
- * and unread on the other. A placement always wins: a ranked item stays in its
- * tier even if its date is cleared. Placements and reads referencing missing
- * items — or belonging to other viewers — are ignored.
+ * "Have a date" is per kind: movies/TV read the item's shared `doneOn`; books
+ * look for the VIEWER's own completion row, so the same book can be ranked on
+ * one board and unread on the other. A placement always wins: a ranked item
+ * stays in its tier even if its date is cleared. Placements and completions
+ * referencing missing items — or belonging to other viewers — are ignored.
  */
 export function deriveBoard(
   items: TierItem[],
   placements: TierPlacement[],
-  reads: TierRead[],
+  completions: TierCompletion[],
   viewerId: string | null,
   kind: TierKind,
 ): Board {
@@ -100,10 +100,10 @@ export function deriveBoard(
     if (p.userId === viewerId) placementByItem.set(p.itemId, p)
   }
   const personal = datesArePersonal(kind)
-  const readItems = new Set<string>()
+  const completedItems = new Set<string>()
   if (personal) {
-    for (const r of reads) {
-      if (r.userId === viewerId) readItems.add(r.itemId)
+    for (const r of completions) {
+      if (r.userId === viewerId) completedItems.add(r.itemId)
     }
   }
 
@@ -116,7 +116,7 @@ export function deriveBoard(
   for (const item of items) {
     if (item.kind !== kind) continue
     const placement = placementByItem.get(item.id)
-    const dated = personal ? readItems.has(item.id) : item.watchedOn !== null
+    const dated = personal ? completedItems.has(item.id) : item.doneOn !== null
     if (placement) tiers[placement.tier].push({ item, placement })
     else if (!dated) unwatched.push(item)
     else unranked.push(item)

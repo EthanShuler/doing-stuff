@@ -3,11 +3,11 @@ import type { TierKind } from '../../types'
 /**
  * Per-kind wording + iconography, so the components stay kind-agnostic.
  * Movies and TV are "watched" (one shared date on the pool item — we watch
- * together); books are "read", and read state is per person (see
- * `tier_item_reads`); ice cream is "tried" — shared like movies/TV, but with
- * no visible date (the shared `watched_on` is just its tried/not-tried
- * marker). The reading list is also per person — each member keeps their own
- * (see `listIsPersonal`). `datesArePersonal()` / `listIsPersonal()` in
+ * together); books are "read", and read state is per person (a
+ * `tier_item_completions` row); ice cream is "tried" — shared like movies/TV,
+ * but with no visible date (the item's shared `done_on` is just its
+ * tried/not-tried marker). The reading list is also per person — each member
+ * keeps their own (see `listIsPersonal`). `datesArePersonal()` / `listIsPersonal()` in
  * derive.ts are the behavior switches — this file is just the words.
  */
 export interface KindCopy {

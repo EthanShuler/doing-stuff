@@ -96,12 +96,12 @@ export interface TierItem {
   title: string
   /** Poster/cover image URL, pasted by hand. '' = none (card shows a fallback). */
   imageUrl: string
-  /** ISO date ("YYYY-MM-DD") we finished watching it; null when unknown (legacy
-   *  rows). Movies/TV only — books are read separately, so their dates live
-   *  per person in TierRead and this stays null. Ice cream shows no dates in
-   *  the UI, but reuses this as its shared "tried it" marker (null = not
-   *  tried; any date = tried). */
-  watchedOn: string | null
+  /** The SHARED "we finished this" date, ISO ("YYYY-MM-DD"); null when unknown
+   *  (legacy rows). Movies/TV only — books are read separately, so their dates
+   *  live per person in TierCompletion and this stays null. Ice cream shows no
+   *  dates in the UI, but reuses this as its shared "tried it" marker (null =
+   *  not tried; any date = tried). */
+  doneOn: string | null
   /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
   tags: string[]
   /** Who made it — author for books, director for movies, etc. (per-kind label
@@ -114,17 +114,19 @@ export interface TierItem {
 }
 
 /**
- * One person's "I've read this" record for a BOOK pool item — one row in
- * `tier_item_reads`. The pool is shared but reading isn't: each member marks
- * their own copy read, so a book can sit ranked on one board and on the Unread
- * shelf of the other. Absence of a row = that member hasn't read it.
+ * ONE PERSON'S "I'm done with this" record for a pool item — one row in
+ * `tier_item_completions`. Today only books use it: the pool is shared but
+ * reading isn't, so each member marks their own copy read and a book can sit
+ * ranked on one board and on the Unread shelf of the other. Absence of a row =
+ * that member hasn't finished it. (The shared counterpart is `TierItem.doneOn`
+ * — same meaning, one date for the space; `datesArePersonal()` picks.)
  */
-export interface TierRead {
+export interface TierCompletion {
   id: string
   itemId: string
   userId: string
   /** ISO date this member finished it. */
-  readOn: string
+  doneOn: string
 }
 
 /**

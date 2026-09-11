@@ -50,10 +50,11 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
 
 - **Tier item** (`tier_items`) — a movie, show, book, or ice cream flavor in the
   space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'` column, a
-  title, a hand-pasted poster/cover `image_url`, a nullable `watched_on` date —
-  when we finished it; defaults to today on a board add or watchlist check-off.
-  Movies/TV only — books leave it null and use per-person read records instead,
-  and ice cream never shows a date: `watched_on` is just its shared
+  title, a hand-pasted poster/cover `image_url`, a nullable `done_on` date —
+  the SHARED "we finished it" date; defaults to today on a board add or
+  watchlist check-off.
+  Movies/TV only — books leave it null and use per-person completions instead,
+  and ice cream never shows a date: `done_on` is just its shared
   tried/not-tried marker, managed by dragging on/off the Not tried shelf
   (`usesDates: false` in the tier-list `copy.ts` hides the modal's date
   field) — and free-text
@@ -78,13 +79,16 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   members **read** everyone's placements but
   **write only their own** — the partner's board is read-only at the security
   boundary, not just in the UI.
-- **Read record** (`tier_item_reads`) — **one person's** "I've read this" for a
-  BOOK item (a `read_on` date, upsert on `unique (item_id, user_id)`). Movies/TV
-  are watched together so their date is shared on the item; books are read
-  separately, so each member marks their own — the same book can be ranked on
-  one board and Unread on the other. `datesArePersonal()` in the tier-list
-  `derive.ts` is the behavior switch: for books, shelf drags and the modal's
-  date field write the viewer's own read row and never touch `watched_on`.
+- **Completion** (`tier_item_completions`) — **one person's** "I'm done with
+  this" for an item; today only BOOKS use it (a `done_on` date, upsert on
+  `unique (item_id, user_id)` — deliberately the same column name as the
+  shared `tier_items.done_on`, so the shared and personal sides read in
+  parallel). Movies/TV are watched together so their date is shared on the
+  item; books are read separately, so each member marks their own — the same
+  book can be ranked on one board and Unread on the other.
+  `datesArePersonal()` in the tier-list `derive.ts` is the behavior switch:
+  for books, shelf drags and the modal's date field write the viewer's own
+  completion row and never touch the item's shared `done_on`.
   Same split RLS as placements (read everyone's, write only your own).
 - **Watchlist item** (`watchlist_items`) — a "want to watch/read/try" entry
   per kind (UI label: Watchlist, Reading list for books, or To-try list for
@@ -97,13 +101,13 @@ S/A/B/C/D/F boards. The domain model splits pool from opinion:
   them, drag-to-reorder in `Watchlist.tsx`, top = watch/read/try next; new
   rows append at max + 1, and checked-off rows sink below the queue (keeping
   their slot, so unchecking restores it). Checking one off
-  creates the tier item — dated today: the shared `watched_on` for movies/TV
-  and ice cream, the *checker's own read record* for books — carrying the
+  creates the tier item — dated today: the shared `done_on` for movies/TV
+  and ice cream, the *checker's own completion row* for books — carrying the
   image and creator onto it, and links via `tier_item_id`
   (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
 All four routes render the same `TierListPage` (kind prop), so the store —
-holding every kind plus all users' placements and read records — survives
+holding every kind plus all users' placements and completions — survives
 kind switches. A
 You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
 (`TierBoard`), the partner's is the same layout with no drag wiring
@@ -410,13 +414,13 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_items`, `tier_placements`,
-  `tier_item_reads`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
+  `tier_item_completions`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
   `music_practice_days`, `little_guys`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
-  **`tier_placements` / `tier_item_reads` / `music_practice_days`** (members
+  **`tier_placements` / `tier_item_completions` / `music_practice_days`** (members
   read all, but insert/update/delete require `user_id = auth.uid()` — rankings,
   book read state, and daily practice are personal), and **`watchlist_items`**
   (members read all; writes to BOOK rows additionally require

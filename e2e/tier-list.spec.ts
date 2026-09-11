@@ -8,7 +8,7 @@ import { boardShelf, pickList, pickSegment, tierRow } from './helpers'
 //   Everything Everywhere is dated with no Avery placement (→ her Unranked).
 // - Books: read state is per person — Project Hail Mary is ranked A by Avery
 //   (she read it) but Unread for Jordan.
-// - Ice cream: no dates in the UI — watchedOn is just the shared tried marker.
+// - Ice cream: no dates in the UI — the item’s shared doneOn is just the tried marker.
 //   Rum raisin is untried (→ Not tried for both); Strawberry cheesecake is
 //   tried but unranked by Avery.
 

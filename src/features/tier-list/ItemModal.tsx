@@ -16,11 +16,11 @@ export interface ItemDraft {
   imageUrl: string
   /** ISO date it was finished; '' = not yet (the item sits on the unwatched/
    *  unread shelf until it's dated or dragged into a tier). For movies/TV this
-   *  is the shared watched date; for books it's the EDITOR's own read date;
+   *  is the item's shared done date; for books it's the EDITOR's own one;
    *  dateless kinds (ice cream) show no field and just pass the existing
    *  tried marker through unchanged. Board items only — list items aren't
    *  started yet, so the field is hidden. */
-  watchedOn: string
+  doneOn: string
   /** Shared filter labels ("disney", "fantasy"). Board items only. */
   tags: string[]
   /** Who made it — author/director/etc. (label per kind in copy.ts). Both
@@ -156,7 +156,7 @@ export function ItemModal({
     kind,
     title: draft.title.trim() || 'Title…',
     imageUrl: previewUrl,
-    watchedOn: null,
+    doneOn: null,
     tags: [],
     creator: draft.creator.trim(),
     createdBy: null,
@@ -273,8 +273,8 @@ export function ItemModal({
                 <TextInput
                   label={copy.dateLabel}
                   type="date"
-                  value={draft.watchedOn}
-                  onChange={(e) => onChange({ watchedOn: e.currentTarget.value })}
+                  value={draft.doneOn}
+                  onChange={(e) => onChange({ doneOn: e.currentTarget.value })}
                   mb={18}
                 />
               )}

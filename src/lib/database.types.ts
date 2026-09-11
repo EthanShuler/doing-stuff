@@ -147,7 +147,7 @@ export interface Database {
           kind: string
           title: string
           image_url: string
-          watched_on: string | null
+          done_on: string | null
           tags: string[]
           creator: string
           created_by: string | null
@@ -159,7 +159,7 @@ export interface Database {
           kind: string
           title: string
           image_url?: string
-          watched_on?: string | null
+          done_on?: string | null
           tags?: string[]
           creator?: string
           created_by?: string | null
@@ -171,7 +171,7 @@ export interface Database {
           kind?: string
           title?: string
           image_url?: string
-          watched_on?: string | null
+          done_on?: string | null
           tags?: string[]
           creator?: string
           created_by?: string | null
@@ -209,13 +209,13 @@ export interface Database {
         }
         Relationships: []
       }
-      tier_item_reads: {
+      tier_item_completions: {
         Row: {
           id: string
           space_id: string
           item_id: string
           user_id: string
-          read_on: string
+          done_on: string
           created_at: string
         }
         Insert: {
@@ -223,7 +223,7 @@ export interface Database {
           space_id: string
           item_id: string
           user_id?: string
-          read_on: string
+          done_on: string
           created_at?: string
         }
         Update: {
@@ -231,7 +231,7 @@ export interface Database {
           space_id?: string
           item_id?: string
           user_id?: string
-          read_on?: string
+          done_on?: string
           created_at?: string
         }
         Relationships: []

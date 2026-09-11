@@ -31,7 +31,7 @@ type Mode = 'board' | 'watchlist'
 const emptyDraft = (variant: Mode): ItemDraft => ({
   title: '',
   imageUrl: '',
-  watchedOn: variant === 'board' ? today() : '',
+  doneOn: variant === 'board' ? today() : '',
   tags: [],
   creator: '',
 })
@@ -91,12 +91,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   // has no date — it's looked up via the tier item it produced). Movies/TV:
   // the shared watched date. Books: YOUR read date — a book the partner
   // checked off shows dateless until you read it too.
-  const watchedDates = useMemo<Map<string, string | null>>(
+  const doneDates = useMemo<Map<string, string | null>>(
     () =>
       personal
-        ? new Map(store.reads.filter((r) => r.userId === store.selfId).map((r) => [r.itemId, r.readOn]))
-        : new Map(store.items.filter((item) => item.kind === kind).map((item) => [item.id, item.watchedOn])),
-    [personal, store.reads, store.selfId, store.items, kind],
+        ? new Map(store.completions.filter((r) => r.userId === store.selfId).map((r) => [r.itemId, r.doneOn]))
+        : new Map(store.items.filter((item) => item.kind === kind).map((item) => [item.id, item.doneOn])),
+    [personal, store.completions, store.selfId, store.items, kind],
   )
 
   // Tag filter (shared tri-state pills — see src/lib/useTagFilter). While any
@@ -117,8 +117,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
-    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.reads, viewerId, kind),
-    [store.items, tagFilter, store.placements, store.reads, viewerId, kind],
+    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, kind),
+    [store.items, tagFilter, store.placements, store.completions, viewerId, kind],
   )
 
   // Your placement position per item — neighbor lookup when a drop lands.
@@ -141,16 +141,16 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     // The date field edits the shared watched date — or, for books, YOUR own
     // read date (blank = you haven't read it, whatever the partner has done).
     const dateOn = personal
-      ? store.reads.find((r) => r.itemId === item.id && r.userId === store.selfId)?.readOn ?? ''
-      : item.watchedOn ?? ''
-    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: dateOn, tags: item.tags, creator: item.creator })
+      ? store.completions.find((r) => r.itemId === item.id && r.userId === store.selfId)?.doneOn ?? ''
+      : item.doneOn ?? ''
+    setDraft({ title: item.title, imageUrl: item.imageUrl, doneOn: dateOn, tags: item.tags, creator: item.creator })
     setModalOpen(true)
   }
 
   const openEditWatch = (item: WatchlistItem) => {
     setModalVariant('watchlist')
     setEditingId(item.id)
-    setDraft({ title: item.title, imageUrl: item.imageUrl, watchedOn: '', tags: [], creator: item.creator })
+    setDraft({ title: item.title, imageUrl: item.imageUrl, doneOn: '', tags: [], creator: item.creator })
     setModalOpen(true)
   }
 
@@ -168,7 +168,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
           if (editingId) await store.updateWatchlistItem(editingId, draft.title, draft.imageUrl, draft.creator)
           else await store.addWatchlistItem(kind, draft.title, draft.imageUrl, draft.creator)
         } else {
-          const dateOn = draft.watchedOn || null
+          const dateOn = draft.doneOn || null
           if (editingId) await store.updateItem(editingId, kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
           else await store.addItem(kind, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
         }
@@ -288,7 +288,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 <Watchlist
                   items={watchItems}
                   kind={kind}
-                  watchedDates={watchedDates}
+                  doneDates={doneDates}
                   onCheck={(item) => {
                     void store.checkOffWatchlistItem(item)
                   }}
@@ -351,11 +351,11 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 // Dragging out of the unwatched/unread shelf means "finished it"
                 // → stamp today; dragging onto it clears the date. Movies/TV
                 // write the shared watched date; books write YOUR read record.
-                onMarkWatched={(itemId: string) => {
-                  void (personal ? store.setReadOn(itemId, today()) : store.setWatchedOn(itemId, today()))
+                onMarkDone={(itemId: string) => {
+                  void (personal ? store.setDoneOn(itemId, today()) : store.setSharedDoneOn(itemId, today()))
                 }}
-                onMarkUnwatched={(itemId: string) => {
-                  void (personal ? store.setReadOn(itemId, null) : store.setWatchedOn(itemId, null))
+                onMarkUndone={(itemId: string) => {
+                  void (personal ? store.setDoneOn(itemId, null) : store.setSharedDoneOn(itemId, null))
                 }}
                 onCardClick={openEdit}
                 shelfHint={

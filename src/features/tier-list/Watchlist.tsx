@@ -35,11 +35,12 @@ interface WatchlistProps {
    *  position order, top = next up — then the checked-off rows. */
   items: WatchlistItem[]
   kind: TierKind
-  /** Date per TIER item id — a checked wish looks its own up via `tierItemId`
-   *  (the wish row has no date). For movies/TV that's the shared watched date;
-   *  for books the page passes the VIEWER's own read dates, so a book the
-   *  partner checked off shows dateless here until you read it too. */
-  watchedDates: ReadonlyMap<string, string | null>
+  /** Done date per TIER item id — a checked wish looks its own up via
+   *  `tierItemId` (the wish row has no date). For movies/TV that's the item's
+   *  shared date; for books the page passes the VIEWER's own completion dates,
+   *  so a book the partner checked off shows dateless here until you read it
+   *  too. */
+  doneDates: ReadonlyMap<string, string | null>
   /** Check off an open item — creates the tier item and drops it on the board. */
   onCheck: (item: WatchlistItem) => void
   /** Reopen a checked item (the tier item it made stays on the board). */
@@ -59,7 +60,7 @@ function WatchRow({
   item,
   copy,
   done,
-  watchedOn,
+  doneOn,
   lifted,
   onCheck,
   onUncheck,
@@ -69,7 +70,7 @@ function WatchRow({
   item: WatchlistItem
   copy: KindCopy
   done: boolean
-  watchedOn: string | null
+  doneOn: string | null
   /** Floating in the DragOverlay: bigger shadow + slight tilt. */
   lifted?: boolean
   onCheck: (item: WatchlistItem) => void
@@ -129,8 +130,8 @@ function WatchRow({
           )}
           {done && (
             <Text fz={12} c={colors.muted} mt={2} style={{ fontFamily: fonts.sans }}>
-              {copy.usesDates && watchedOn
-                ? `${copy.pastCap} ${formatDate(watchedOn)} — on your tier board, go rank it.`
+              {copy.usesDates && doneOn
+                ? `${copy.pastCap} ${formatDate(doneOn)} — on your tier board, go rank it.`
                 : copy.onBoardNote}
             </Text>
           )}
@@ -177,7 +178,7 @@ function SortableRow(props: Parameters<typeof WatchRow>[0]) {
 export function Watchlist({
   items,
   kind,
-  watchedDates,
+  doneDates,
   onCheck,
   onUncheck,
   onEdit,
@@ -251,7 +252,7 @@ export function Watchlist({
     item,
     copy,
     done: isDone,
-    watchedOn: item.tierItemId ? watchedDates.get(item.tierItemId) ?? null : null,
+    doneOn: item.tierItemId ? doneDates.get(item.tierItemId) ?? null : null,
     onCheck,
     onUncheck,
     onEdit,
