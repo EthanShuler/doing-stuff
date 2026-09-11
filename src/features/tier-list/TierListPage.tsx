@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, Button, Group, SegmentedControl, Text } from '@mantine/core'
+import { Button, SegmentedControl, Text } from '@mantine/core'
 import type { Tier, TierItem, TierKind, WatchlistItem } from '../../types'
-import { colors, fonts } from '../../theme'
+import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { useBusy } from '../../lib/useBusy'
 import { useTagFilter } from '../../lib/useTagFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
+import { useConfirm } from '../../components/ConfirmModal'
+import { ControlBar } from '../../components/ControlBar'
 import { FloatingBanner } from '../../components/FloatingBanner'
+import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
 import { datesArePersonal, deriveBoard, distinctTags, filterByTags, listIsPersonal, sortWatchlist } from './derive'
@@ -18,6 +21,7 @@ import { CardVisual } from './TierCard'
 import { Watchlist } from './Watchlist'
 import { ItemModal } from './ItemModal'
 import type { ItemDraft } from './ItemModal'
+import { ListPicker } from './ListPicker'
 
 type Mode = 'board' | 'watchlist'
 
@@ -44,6 +48,7 @@ interface TierListPageProps {
  *  switching kinds; only the `kind` prop changes and the board re-derives. */
 export function TierListPage({ kind, spaceId, userId, configured }: TierListPageProps) {
   const store = useTierListStore(spaceId, userId)
+  const confirm = useConfirm()
   const copy = KIND_COPY[kind]
   const noun = copy.noun
   // Books track "have I read it" per person; movies/TV share one watched date.
@@ -173,6 +178,20 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       }
     })
 
+  // Watch/reading-list rows are shared too (except books), and the row's ×
+  // sits right beside the checkbox — so removing one asks first.
+  const confirmRemoveFromList = () =>
+    confirm({
+      title: `Remove this from the ${copy.listLabel.toLowerCase()}?`,
+      message: `It hasn't been ${copy.past} yet, so nothing else goes with it.`,
+      confirmLabel: 'Remove',
+    })
+
+  const removeFromList = async (id: string) => {
+    if (!(await confirmRemoveFromList())) return
+    void store.deleteWatchlistItem(id)
+  }
+
   const deleteEditingItem = async () => {
     if (!editingId) {
       closeModal()
@@ -180,9 +199,14 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     }
     try {
       if (modalVariant === 'watchlist') {
+        if (!(await confirmRemoveFromList())) return
         await store.deleteWatchlistItem(editingId)
       } else {
-        if (!window.confirm(`Delete this ${noun} for both of you? Everyone's rankings of it are removed too.`)) return
+        const ok = await confirm({
+          title: `Delete this ${noun} for both of you?`,
+          message: "Everyone's rankings of it are removed too.",
+        })
+        if (!ok) return
         await store.deleteItem(editingId)
       }
       closeModal()
@@ -192,27 +216,22 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   }
 
   // Gate on the first data load (live mode only; the space resolves in App).
-  if (configured && store.loading) {
-    return <Splash text="Loading your space…" mih="60vh" />
-  }
+  // The picker and control bar stay put; only the board waits.
+  const loadingData = configured && store.loading
 
   return (
     <>
       <title>{`${copy.pageTitle} · cajubinile.com`}</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
 
-      <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        <Box maw={1200} mx="auto">
-          {/* Control bar, mirroring the doing-stuff HeaderActions chrome. */}
-          <Group
-            justify="space-between"
-            align="center"
-            gap={12}
-            wrap="wrap"
-            pb={18}
-            style={{ borderBottom: `1px dotted ${colors.rule}` }}
-          >
-            <Group gap={12} align="center" wrap="wrap">
+      <PageFrame>
+        {/* Which list you're looking at — the four boards used to be four
+            header nav items. */}
+        <ListPicker activeKey={kind} />
+
+        <ControlBar
+          left={
+            <>
               <SegmentedControl
                 value={mode}
                 onChange={(value) => setMode(value as Mode)}
@@ -222,6 +241,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 ]}
               />
               {mode === 'board' &&
+                !loadingData &&
                 (partner ? (
                   <SegmentedControl
                     value={viewer}
@@ -232,121 +252,126 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                     ]}
                   />
                 ) : (
-                  <Text fz={13} c={colors.muted} style={{ fontFamily: fonts.sans }}>
+                  // Third row at phone width — the board itself says as much.
+                  <Text fz={text.small} c={colors.muted} visibleFrom="sm" style={{ fontFamily: fonts.sans }}>
                     Just your board for now — rankings are per person once your partner joins.
                   </Text>
                 ))}
-            </Group>
-            <Button onClick={openAdd} radius={10}>
-              + Add {noun}
-            </Button>
-          </Group>
+            </>
+          }
+          right={<Button onClick={openAdd}>+ Add {noun}</Button>}
+        />
 
-          {/* Tag filter pills — only once something on this kind is tagged. */}
-          {mode === 'board' && (
-            <TagFilterPills
-              tags={kindTags}
-              allLabel={`All ${noun}s`}
-              tagFilter={tagFilter}
-              filterActive={filterActive}
-              onToggle={toggleTag}
-              onClear={clearTagFilter}
-            />
-          )}
+        {loadingData ? (
+          <Splash text="Loading your space…" mih="40vh" />
+        ) : (
+          <>
+            {/* Tag filter pills — only once something on this kind is tagged. */}
+            {mode === 'board' && (
+              <TagFilterPills
+                tags={kindTags}
+                allLabel={`All ${noun}s`}
+                tagFilter={tagFilter}
+                filterActive={filterActive}
+                onToggle={toggleTag}
+                onClear={clearTagFilter}
+              />
+            )}
 
-          {mode === 'watchlist' ? (
-            <>
-              {listIsPersonal(kind) && partner && (
-                <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                  Your {copy.listLabel.toLowerCase()} — {partnerName} keeps their own.
+            {mode === 'watchlist' ? (
+              <>
+                {listIsPersonal(kind) && partner && (
+                  <Text fz={text.small} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+                    Your {copy.listLabel.toLowerCase()} — {partnerName} keeps their own.
+                  </Text>
+                )}
+                <Watchlist
+                  items={watchItems}
+                  kind={kind}
+                  watchedDates={watchedDates}
+                  onCheck={(item) => {
+                    void store.checkOffWatchlistItem(item)
+                  }}
+                  onUncheck={(id) => {
+                    void store.uncheckWatchlistItem(id)
+                  }}
+                  onEdit={openEditWatch}
+                  onDelete={(id) => {
+                    void removeFromList(id)
+                  }}
+                  onMove={(id, position) => {
+                    void store.moveWatchlistItem(id, position)
+                  }}
+                  onRenormalize={(orderedIds) => {
+                    void store.renormalizeWatchlist(orderedIds)
+                  }}
+                />
+              </>
+            ) : showingPartner ? (
+              <>
+                <Text fz={text.small} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+                  {partnerName}'s board — just for looking.
                 </Text>
-              )}
-              <Watchlist
-                items={watchItems}
-                kind={kind}
-                watchedDates={watchedDates}
-                onCheck={(item) => {
-                  void store.checkOffWatchlistItem(item)
-                }}
-                onUncheck={(id) => {
-                  void store.uncheckWatchlistItem(id)
-                }}
-                onEdit={openEditWatch}
-                onDelete={(id) => {
-                  void store.deleteWatchlistItem(id)
-                }}
-                onMove={(id, position) => {
-                  void store.moveWatchlistItem(id, position)
-                }}
-                onRenormalize={(orderedIds) => {
-                  void store.renormalizeWatchlist(orderedIds)
-                }}
-              />
-            </>
-          ) : showingPartner ? (
-            <>
-              <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                {partnerName}'s board — just for looking.
-              </Text>
-              <BoardView
+                <BoardView
+                  board={board}
+                  renderCard={(item) => <CardVisual key={item.id} item={item} />}
+                  shelfHint={`${partnerName} hasn't ranked everything yet.`}
+                  unwatchedHint={`Nothing waiting to be ${copy.past}.`}
+                  unwatchedLabel={copy.shelfLabel}
+                />
+              </>
+            ) : filterActive ? (
+              // Your board, filtered: hidden cards make drop positions ambiguous,
+              // so this is the same read-only layout — cards still open the editor.
+              <>
+                <Text fz={text.small} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+                  Filtered by tag — clear the filter to rearrange.
+                </Text>
+                <BoardView
+                  board={board}
+                  renderCard={(item) => <CardVisual key={item.id} item={item} onClick={() => openEdit(item)} />}
+                  shelfHint={`No unranked ${noun}s match this filter.`}
+                  unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this filter.`}
+                  unwatchedLabel={copy.shelfLabel}
+                />
+              </>
+            ) : (
+              <TierBoard
                 board={board}
-                renderCard={(item) => <CardVisual key={item.id} item={item} />}
-                shelfHint={`${partnerName} hasn't ranked everything yet.`}
-                unwatchedHint={`Nothing waiting to be ${copy.past}.`}
+                positions={positions}
+                onPlace={(itemId: string, tier: Tier, position: number) => {
+                  void store.placeItem(itemId, tier, position)
+                }}
+                onUnrank={(itemId: string) => {
+                  void store.unplaceItem(itemId)
+                }}
+                onRenormalize={(tier: Tier, orderedIds: string[]) => {
+                  void store.placeTier(tier, orderedIds)
+                }}
+                // Dragging out of the unwatched/unread shelf means "finished it"
+                // → stamp today; dragging onto it clears the date. Movies/TV
+                // write the shared watched date; books write YOUR read record.
+                onMarkWatched={(itemId: string) => {
+                  void (personal ? store.setReadOn(itemId, today()) : store.setWatchedOn(itemId, today()))
+                }}
+                onMarkUnwatched={(itemId: string) => {
+                  void (personal ? store.setReadOn(itemId, null) : store.setWatchedOn(itemId, null))
+                }}
+                onCardClick={openEdit}
+                shelfHint={
+                  board.unranked.length === 0 &&
+                  board.unwatched.length === 0 &&
+                  Object.values(board.tiers).every((t) => t.length === 0)
+                    ? `No ${noun}s yet — add one, or check something off your ${copy.listLabel.toLowerCase()}.`
+                    : 'Everything is ranked. Nice.'
+                }
+                unwatchedHint={`Drag a ${noun} here if you haven't actually ${copy.past} it yet.`}
                 unwatchedLabel={copy.shelfLabel}
               />
-            </>
-          ) : filterActive ? (
-            // Your board, filtered: hidden cards make drop positions ambiguous,
-            // so this is the same read-only layout — cards still open the editor.
-            <>
-              <Text fz={13} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                Filtered by tag — clear the filter to rearrange.
-              </Text>
-              <BoardView
-                board={board}
-                renderCard={(item) => <CardVisual key={item.id} item={item} onClick={() => openEdit(item)} />}
-                shelfHint={`No unranked ${noun}s match this filter.`}
-                unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this filter.`}
-                unwatchedLabel={copy.shelfLabel}
-              />
-            </>
-          ) : (
-            <TierBoard
-              board={board}
-              positions={positions}
-              onPlace={(itemId: string, tier: Tier, position: number) => {
-                void store.placeItem(itemId, tier, position)
-              }}
-              onUnrank={(itemId: string) => {
-                void store.unplaceItem(itemId)
-              }}
-              onRenormalize={(tier: Tier, orderedIds: string[]) => {
-                void store.placeTier(tier, orderedIds)
-              }}
-              // Dragging out of the unwatched/unread shelf means "finished it"
-              // → stamp today; dragging onto it clears the date. Movies/TV
-              // write the shared watched date; books write YOUR read record.
-              onMarkWatched={(itemId: string) => {
-                void (personal ? store.setReadOn(itemId, today()) : store.setWatchedOn(itemId, today()))
-              }}
-              onMarkUnwatched={(itemId: string) => {
-                void (personal ? store.setReadOn(itemId, null) : store.setWatchedOn(itemId, null))
-              }}
-              onCardClick={openEdit}
-              shelfHint={
-                board.unranked.length === 0 &&
-                board.unwatched.length === 0 &&
-                Object.values(board.tiers).every((t) => t.length === 0)
-                  ? `No ${noun}s yet — add one, or check something off your ${copy.listLabel.toLowerCase()}.`
-                  : 'Everything is ranked. Nice.'
-              }
-              unwatchedHint={`Drag a ${noun} here if you haven't actually ${copy.past} it yet.`}
-              unwatchedLabel={copy.shelfLabel}
-            />
-          )}
-        </Box>
-      </Box>
+            )}
+          </>
+        )}
+      </PageFrame>
 
       <ItemModal
         opened={modalOpen}

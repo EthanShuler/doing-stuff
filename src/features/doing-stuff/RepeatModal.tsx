@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Group, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
+import { Box, Button, Group, Text, TextInput, UnstyledButton } from '@mantine/core'
 import type { Repeat } from '../../types'
-import { colors, DANGER, fieldLabelStyle, fonts, warmBorder } from '../../theme'
+import { colors, DANGER, fieldLabelStyle, fonts, text, warmBorder } from '../../theme'
 import { formatDate, today } from '../../lib/format'
 import { useBusy } from '../../lib/useBusy'
 import { ModalShell } from '../../components/ModalShell'
@@ -55,14 +55,29 @@ export function RepeatModal({
   ].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <ModalShell opened={opened} onClose={onClose}>
-      <Title order={3} fz={28} mb={4}>
-        Add repeat
-      </Title>
-      <Text c={colors.muted} fz={14} mb={22} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
-        {entryTitle}
-      </Text>
-
+    <ModalShell
+      opened={opened}
+      onClose={onClose}
+      // Which outing is being repeated is part of the question, so it names
+      // the dialog too (Mantine builds aria-labelledby from the title).
+      title={
+        <>
+          <Text component="span" display="block">
+            Add repeat
+          </Text>
+          <Text
+            component="span"
+            display="block"
+            c={colors.muted}
+            fz={text.body}
+            mt={4}
+            style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}
+          >
+            {entryTitle}
+          </Text>
+        </>
+      }
+    >
       <Group gap={10} mb={24} align="flex-end">
         <TextInput
           label="Date"
@@ -71,7 +86,7 @@ export function RepeatModal({
           onChange={(e) => setDate(e.currentTarget.value)}
           style={{ flex: 1 }}
         />
-        <Button onClick={() => void add()} radius={10} disabled={!date} loading={busy}>
+        <Button onClick={() => void add()} disabled={!date} loading={busy}>
           Add repeat
         </Button>
       </Group>
@@ -93,7 +108,7 @@ export function RepeatModal({
                 {formatDate(item.date)}
               </Text>
               {item.first && (
-                <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.1em' }}>
+                <Text c={colors.faint} style={{ fontFamily: fonts.mono, fontSize: text.micro, letterSpacing: '0.1em' }}>
                   FIRST ENTRY
                 </Text>
               )}
@@ -102,7 +117,7 @@ export function RepeatModal({
               <UnstyledButton
                 onClick={() => onRemove(item.id)}
                 aria-label={`Remove repeat on ${formatDate(item.date)}`}
-                style={{ fontFamily: fonts.sans, fontSize: 12, fontWeight: 600, color: DANGER }}
+                style={{ fontFamily: fonts.sans, fontSize: text.caption, fontWeight: 600, color: DANGER }}
               >
                 Remove
               </UnstyledButton>
@@ -112,7 +127,7 @@ export function RepeatModal({
       </Box>
 
       <Group justify="flex-end" mt={24}>
-        <Button variant="secondary" onClick={onClose} radius={10}>
+        <Button variant="secondary" onClick={onClose}>
           Done
         </Button>
       </Group>

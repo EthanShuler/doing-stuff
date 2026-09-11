@@ -1,8 +1,8 @@
 import { Box } from '@mantine/core'
-import { colors, fonts } from '../theme'
+import { colors, fonts, radii, shadows, text } from '../theme'
 
 const TONES = {
-  /** A failed write — clicking dismisses it. */
+  /** A failed write — dismissed with the ✕. */
   error: {
     color: 'oklch(0.45 0.14 25)',
     background: 'oklch(0.96 0.04 25)',
@@ -38,24 +38,22 @@ export function FloatingBanner({
       c={t.color}
       px={14}
       py={9}
-      onClick={onDismiss}
       style={{
         position: 'fixed',
         top,
         left: '50%',
         transform: 'translateX(-50%)',
-        // Above Mantine's modal (200): failed writes keep their modal open and
-        // rely on this banner to say why.
+        // Above Mantine's modal (200) and the confirm dialog (250): failed
+        // writes keep their modal open and rely on this banner to say why.
         zIndex: 300,
         maxWidth: 'min(92vw, 520px)',
         border: t.border,
-        borderRadius: 9,
+        borderRadius: radii.chip,
         background: t.background,
-        fontSize: 13,
+        fontSize: text.small,
         fontWeight: 500,
         fontFamily: fonts.sans,
-        boxShadow: '0 8px 24px rgba(40,30,20,0.14)',
-        cursor: 'pointer',
+        boxShadow: shadows.banner,
       }}
     >
       {message}

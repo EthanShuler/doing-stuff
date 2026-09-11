@@ -45,6 +45,12 @@ export const warmBorder = (alpha: number) => `rgba(120,100,80,${alpha})`
 
 export const colors = {
   pageBg: 'oklch(0.972 0.013 78)',
+  /** Card / panel / row fill — the paper the content sits on. */
+  surface: '#fff',
+  /** Text, dots and icons drawn ON a filled accent (a lit pill, today's
+   *  calendar cell). Same value as `surface`, but a different meaning — keep
+   *  them apart so a future tint of one doesn't silently move the other. */
+  onAccent: '#fff',
   ink: '#3a352e',
   /** Softer ink — secondary button labels, list metadata. */
   inkSoft: '#5c574e',
@@ -65,6 +71,52 @@ export const colors = {
   cardTint: 'oklch(0.96 0.018 78)',
   starEmpty: '#ddd6c9',
 }
+
+/** The app's elevation scale. Every drop shadow in the UI is one of these —
+ *  reach for a literal only if a genuinely new elevation appears (and then add
+ *  it here). `hover` is mirrored in index.css, which can't read this file. */
+export const shadows = {
+  /** Resting photo/poster card. */
+  card: '0 1px 3px rgba(40,30,20,0.08)',
+  /** Pointer hovering a clickable card (see the [data-hover-card] rules). */
+  hover: '0 6px 16px rgba(40,30,20,0.14)',
+  /** Card floating in a drag overlay. */
+  lifted: '0 12px 28px rgba(40,30,20,0.28)',
+  /** Autocomplete dropdown over a modal. */
+  popover: '0 10px 28px rgba(40,30,20,0.18)',
+  /** The fixed error/notice banner. */
+  banner: '0 8px 24px rgba(40,30,20,0.14)',
+  /** Modal card over its dim backdrop. */
+  modal: '0 24px 60px rgba(40,30,20,0.3)',
+} as const
+
+/** Corner radii, smallest to largest. Mantine's `defaultRadius` is 10, which
+ *  sits between `chip` and `card` — components that take a Mantine radius
+ *  usually want the default and shouldn't pass one at all. */
+export const radii = {
+  /** Chips, pills, nav links, inputs. */
+  chip: 9,
+  /** Photo / poster / list cards. */
+  card: 12,
+  /** Panels inside a modal. */
+  panel: 14,
+  /** Full-width framed regions (the map frame, empty states). */
+  frame: 16,
+  /** The modal card itself. */
+  modal: 18,
+} as const
+
+/** The small-text scale. Body copy and headings set their own sizes; these are
+ *  the recurring metadata/caption sizes, named so they stop drifting by half a
+ *  pixel per component. */
+export const text = {
+  micro: 10,
+  tiny: 11,
+  caption: 12,
+  small: 13,
+  body: 14,
+  lead: 15,
+} as const
 
 /** Safe fallback color for entries whose category was deleted. */
 export const FALLBACK_COLOR = '#ccc'

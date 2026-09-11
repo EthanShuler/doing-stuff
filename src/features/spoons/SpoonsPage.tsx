@@ -1,9 +1,11 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
-import { Box, Button, Group, SegmentedControl } from '@mantine/core'
+import { Button, SegmentedControl } from '@mantine/core'
 import type { Spoon } from '../../types'
-import { colors, fonts } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
+import { useConfirm } from '../../components/ConfirmModal'
+import { ControlBar } from '../../components/ControlBar'
 import { FloatingBanner } from '../../components/FloatingBanner'
+import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useSpoonStore } from './useSpoonStore'
 import type { SpoonDraft } from './useSpoonStore'
@@ -24,6 +26,7 @@ const emptyDraft = (): SpoonDraft => ({ name: '', imageUrl: '', place: '', acqui
  *  store (and its realtime channel) trivially survives the switch. */
 export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; configured: boolean }) {
   const store = useSpoonStore(spaceId)
+  const confirm = useConfirm()
   const [screen, setScreen] = useState<Screen>('list')
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -76,7 +79,7 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
       closeModal()
       return
     }
-    if (!window.confirm('Delete this spoon? Its photo is removed too.')) return
+    if (!(await confirm({ title: 'Delete this spoon?', message: 'Its photo is removed too.' }))) return
     try {
       await store.deleteSpoon(editingId)
       closeModal()
@@ -85,9 +88,8 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
     }
   }
 
-  if (configured && store.loading) {
-    return <Splash text="Loading your space…" mih="60vh" />
-  }
+  // Only the collection waits on the first load — the control bar stays put.
+  const loadingData = configured && store.loading
 
   return (
     <>
@@ -100,16 +102,9 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
         onDismiss={store.clearNotice}
       />
 
-      <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        <Box maw={1200} mx="auto">
-          <Group
-            justify="space-between"
-            align="center"
-            gap={12}
-            wrap="wrap"
-            pb={18}
-            style={{ borderBottom: `1px dotted ${colors.rule}` }}
-          >
+      <PageFrame>
+        <ControlBar
+          left={
             <SegmentedControl
               value={screen}
               onChange={(value) => setScreen(value as Screen)}
@@ -118,20 +113,20 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
                 { label: 'Map', value: 'map' },
               ]}
             />
-            <Button onClick={openAdd} radius={10}>
-              + Add spoon
-            </Button>
-          </Group>
+          }
+          right={<Button onClick={openAdd}>+ Add spoon</Button>}
+        />
 
-          {screen === 'map' ? (
-            <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
-              <SpoonMap markers={markers} onEdit={openEdit} />
-            </Suspense>
-          ) : (
-            <SpoonGrid spoons={sorted} onEdit={openEdit} />
-          )}
-        </Box>
-      </Box>
+        {loadingData ? (
+          <Splash text="Loading your space…" mih="40vh" />
+        ) : screen === 'map' ? (
+          <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
+            <SpoonMap markers={markers} onEdit={openEdit} />
+          </Suspense>
+        ) : (
+          <SpoonGrid spoons={sorted} onEdit={openEdit} />
+        )}
+      </PageFrame>
 
       <SpoonModal
         opened={modalOpen}

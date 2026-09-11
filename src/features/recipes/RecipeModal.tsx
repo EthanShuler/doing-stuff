@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, FileButton, Group, TagsInput, Textarea, TextInput, Title, UnstyledButton } from '@mantine/core'
-import { colors, DANGER, fonts } from '../../theme'
+import { Box, Button, FileButton, Group, TagsInput, Textarea, TextInput, UnstyledButton } from '@mantine/core'
+import { colors, fonts, radii, text } from '../../theme'
+import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 import type { RecipeDraft } from './useRecipeStore'
 import { RecipePhoto } from './RecipeGrid'
@@ -58,11 +59,7 @@ export function RecipeModal({
   }
 
   return (
-    <ModalShell opened={opened} onClose={onClose} width={640}>
-      <Title order={3} fz={28} mb={22}>
-        {isEditing ? 'Edit recipe' : 'Add a recipe'}
-      </Title>
-
+    <ModalShell opened={opened} onClose={onClose} size="xl" title={isEditing ? 'Edit recipe' : 'Add a recipe'}>
       <Group gap={20} align="flex-start" wrap="nowrap">
         <Box flex={1}>
           <TextInput
@@ -103,7 +100,7 @@ export function RecipeModal({
         {/* Photo column: preview + upload. Keyed on the URL so a replacement
             retries a broken image. */}
         <Box w={150} style={{ flexShrink: 0 }}>
-          <Box key={draft.imageUrl} mt={4} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${colors.cardBorder}` }}>
+          <Box key={draft.imageUrl} mt={4} style={{ borderRadius: radii.card, overflow: 'hidden', border: `1px solid ${colors.cardBorder}` }}>
             <RecipePhoto imageUrl={draft.imageUrl} title={draft.title} height={150} />
           </Box>
           <FileButton onChange={(file) => void pickPhoto(file)} accept="image/*">
@@ -118,7 +115,7 @@ export function RecipeModal({
               onClick={() => onChange({ imageUrl: '' })}
               w="100%"
               mt={6}
-              style={{ fontFamily: fonts.sans, fontSize: 12, fontWeight: 600, color: colors.muted, textAlign: 'center' }}
+              style={{ fontFamily: fonts.sans, fontSize: text.caption, fontWeight: 600, color: colors.muted, textAlign: 'center' }}
             >
               Remove photo
             </UnstyledButton>
@@ -173,24 +170,15 @@ export function RecipeModal({
         mb={6}
       />
 
-      <Group justify="space-between" align="center" gap={10} mt={22}>
-        {isEditing && (
-          <UnstyledButton
-            onClick={onDelete}
-            style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
-          >
-            Delete recipe
-          </UnstyledButton>
-        )}
-        <Group gap={10} ml="auto">
-          <Button variant="secondary" onClick={onClose} radius={10}>
-            Cancel
-          </Button>
-          <Button onClick={onSave} disabled={!canSave || uploading} loading={saving} radius={10}>
-            {isEditing ? 'Save changes' : 'Add recipe'}
-          </Button>
-        </Group>
-      </Group>
+      <ModalFooter
+        onCancel={onClose}
+        onConfirm={onSave}
+        confirmLabel={isEditing ? 'Save changes' : 'Add recipe'}
+        confirmDisabled={!canSave || uploading}
+        loading={saving}
+        onDelete={isEditing ? onDelete : undefined}
+        deleteLabel="Delete recipe"
+      />
     </ModalShell>
   )
 }

@@ -1,15 +1,17 @@
 import { expect, test } from '@playwright/test'
-import { pickSegment } from './helpers'
+import { pickList, pickSegment } from './helpers'
 
-test('header feature nav navigates and browser back works', async ({ page }) => {
+test('header feature nav and the list picker navigate; browser back works', async ({ page }) => {
   await page.goto('/')
   const header = page.locator('header')
 
-  await header.getByText('Movies', { exact: true }).click()
+  // One header item covers all four boards; it lands on Movies.
+  await header.getByText('Tier Lists', { exact: true }).click()
   await expect(page).toHaveURL('/movies')
   await expect(page.getByText('Spirited Away')).toBeVisible()
 
-  await header.getByText('Books', { exact: true }).click()
+  // The in-page picker switches between them (and pushes history).
+  await pickList(page, 'Books')
   await expect(page).toHaveURL('/books')
   await expect(page.getByText('Piranesi')).toBeVisible()
 

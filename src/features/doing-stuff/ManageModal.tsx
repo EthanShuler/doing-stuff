@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Group, Paper, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
+import { Box, Button, Group, Paper, Text, TextInput, UnstyledButton } from '@mantine/core'
 import type { Activity, Category, Home } from '../../types'
-import { colors, fonts, palette, swatchFor } from '../../theme'
+import { colors, fonts, palette, radii, swatchFor, text } from '../../theme'
+import { useConfirm } from '../../components/ConfirmModal'
 import { ModalShell } from '../../components/ModalShell'
 
 interface ManageModalProps {
@@ -37,6 +38,7 @@ export function ManageModal({
   const [emojiDrafts, setEmojiDrafts] = useState<Record<string, string>>({})
   const [newCatName, setNewCatName] = useState('')
   const [newCatColor, setNewCatColor] = useState(3)
+  const confirm = useConfirm()
 
   const commitEmoji = (activity: Activity) => {
     const draft = emojiDrafts[activity.id]
@@ -88,23 +90,28 @@ export function ManageModal({
   }
 
   return (
-    <ModalShell opened={opened} onClose={onClose} width={520}>
-      <Group justify="space-between" align="center" mb={22}>
-        <Title order={3} fz={28}>
+    <ModalShell
+      opened={opened}
+      onClose={onClose}
+      size="md"
+      // A fragment, so the only action this modal has rides in the header
+      // beside its name. Spans (not Boxes) — the heading is an <h2>.
+      title={
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12 }}>
           Categories &amp; activities
-        </Title>
-        <Button onClick={onClose} radius={9} size="sm">
-          Done
-        </Button>
-      </Group>
-
+          <Button onClick={onClose} radius={radii.chip} size="sm">
+            Done
+          </Button>
+        </span>
+      }
+    >
       {/* HOME BASE — the shared map center. */}
       <Paper
-        bg="#fff"
+        bg={colors.surface}
         withBorder
         p="16px 18px"
         mb={18}
-        style={{ borderColor: colors.cardBorder, borderRadius: 14 }}
+        style={{ borderColor: colors.cardBorder, borderRadius: radii.panel }}
       >
         <Text fz={12} fw={700} tt="uppercase" c={colors.muted} mb={11} style={{ letterSpacing: '0.07em' }}>
           🏠 Home base
@@ -121,7 +128,7 @@ export function ManageModal({
             placeholder="Your address — the center of the map"
             styles={{ input: { fontSize: 13 } }}
           />
-          <Button variant="chip" onClick={commitHome} radius={9}>
+          <Button variant="chip" onClick={commitHome} radius={radii.chip}>
             Save
           </Button>
         </Group>
@@ -138,11 +145,11 @@ export function ManageModal({
         return (
           <Paper
             key={category.id}
-            bg="#fff"
+            bg={colors.surface}
             withBorder
             p="16px 18px"
             mb={14}
-            style={{ borderColor: colors.cardBorder, borderRadius: 14 }}
+            style={{ borderColor: colors.cardBorder, borderRadius: radii.panel }}
           >
             <Group gap={9} align="center" mb={12}>
               <Box w={11} h={11} style={{ borderRadius: '50%', background: swatch.color, flexShrink: 0 }} />
@@ -150,17 +157,16 @@ export function ManageModal({
                 {category.name}
               </Text>
               <UnstyledButton
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Remove "${category.name}"? All of its activities and their logged entries are deleted too.`,
-                    )
-                  ) {
-                    onDeleteCategory(category.id)
-                  }
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Remove "${category.name}"?`,
+                    message: 'All of its activities and their logged entries are deleted too.',
+                    confirmLabel: 'Remove',
+                  })
+                  if (ok) onDeleteCategory(category.id)
                 }}
                 ml="auto"
-                style={{ fontFamily: fonts.sans, fontSize: 11, fontWeight: 600, color: colors.faint }}
+                style={{ fontFamily: fonts.sans, fontSize: text.tiny, fontWeight: 600, color: colors.faint }}
               >
                 Remove category
               </UnstyledButton>
@@ -196,7 +202,7 @@ export function ManageModal({
                       textAlign: 'center',
                       border: 'none',
                       outline: 'none',
-                      background: '#fff',
+                      background: colors.surface,
                       borderRadius: '50%',
                       padding: '3px 0',
                       fontSize: 15,
@@ -206,10 +212,13 @@ export function ManageModal({
                   />
                   <span style={{ padding: '0 2px' }}>{activity.name}</span>
                   <UnstyledButton
-                    onClick={() => {
-                      if (window.confirm(`Remove "${activity.name}"? Its logged entries are deleted too.`)) {
-                        onDeleteActivity(activity.id)
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Remove "${activity.name}"?`,
+                        message: 'Its logged entries are deleted too.',
+                        confirmLabel: 'Remove',
+                      })
+                      if (ok) onDeleteActivity(activity.id)
                     }}
                     aria-label={`Remove ${activity.name}`}
                     style={{ fontFamily: fonts.sans, fontSize: 14, lineHeight: 1, color: colors.faint, padding: '0 2px' }}
@@ -234,7 +243,7 @@ export function ManageModal({
                 placeholder="Add an activity…"
                 styles={{ input: { fontSize: 13 } }}
               />
-              <Button variant="chip" onClick={() => submitActivity(category.id)} radius={9}>
+              <Button variant="chip" onClick={() => submitActivity(category.id)} radius={radii.chip}>
                 Add
               </Button>
             </Group>
@@ -246,7 +255,7 @@ export function ManageModal({
         bg={colors.cardTint}
         p="16px 18px"
         mt={18}
-        style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14 }}
+        style={{ border: `1px dashed ${colors.dotted}`, borderRadius: radii.panel }}
       >
         <Text fz={12} fw={600} tt="uppercase" c={colors.muted} mb={11} style={{ letterSpacing: '0.06em' }}>
           New category
@@ -262,7 +271,7 @@ export function ManageModal({
             placeholder="e.g. Date nights"
             styles={{ input: { fontSize: 13 } }}
           />
-          <Button onClick={submitCategory} radius={9}>
+          <Button onClick={submitCategory} radius={radii.chip}>
             Create
           </Button>
         </Group>

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { boardShelf, pickSegment, tierRow } from './helpers'
+import { boardShelf, pickList, pickSegment, tierRow } from './helpers'
 
 // Seed facts these tests lean on (useTierListStore seed):
 // - Viewer in keyless mode is u1 "Avery"; partner is u2 "Jordan".
@@ -18,6 +18,16 @@ test('movie board derives tiers and shelves for the viewer', async ({ page }) =>
   await expect(tierRow(page, 'S').getByText('Paddington 2')).toBeVisible()
   await expect(boardShelf(page, 'unranked').getByText('Everything Everywhere All at Once')).toBeVisible()
   await expect(boardShelf(page, 'unwatched').getByText('Blade Runner 2049')).toBeVisible()
+})
+
+test('the list picker switches boards without leaving the page', async ({ page }) => {
+  await page.goto('/movies')
+  await expect(tierRow(page, 'S').getByText('Spirited Away')).toBeVisible()
+
+  await pickList(page, 'TV')
+  await expect(page).toHaveURL('/tv')
+  await expect(page.getByText('Severance')).toBeVisible()
+  await expect(page.getByText('Spirited Away')).not.toBeVisible()
 })
 
 test('You/Partner toggle swaps whose board is derived, read-only', async ({ page }) => {

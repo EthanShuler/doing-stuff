@@ -78,7 +78,7 @@ export function CalendarView({
       {/* GRID */}
       <Box
         mt={20}
-        bg="#fff"
+        bg={colors.surface}
         style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 16, overflow: 'hidden' }}
       >
         {/* Seven day columns need real width; scroll sideways on phones
@@ -179,7 +179,7 @@ function DayCell({
             fontSize: 11,
             fontWeight: day.isToday ? 700 : 500,
             background: day.isToday ? ACCENT : 'transparent',
-            color: day.isToday ? '#fff' : day.inMonth ? colors.muted : colors.faint,
+            color: day.isToday ? colors.onAccent : day.inMonth ? colors.muted : colors.faint,
           }}
         >
           {day.dayOfMonth}

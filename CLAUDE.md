@@ -5,8 +5,12 @@ Guidance for working in this repo. Read this before making changes.
 ## What this is
 
 **cajubinile.com** — a shared personal site for two people, split into features
-behind a persistent Mantine AppShell header (brand + feature nav + sign-out).
-Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
+behind a persistent Mantine AppShell header (brand link + feature nav +
+sign-out). The nav is **one item per feature, not per route** — seven of them,
+collapsing into the burger drawer below Mantine's `md` breakpoint; the four
+tier-list routes share a single "Tier Lists" item and are chosen in-page with
+the `ListPicker` pill row. The three unbuilt placeholder routes are off the nav
+but still resolve. Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
 and `/ice-cream` are the **Tier Lists** feature; `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
@@ -244,12 +248,20 @@ paper), ported from the Claude Design "Compass" direction.
   `index.html` as the SPA fallback, so deep links work with no extra config.
 - **Mantine v9** (`@mantine/core`) for UI components. The earthy look lives in
   two files: `src/theme.ts` (raw palette, fonts, category swatches, named color
-  tokens + `warmBorder(alpha)` — the source of truth) and `src/mantineTheme.ts`
+  tokens including `colors.surface` / `colors.onAccent`, the `shadows` /
+  `radii` / `text` scales, and `warmBorder(alpha)` — the source of truth) and
+  `src/mantineTheme.ts`
   (translates it into a Mantine theme so components inherit it, including the
   custom Button variants `secondary` / `chip` and the SegmentedControl chip
   styling). Style with Mantine props plus inline style objects referencing
-  `theme.ts` — no raw color literals in components. **No Tailwind, no CSS
-  files** — `index.css` stays empty; Mantine's stylesheet provides the reset.
+  `theme.ts` — no raw color literals in components. Reach for the named tokens
+  (`colors.surface`, `shadows.card`, `radii.card`, `text.small`) rather than
+  re-typing a literal, and don't pass `radius` to a Mantine Button — the
+  theme's `defaultRadius` already is 10. **No Tailwind, no CSS files** —
+  `index.css` holds exactly one rule set, the `[data-hover-card]` hover /
+  focus-visible treatment that inline styles can't express (its values are
+  hand-copies of `warmBorder(0.3)` / `shadows.hover` / `ACCENT`); Mantine's
+  stylesheet provides the reset. Anything else belongs in the theme.
 - **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles).
 - **@dnd-kit** (`core` + `sortable` + `utilities`) for the tier-list drag-n-drop.
   Multi-container pattern: each tier row is a droppable + `SortableContext`;
@@ -306,7 +318,10 @@ run `npm run build` (or `npm run typecheck`) and `npm test`.
 
 **Playwright** (`e2e/`, config in `playwright.config.ts`) covers the browser
 flows: every route hard-loads, nav/back, store survival across screen
-switches, entry-modal gating, tier-board derivation, and the mobile drawer.
+switches, entry-modal gating, tier-board derivation, the list picker, the
+mobile drawer, and that no route scrolls sideways at 390px
+(`mobile-overflow.spec.ts` — its name must keep matching the mobile project's
+`testMatch`).
 It boots its own Vite server on a dedicated port with the Supabase keys
 blanked, so it always runs against the deterministic in-memory seed — safe to
 run anytime, no backend touched. Mantine interaction helpers (Select combobox,
@@ -337,8 +352,10 @@ behind identical action signatures, so components never branch on which mode is
 active. Actions are `async`. Entry and repeat actions **throw** on failure (the
 modal stays open and `store.error` surfaces the reason); category / activity /
 wishlist / home actions record the error without throwing. `store.error` clears
-when a new write starts or when the banner is clicked; `store.notice` is a
-non-fatal warning (e.g. an un-geocodable address), dismissed via `clearNotice`.
+when a new write starts or via the banner's ✕ (the banner body itself isn't
+clickable — it sits over an open modal, where a stray click shouldn't dismiss
+it); `store.notice` is a non-fatal warning (e.g. an un-geocodable address),
+dismissed via `clearNotice`.
 
 In live mode the store also subscribes to **Supabase Realtime** (one channel per
 space) so the partner's edits appear without a reload: INSERT/UPDATE events are
@@ -454,10 +471,15 @@ src/
     AuthScreen.tsx         login / sign-up (no-op without keys)
     CategoryPills.tsx      "All" + per-category filter pill row
     ComingSoon.tsx         placeholder page for unbuilt features
+    ConfirmModal.tsx       ConfirmProvider / useConfirm / useConfirmOpen
+    ControlBar.tsx         every page's top row: left controls, right action, rule
     EmptyCard.tsx          dashed empty-state card
     FloatingBanner.tsx     fixed dismissible error/notice banner
     MapCanvas.tsx          shared Leaflet frame: tiles, Recenter, FitToPins, icon cache
-    ModalShell.tsx         shared Mantine modal chrome
+    ModalFooter.tsx        modal action row: Delete link / Cancel / primary
+    ModalShell.tsx         shared Mantine modal chrome (title, size, confirm-aware)
+    PageFrame.tsx          PAGE_MAX_WIDTH + each page's padded, centered column
+    PhotoCard.tsx          PhotoCardGrid + PhotoCard (spoons / guys / recipes)
     Pill.tsx               category filter pill
     Splash.tsx             centered loading/fatal message
     Stars.tsx              read-only rating display
@@ -482,6 +504,7 @@ src/
       derive.ts            pure board building, moveItem, positions, datesArePersonal
       derive.test.ts       vitest coverage for derive.ts
       copy.ts              per-kind wording: watch/read, Watchlist/Reading list, emoji
+      ListPicker.tsx       in-page pill row selecting which board you're on
       TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
       BoardView.tsx        pure board layout (tier rows + unranked/unread shelves)
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
@@ -536,7 +559,8 @@ e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
                            tier-list, spoons, little-guys, parks, recipes,
-                           music-practice, mobile) — see playwright.config.ts
+                           music-practice, mobile, mobile-overflow)
+                           — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants
 ```
@@ -557,9 +581,24 @@ and `src/lib/`.
   deleting an activity drops its entries; deleting a category drops its
   activities and their entries; deleting an entry drops its repeats and reopens
   any wish linked to it. Preserve the local mirroring when adding tables.
-- **Destructive deletes confirm first.** Entry, activity, and category deletion
-  go through `window.confirm` (the message spells out what cascades). Keep this
-  for anything else that destroys logged data.
+- **Destructive deletes confirm first.** Every one of them goes through
+  `useConfirm()` (`src/components/ConfirmModal.tsx`, provider mounted in
+  `main.tsx`): `if (!(await confirm({ title, message }))) return`. It resolves
+  false on Cancel, Escape, and the overlay, and it stacks above an open modal
+  (ModalShell yields the focus trap and the escape key while one is up, and the
+  provider owns the Escape key so a later-mounted modal can't swallow the same
+  press). Never `window.confirm`. Keep this for anything that destroys logged
+  or shared data — entries, repeats, categories, activities, wishes, tier
+  items, watchlist rows, spoons, little guys, recipes, park visits.
+- **Every feature page wears the same shell.** `PageFrame` (padding + the
+  centered `PAGE_MAX_WIDTH` column) wraps the page; `ControlBar` is its top row
+  (`left` = toggles/filters/counts, `right` = the primary action) above the
+  dotted rule. The first-load gate replaces **only the content below the bar**
+  — `{loading ? <Splash mih="40vh"/> : content}` — so the chrome never
+  disappears and reappears; anything derived from the data that would flash a
+  wrong-looking value (the parks scoreboard, the little-guys count) hides with
+  it. Photo grids go through `PhotoCardGrid` / `PhotoCard`, and modal action
+  rows through `ModalFooter`.
 - **Dates are local, not UTC.** `today()` and the calendar build ISO strings
   from local date parts. Don't reintroduce `toISOString()` for dates — it shifts
   evenings to tomorrow for anyone west of UTC.

@@ -39,7 +39,7 @@ export function ParkList({
             label={m.name || 'Member'}
             active={filter === m.id}
             activeBg={m.color}
-            dotColor={filter === m.id ? '#fff' : m.color}
+            dotColor={filter === m.id ? colors.onAccent : m.color}
             onClick={() => setFilter(m.id)}
           />
         ))}
@@ -114,7 +114,7 @@ export function ParkList({
                         fw={600}
                         px={9}
                         py={3}
-                        c="#fff"
+                        c={colors.onAccent}
                         style={{ background: colors.ink, borderRadius: 20, fontFamily: fonts.sans }}
                       >
                         together

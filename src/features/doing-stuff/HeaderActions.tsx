@@ -1,6 +1,6 @@
-import { Button, Group } from '@mantine/core'
+import { Button } from '@mantine/core'
 import type { Screen } from '../../types'
-import { colors } from '../../theme'
+import { ControlBar } from '../../components/ControlBar'
 import { ScreenToggle } from './ScreenToggle'
 
 /** The doing-stuff control bar, rendered once above every screen: the
@@ -18,23 +18,16 @@ export function HeaderActions({
   onAdd: () => void
 }) {
   return (
-    <Group
-      justify="space-between"
-      align="center"
-      gap={12}
-      wrap="wrap"
-      pb={18}
-      style={{ borderBottom: `1px dotted ${colors.rule}` }}
-    >
-      <ScreenToggle screen={screen} onChange={onScreenChange} />
-      <Group gap={10}>
-        <Button variant="secondary" onClick={onManage} radius={10}>
-          Manage
-        </Button>
-        <Button onClick={onAdd} radius={10}>
-          + New entry
-        </Button>
-      </Group>
-    </Group>
+    <ControlBar
+      left={<ScreenToggle screen={screen} onChange={onScreenChange} />}
+      right={
+        <>
+          <Button variant="secondary" onClick={onManage}>
+            Manage
+          </Button>
+          <Button onClick={onAdd}>+ New entry</Button>
+        </>
+      }
+    />
   )
 }

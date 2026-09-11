@@ -1,6 +1,7 @@
-import { Box, Text, UnstyledButton } from '@mantine/core'
+import { Text } from '@mantine/core'
 import type { LittleGuy } from '../../types'
-import { colors, fonts } from '../../theme'
+import { colors, fonts, text } from '../../theme'
+import { PhotoCard, PhotoCardGrid } from '../../components/PhotoCard'
 import { PhotoWithFallback } from '../../components/PhotoWithFallback'
 import type { Member } from './derive'
 import { ownerLabel } from './derive'
@@ -44,43 +45,26 @@ export function LittleGuyGrid({
   onEdit: (guy: LittleGuy) => void
 }) {
   return (
-    <Box
-      mt={24}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-        gap: 18,
-      }}
-    >
+    <PhotoCardGrid>
       {guys.map((guy) => (
-        <UnstyledButton
+        <PhotoCard
           key={guy.id}
+          imageUrl={guy.imageUrl}
+          alt={guy.name}
+          fallbackEmoji={LITTLE_GUY_EMOJI}
+          title={guy.name}
           onClick={() => onEdit(guy)}
-          bg="#fff"
-          style={{
-            border: `1px solid ${colors.cardBorder}`,
-            borderRadius: 12,
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(40,30,20,0.08)',
-            display: 'block',
-          }}
         >
-          <LittleGuyPhoto imageUrl={guy.imageUrl} name={guy.name} height={170} />
-          <Box p="10px 12px 12px">
-            <Text fz={15} fw={700} c={colors.ink} lh={1.3} style={{ fontFamily: fonts.sans }}>
-              {guy.name}
+          {guy.personality && (
+            <Text fz={text.small} c={colors.muted} mt={2} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
+              {guy.personality}
             </Text>
-            {guy.personality && (
-              <Text fz={12.5} c={colors.muted} mt={2} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>
-                {guy.personality}
-              </Text>
-            )}
-            <Text fz={11} c={colors.faint} mt={4} style={{ fontFamily: fonts.mono }}>
-              {ownerLabel(guy, members)}
-            </Text>
-          </Box>
-        </UnstyledButton>
+          )}
+          <Text fz={text.tiny} c={colors.faint} mt={4} style={{ fontFamily: fonts.mono }}>
+            {ownerLabel(guy, members)}
+          </Text>
+        </PhotoCard>
       ))}
-    </Box>
+    </PhotoCardGrid>
   )
 }

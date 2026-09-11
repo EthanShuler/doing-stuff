@@ -1,3 +1,32 @@
 /* Mantine's styles.css provides the global reset (box-sizing, body margin) and
    drives input focus/placeholder styling. Keep this file empty unless a rule
-   genuinely can't be expressed through the Mantine theme. */
+   genuinely can't be expressed through the Mantine theme.
+
+   The ONE exception lives below: clickable cards need :hover and
+   :focus-visible, which inline style objects can't express. The values are
+   copies of src/theme.ts — CSS can't import it — so keep them in sync:
+     border-color  = warmBorder(0.3)  (colors.dotted)
+     box-shadow    = shadows.hover
+     outline       = ACCENT
+   Anything set here !important overrides the card's inline resting styles
+   (shadows.card + colors.cardBorder), which is the point.
+
+   Opt in from a component with `data-hover-card` — see src/components/PhotoCard.tsx. */
+
+[data-hover-card] {
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease;
+}
+
+@media (hover: hover) {
+  [data-hover-card]:hover {
+    border-color: rgba(120, 100, 80, 0.3) !important;
+    box-shadow: 0 6px 16px rgba(40, 30, 20, 0.14) !important;
+  }
+}
+
+[data-hover-card]:focus-visible {
+  outline: 2px solid oklch(0.62 0.13 45);
+  outline-offset: 2px;
+}

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Box, Button, Group, NumberInput, SegmentedControl, Stack, Text } from '@mantine/core'
 import { ACCENT_BLUE, ACCENT_BLUE_SOFT, colors, fonts, warmBorder } from '../../theme'
 import { formatDate, formatDateWithYear, today } from '../../lib/format'
+import { FloatingBanner } from '../../components/FloatingBanner'
+import { Splash } from '../../components/Splash'
 import { CIRCLE, daysDescending, isCirclePos, previousDay, type CircleKey } from './derive'
 import { useBassoonStore } from './useBassoonStore'
 
@@ -58,8 +60,16 @@ export function Bassoon({ spaceId, userId }: { spaceId: string | null; userId: s
   const savedMatches = logged !== null && logged.position === pendingPos && (logged.tempo ?? null) === pendingTempoNum
   const canLog = pendingPos !== null && !savedMatches
 
+  // The wheel's pending pick is carried forward from the last practiced day,
+  // so it can't be drawn until the days have arrived.
+  if (store.loading) {
+    return <Splash text="Loading your practice log…" mih="40vh" />
+  }
+
   return (
     <Stack align="center" gap={16} mt={16}>
+      {/* Same failed-write banner every other feature uses. */}
+      <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
       <SegmentedControl
         size="xs"
         value={view}
@@ -118,12 +128,6 @@ export function Bassoon({ spaceId, userId }: { spaceId: string | null; userId: s
         </Stack>
       ) : (
         <History days={store.days} />
-      )}
-
-      {store.error && (
-        <Text fz={13} c={colors.inkSoft}>
-          Couldn't save — {store.error}
-        </Text>
       )}
     </Stack>
   )

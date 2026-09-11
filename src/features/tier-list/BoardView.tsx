@@ -56,7 +56,7 @@ export function BoardView({
 }) {
   return (
     <Box mt={20}>
-      <Box style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
+      <Box style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 14, overflow: 'hidden', background: colors.surface }}>
         {TIERS.map((tier, i) => {
           const swatch = tierSwatch(tier)
           const items = board.tiers[tier]

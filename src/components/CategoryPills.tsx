@@ -33,7 +33,7 @@ export function CategoryPills({
             label={category.name}
             active={active}
             activeBg={swatch.color}
-            dotColor={active ? '#fff' : swatch.color}
+            dotColor={active ? colors.onAccent : swatch.color}
             onClick={() => onChange(category.id)}
           />
         )

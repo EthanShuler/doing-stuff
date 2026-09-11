@@ -1,18 +1,7 @@
-import {
-  Box,
-  Button,
-  Checkbox,
-  Group,
-  Rating,
-  Select,
-  Text,
-  Textarea,
-  TextInput,
-  Title,
-  UnstyledButton,
-} from '@mantine/core'
+import { Box, Checkbox, Group, Rating, Select, Text, Textarea, TextInput } from '@mantine/core'
 import type { Activity, Category, EntryDraft } from '../../types'
-import { ACCENT, colors, DANGER, fieldLabelStyle, fonts } from '../../theme'
+import { ACCENT, colors, fieldLabelStyle, fonts } from '../../theme'
+import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 
 interface EntryModalProps {
@@ -52,11 +41,7 @@ export function EntryModal({
   const canSave = Boolean(draft.activityId) && draft.rating > 0
 
   return (
-    <ModalShell opened={opened} onClose={onClose}>
-      <Title order={3} fz={28} mb={22}>
-        {isEditing ? 'Edit entry' : 'New entry'}
-      </Title>
-
+    <ModalShell opened={opened} onClose={onClose} title={isEditing ? 'Edit entry' : 'New entry'}>
       <Group gap={12} mb={18} grow align="flex-start">
         <Select
           label="Category"
@@ -135,28 +120,19 @@ export function EntryModal({
         placeholder="What did you two do? How did it go?"
         autosize
         minRows={3}
-        mb={24}
+        mb={4}
         styles={{ input: { fontFamily: fonts.serif, lineHeight: 1.5 } }}
       />
 
-      <Group justify="space-between" align="center" gap={10}>
-        {isEditing && (
-          <UnstyledButton
-            onClick={onDelete}
-            style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
-          >
-            Delete entry
-          </UnstyledButton>
-        )}
-        <Group gap={10} ml="auto">
-          <Button variant="secondary" onClick={onClose} radius={10}>
-            Cancel
-          </Button>
-          <Button onClick={onSave} disabled={!canSave} loading={saving} radius={10}>
-            {isEditing ? 'Save changes' : 'Add entry'}
-          </Button>
-        </Group>
-      </Group>
+      <ModalFooter
+        onCancel={onClose}
+        onConfirm={onSave}
+        confirmLabel={isEditing ? 'Save changes' : 'Add entry'}
+        confirmDisabled={!canSave}
+        loading={saving}
+        onDelete={isEditing ? onDelete : undefined}
+        deleteLabel="Delete entry"
+      />
     </ModalShell>
   )
 }

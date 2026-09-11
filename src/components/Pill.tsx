@@ -34,7 +34,7 @@ export function Pill({
         borderRadius: 30,
         fontWeight: filled || excluded ? 600 : 500,
         background: filled ? activeBg : colors.chip,
-        color: filled ? '#fff' : colors.inkFaded,
+        color: filled ? colors.onAccent : colors.inkFaded,
         border: filled || excluded ? `1px solid ${activeBg}` : `1px solid ${colors.borderFaint}`,
         textDecoration: excluded ? 'line-through' : 'none',
       }}

@@ -4,7 +4,7 @@ import { Box, Text } from '@mantine/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
-import { colors, fonts } from '../../theme'
+import { colors, fonts, shadows, text } from '../../theme'
 import { posterSrc } from '../../lib/imageUrl'
 import { KIND_COPY } from './copy'
 
@@ -88,13 +88,13 @@ export function CardVisual({
   return (
     <Box
       w={CARD_WIDTH}
-      bg="#fff"
+      bg={colors.surface}
       onClick={onClick}
       style={{
         border: `1px solid ${colors.cardBorder}`,
         borderRadius: 8,
         overflow: 'hidden',
-        boxShadow: lifted ? '0 12px 28px rgba(40,30,20,0.28)' : '0 1px 3px rgba(40,30,20,0.08)',
+        boxShadow: lifted ? shadows.lifted : shadows.card,
         transform: lifted ? 'rotate(2deg)' : undefined,
         cursor: onClick ? 'pointer' : undefined,
         userSelect: 'none',
@@ -109,7 +109,7 @@ export function CardVisual({
         srcWidth={CARD_WIDTH}
       />
       <Text
-        fz={10.5}
+        fz={text.tiny}
         lh={1.25}
         fw={600}
         c={colors.ink}

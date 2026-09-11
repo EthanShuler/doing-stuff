@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { TierKind, WatchlistItem } from '../../types'
-import { ACCENT, colors, fonts } from '../../theme'
+import { ACCENT, colors, fonts, shadows } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { EmptyCard } from '../../components/EmptyCard'
 import { positionBetween } from './derive'
@@ -79,13 +79,13 @@ function WatchRow({
 }) {
   return (
     <Paper
-      bg="#fff"
+      bg={colors.surface}
       withBorder
       p="12px 16px"
       style={{
         borderColor: colors.cardBorder,
         borderRadius: 12,
-        boxShadow: lifted ? '0 12px 28px rgba(40,30,20,0.28)' : undefined,
+        boxShadow: lifted ? shadows.lifted : undefined,
         transform: lifted ? 'rotate(1deg)' : undefined,
       }}
     >

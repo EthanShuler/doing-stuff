@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Box, Button, Group, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
+import { Button, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
 import { useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
-import { colors, fonts } from '../../theme'
+import { colors } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
 import { useTagFilter } from '../../lib/useTagFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
+import { useConfirm } from '../../components/ConfirmModal'
+import { ControlBar } from '../../components/ControlBar'
 import { EmptyCard } from '../../components/EmptyCard'
 import { FloatingBanner } from '../../components/FloatingBanner'
+import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useRecipeStore } from './useRecipeStore'
 import type { RecipeDraft } from './useRecipeStore'
@@ -39,6 +42,7 @@ const emptyDraft = (): RecipeDraft => ({
 export function RecipesPage({ spaceId, configured }: { spaceId: string | null; configured: boolean }) {
   const store = useRecipeStore(spaceId)
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const { id: openId } = useParams()
 
   const [view, setView] = useState<View>('grid')
@@ -103,7 +107,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
       closeModal()
       return
     }
-    if (!window.confirm('Delete this recipe for both of you? Its photo is removed too.')) return
+    if (!(await confirm({ title: 'Delete this recipe for both of you?', message: 'Its photo is removed too.' }))) return
     try {
       await store.deleteRecipe(editingId)
       closeModal()
@@ -114,9 +118,9 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
     }
   }
 
-  if (configured && store.loading) {
-    return <Splash text="Loading your space…" mih="60vh" />
-  }
+  // Both branches gate: a deep link to /recipes/:id would otherwise flash
+  // "Recipe not found" for as long as the first load takes.
+  const loadingData = configured && store.loading
 
   const openRecipe = openId ? store.recipes.find((r) => r.id === openId) ?? null : null
 
@@ -125,36 +129,31 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
       <title>{openRecipe ? `${openRecipe.title} · cajubinile.com` : 'Recipes · cajubinile.com'}</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
 
-      <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        <Box maw={1100} mx="auto">
-          {openId ? (
-            openRecipe ? (
-              // Keyed by id so the tap-to-cross-off marks reset per recipe.
-              <RecipeDetail
-                key={openRecipe.id}
-                recipe={openRecipe}
-                profiles={store.profiles}
-                onBack={() => navigate('/recipes')}
-                onEdit={() => openEdit(openRecipe)}
-              />
-            ) : (
-              <EmptyCard title="Recipe not found" blurb="It may have been deleted.">
-                <Button variant="secondary" radius={10} onClick={() => navigate('/recipes')}>
-                  ← All recipes
-                </Button>
-              </EmptyCard>
-            )
+      <PageFrame>
+        {loadingData ? (
+          <Splash text="Loading your space…" mih="40vh" />
+        ) : openId ? (
+          openRecipe ? (
+            // Keyed by id so the tap-to-cross-off marks reset per recipe.
+            <RecipeDetail
+              key={openRecipe.id}
+              recipe={openRecipe}
+              profiles={store.profiles}
+              onBack={() => navigate('/recipes')}
+              onEdit={() => openEdit(openRecipe)}
+            />
           ) : (
-            <>
-              <Group
-                justify="space-between"
-                align="center"
-                gap={12}
-                wrap="wrap"
-                pb={18}
-                style={{ borderBottom: `1px dotted ${colors.rule}` }}
-              >
-                <Group gap={12} align="center" wrap="wrap">
+            <EmptyCard title="Recipe not found" blurb="It may have been deleted.">
+              <Button variant="secondary" onClick={() => navigate('/recipes')}>
+                ← All recipes
+              </Button>
+            </EmptyCard>
+          )
+        ) : (
+          <>
+            <ControlBar
+              left={
+                <>
                   <SegmentedControl
                     value={view}
                     onChange={(value) => setView(value as View)}
@@ -181,39 +180,37 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
                     }
                     w={200}
                   />
-                </Group>
-                <Button onClick={openAdd} radius={10}>
-                  + Add recipe
-                </Button>
-              </Group>
+                </>
+              }
+              right={<Button onClick={openAdd}>+ Add recipe</Button>}
+            />
 
-              <TagFilterPills
-                tags={allTags}
-                allLabel="All recipes"
-                tagFilter={tagFilter}
-                filterActive={filterActive}
-                onToggle={toggleTag}
-                onClear={clearTagFilter}
-              />
+            <TagFilterPills
+              tags={allTags}
+              allLabel="All recipes"
+              tagFilter={tagFilter}
+              filterActive={filterActive}
+              onToggle={toggleTag}
+              onClear={clearTagFilter}
+            />
 
-              {shown.length === 0 ? (
-                filterActive || search.trim().length > 0 ? (
-                  <EmptyCard title="Nothing matches" blurb="No recipe fits that search and those tags." />
-                ) : (
-                  <EmptyCard
-                    title="No recipes yet"
-                    blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
-                  />
-                )
-              ) : view === 'list' ? (
-                <RecipeList recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
+            {shown.length === 0 ? (
+              filterActive || search.trim().length > 0 ? (
+                <EmptyCard title="Nothing matches" blurb="No recipe fits that search and those tags." />
               ) : (
-                <RecipeGrid recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
-              )}
-            </>
-          )}
-        </Box>
-      </Box>
+                <EmptyCard
+                  title="No recipes yet"
+                  blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
+                />
+              )
+            ) : view === 'list' ? (
+              <RecipeList recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
+            ) : (
+              <RecipeGrid recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
+            )}
+          </>
+        )}
+      </PageFrame>
 
       <RecipeModal
         opened={modalOpen}

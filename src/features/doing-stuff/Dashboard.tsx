@@ -181,7 +181,7 @@ function CardGrid({
       {rows.map((row) => (
         <Paper
           key={row.id}
-          bg="#fff"
+          bg={colors.surface}
           withBorder
           p="18px 20px"
           style={{ borderColor: colors.cardBorder, borderRadius: 14, display: 'flex', flexDirection: 'column' }}
@@ -233,7 +233,7 @@ function Table({
   return (
     <Paper
       mt={20}
-      bg="#fff"
+      bg={colors.surface}
       withBorder
       style={{ borderColor: colors.cardBorder, borderRadius: 14, overflow: 'hidden' }}
     >
@@ -373,7 +373,7 @@ function RepeatBadge({ count, since }: { count: number; since: string }) {
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <EmptyCard title="Nothing here yet" blurb="No entries in this view. Log your next outing together.">
-      <Button onClick={onAdd} radius={10} px={20} py={11} style={{ background: ACCENT }}>
+      <Button onClick={onAdd} px={20} py={11} style={{ background: ACCENT }}>
         + New entry
       </Button>
     </EmptyCard>

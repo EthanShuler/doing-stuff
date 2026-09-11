@@ -107,7 +107,7 @@ export function Wishlist({
             return (
               <Paper
                 key={item.id}
-                bg="#fff"
+                bg={colors.surface}
                 withBorder
                 p="14px 18px"
                 style={{ borderColor: colors.cardBorder, borderRadius: 12 }}

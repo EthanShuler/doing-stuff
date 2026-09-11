@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Group, TagsInput, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
+import { Box, Group, TagsInput, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 import type { TierItem, TierKind } from '../../types'
-import { colors, DANGER, fonts } from '../../theme'
+import { colors, fonts, radii, shadows, text } from '../../theme'
+import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 import { isTmdbConfigured, searchTmdb } from '../../lib/tmdb'
 import { searchOpenLibrary } from '../../lib/openLibrary'
@@ -163,11 +164,7 @@ export function ItemModal({
   }
 
   return (
-    <ModalShell opened={opened} onClose={onClose}>
-      <Title order={3} fz={28} mb={22}>
-        {heading}
-      </Title>
-
+    <ModalShell opened={opened} onClose={onClose} title={heading}>
       <Group gap={20} align="flex-start" wrap="nowrap">
         <Box flex={1}>
           <Box pos="relative" mb={18}>
@@ -191,10 +188,10 @@ export function ItemModal({
                   left: 0,
                   right: 0,
                   zIndex: 30,
-                  background: '#fff',
+                  background: colors.surface,
                   border: `1px solid ${colors.cardBorder}`,
-                  borderRadius: 10,
-                  boxShadow: '0 10px 28px rgba(40,30,20,0.18)',
+                  borderRadius: radii.chip,
+                  boxShadow: shadows.popover,
                   overflowY: 'auto',
                   maxHeight: 264,
                 }}
@@ -239,11 +236,11 @@ export function ItemModal({
                       </Box>
                     )}
                     <Box>
-                      <Text fz={13} fw={600} c={colors.ink} lh={1.3}>
+                      <Text fz={text.small} fw={600} c={colors.ink} lh={1.3}>
                         {result.title}
                       </Text>
                       {result.meta && (
-                        <Text fz={11.5} c={colors.faint}>
+                        <Text fz={text.caption} c={colors.faint}>
                           {result.meta}
                         </Text>
                       )}
@@ -291,7 +288,7 @@ export function ItemModal({
               />
             </>
           )}
-          <Text fz={12} c={colors.faint} style={{ fontFamily: fonts.sans }}>
+          <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>
             {hint}
             {searchEnabled && ` ${copy.attribution}`}
           </Text>
@@ -303,24 +300,15 @@ export function ItemModal({
         </Box>
       </Group>
 
-      <Group justify="space-between" align="center" gap={10} mt={26}>
-        {isEditing && (
-          <UnstyledButton
-            onClick={onDelete}
-            style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: DANGER, padding: '8px 0' }}
-          >
-            {deleteLabel}
-          </UnstyledButton>
-        )}
-        <Group gap={10} ml="auto">
-          <Button variant="secondary" onClick={onClose} radius={10}>
-            Cancel
-          </Button>
-          <Button onClick={onSave} disabled={!canSave} loading={saving} radius={10}>
-            {saveLabel}
-          </Button>
-        </Group>
-      </Group>
+      <ModalFooter
+        onCancel={onClose}
+        onConfirm={onSave}
+        confirmLabel={saveLabel}
+        confirmDisabled={!canSave}
+        loading={saving}
+        onDelete={isEditing ? onDelete : undefined}
+        deleteLabel={deleteLabel}
+      />
     </ModalShell>
   )
 }

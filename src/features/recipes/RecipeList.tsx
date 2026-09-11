@@ -1,6 +1,6 @@
 import { Box, Group, Text, UnstyledButton } from '@mantine/core'
 import type { Recipe } from '../../types'
-import { colors, fonts } from '../../theme'
+import { colors, fonts, text } from '../../theme'
 import { servingsTimeLine } from './derive'
 
 /** The cookbook as a dense scannable index: one row per recipe (already
@@ -10,7 +10,7 @@ export function RecipeList({ recipes, onOpen }: { recipes: Recipe[]; onOpen: (re
   return (
     <Box
       mt={24}
-      bg="#fff"
+      bg={colors.surface}
       style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 12, overflow: 'hidden' }}
     >
       {recipes.map((recipe, index) => {
@@ -26,7 +26,7 @@ export function RecipeList({ recipes, onOpen }: { recipes: Recipe[]; onOpen: (re
           >
             <Group justify="space-between" align="center" gap={12} wrap="nowrap">
               <Box miw={0}>
-                <Text fz={14.5} fw={700} c={colors.ink} truncate style={{ fontFamily: fonts.sans }}>
+                <Text fz={text.lead} fw={700} c={colors.ink} truncate style={{ fontFamily: fonts.sans }}>
                   {recipe.title}
                 </Text>
                 {recipe.source && (
@@ -51,7 +51,7 @@ export function RecipeList({ recipes, onOpen }: { recipes: Recipe[]; onOpen: (re
                   </Text>
                 ))}
                 {meta && (
-                  <Text fz={11.5} c={colors.faint} style={{ fontFamily: fonts.mono, whiteSpace: 'nowrap' }}>
+                  <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.mono, whiteSpace: 'nowrap' }}>
                     {meta}
                   </Text>
                 )}

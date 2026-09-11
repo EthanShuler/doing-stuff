@@ -2,27 +2,24 @@ import { Suspense } from 'react'
 import type { ReactNode } from 'react'
 import { AppShell, Burger, Button, Group, Text, UnstyledButton } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { useLocation, useNavigate } from 'react-router'
-import { ACCENT, colors, fonts } from '../theme'
+import { Link, useLocation } from 'react-router'
+import { ACCENT, colors, fonts, radii, text } from '../theme'
 import { supabase } from '../lib/supabase'
 import { Splash } from '../components/Splash'
 
-/** Top-level features behind the shell nav. Doing Stuff spans four routes;
- *  a match also claims its sub-paths (so /recipes/:id lights up Recipes —
- *  '/' is exempt or it would claim everything). */
+/** Top-level features behind the shell nav — one entry per feature, not one
+ *  per route. Doing Stuff spans four routes and Tier Lists four kinds (an
+ *  in-page picker chooses between them, see ListPicker); a match also claims
+ *  its sub-paths (so /recipes/:id lights up Recipes — '/' is exempt or it
+ *  would claim everything). The unbuilt placeholder routes (/french-toast,
+ *  /board-games, /cats) still exist in App.tsx but are off the nav. */
 const FEATURES = [
   { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
-  { label: 'Movies', path: '/movies', matches: ['/movies'] },
-  { label: 'TV', path: '/tv', matches: ['/tv'] },
-  { label: 'Books', path: '/books', matches: ['/books'] },
-  { label: 'French Toast', path: '/french-toast', matches: ['/french-toast'] },
+  { label: 'Tier Lists', path: '/movies', matches: ['/movies', '/tv', '/books', '/ice-cream', '/lists'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
   { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },
-  { label: 'Board Games', path: '/board-games', matches: ['/board-games'] },
-  { label: 'Ice Cream', path: '/ice-cream', matches: ['/ice-cream'] },
   { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
-  { label: 'Cats', path: '/cats', matches: ['/cats'] },
   { label: 'Music Practice', path: '/music-practice', matches: ['/music-practice'] },
 ]
 
@@ -30,21 +27,15 @@ const isActive = (matches: string[], pathname: string) =>
   matches.some((m) => m === pathname || (m !== '/' && pathname.startsWith(`${m}/`)))
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.
- *  On phones the nav collapses into a burger-toggled drawer. */
+ *  Seven nav items need ~920px, so the drawer holds them until `md`. */
 export function AppLayout({ children }: { children: ReactNode }) {
   const [navOpened, { toggle, close }] = useDisclosure(false)
   const { pathname } = useLocation()
-  const navigate = useNavigate()
-
-  const go = (path: string) => {
-    navigate(path)
-    close()
-  }
 
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 220, breakpoint: 'sm', collapsed: { desktop: true, mobile: !navOpened } }}
+      navbar={{ width: 220, breakpoint: 'md', collapsed: { desktop: true, mobile: !navOpened } }}
       padding={0}
       styles={{
         header: { background: colors.pageBg, borderBottom: `1px dotted ${colors.dotted}` },
@@ -58,40 +49,42 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Burger
               opened={navOpened}
               onClick={toggle}
-              hiddenFrom="sm"
+              hiddenFrom="md"
               size="sm"
               color={colors.muted}
               aria-label="Toggle navigation"
             />
             <Text
+              component={Link}
+              to="/"
+              onClick={close}
               fz={19}
               fw={500}
               c={colors.ink}
-              style={{ fontFamily: fonts.serif, fontStyle: 'italic', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}
+              style={{
+                fontFamily: fonts.serif,
+                fontStyle: 'italic',
+                letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap',
+                textDecoration: 'none',
+              }}
             >
               cajubinile.com
             </Text>
-            <Group gap={4} visibleFrom="sm" wrap="nowrap">
+            <Group gap={4} visibleFrom="md" wrap="nowrap">
               {FEATURES.map((feature) => (
                 <FeatureLink
                   key={feature.path}
                   label={feature.label}
+                  path={feature.path}
                   active={isActive(feature.matches, pathname)}
-                  onClick={() => go(feature.path)}
+                  onNavigate={close}
                 />
               ))}
             </Group>
           </Group>
           {supabase && (
-            <Button
-              variant="subtle"
-              onClick={() => supabase!.auth.signOut()}
-              fz={12}
-              fw={600}
-              radius={9}
-              px={10}
-              c={colors.muted}
-            >
+            <Button variant="secondary" size="compact-sm" onClick={() => supabase!.auth.signOut()}>
               Sign out
             </Button>
           )}
@@ -104,8 +97,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <FeatureLink
             key={feature.path}
             label={feature.label}
+            path={feature.path}
             active={isActive(feature.matches, pathname)}
-            onClick={() => go(feature.path)}
+            onNavigate={close}
             block
           />
         ))}
@@ -124,31 +118,38 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
 function FeatureLink({
   label,
+  path,
   active,
-  onClick,
+  onNavigate,
   block,
 }: {
   label: string
+  path: string
   active: boolean
-  onClick: () => void
+  /** Closes the mobile drawer after a pick (a no-op on desktop). */
+  onNavigate: () => void
   block?: boolean
 }) {
   return (
     <UnstyledButton
-      onClick={onClick}
+      component={Link}
+      to={path}
+      onClick={onNavigate}
       px={block ? 12 : 11}
       py={block ? 10 : 6}
       style={{
         fontFamily: fonts.sans,
-        fontSize: 13,
+        fontSize: text.small,
         fontWeight: 600,
         color: active ? colors.ink : colors.muted,
-        borderRadius: 9,
+        borderRadius: radii.chip,
         background: active ? colors.chip : 'transparent',
         boxShadow: active ? `inset 0 -2px 0 ${ACCENT}` : undefined,
         whiteSpace: 'nowrap',
         width: block ? '100%' : undefined,
         textAlign: block ? 'left' : undefined,
+        textDecoration: 'none',
+        display: 'block',
       }}
     >
       {label}

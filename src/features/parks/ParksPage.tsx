@@ -1,7 +1,9 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
-import { Box, Button, Group, SegmentedControl, Text } from '@mantine/core'
-import { colors, fonts } from '../../theme'
+import { Button, Group, SegmentedControl, Text } from '@mantine/core'
+import { colors, fonts, text } from '../../theme'
+import { ControlBar } from '../../components/ControlBar'
 import { FloatingBanner } from '../../components/FloatingBanner'
+import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useParkStore } from './useParkStore'
 import type { Park } from './parks'
@@ -23,7 +25,7 @@ function Stat({ variant, label }: { variant: DotVariant; label: string }) {
   return (
     <Group gap={8} wrap="nowrap">
       <StatusDot variant={variant} />
-      <Text fz={13} fw={600} c={colors.inkSoft} style={{ fontFamily: fonts.sans, whiteSpace: 'nowrap' }}>
+      <Text fz={text.small} fw={600} c={colors.inkSoft} style={{ fontFamily: fonts.sans, whiteSpace: 'nowrap' }}>
         {label}
       </Text>
     </Group>
@@ -66,26 +68,19 @@ export function ParksPage({
     [store.visits, detailPark],
   )
 
-  if (configured && store.loading) {
-    return <Splash text="Loading your space…" mih="60vh" />
-  }
+  // The scoreboard is derived from the visits, so it waits with the content
+  // rather than flashing an honest-looking 0/63.
+  const loadingData = configured && store.loading
 
   return (
     <>
       <title>Parks · cajubinile.com</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
 
-      <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
-        <Box maw={1200} mx="auto">
-          <Group
-            justify="space-between"
-            align="center"
-            gap={12}
-            wrap="wrap"
-            pb={18}
-            style={{ borderBottom: `1px dotted ${colors.rule}` }}
-          >
-            <Group gap={18} wrap="wrap">
+      <PageFrame>
+        <ControlBar
+          left={
+            <>
               <SegmentedControl
                 value={screen}
                 onChange={(value) => setScreen(value as Screen)}
@@ -96,33 +91,35 @@ export function ParksPage({
               />
               {/* The scoreboard: parks each of you has set foot in, and parks
                   you've been to on the same trip. */}
-              <Group gap={16} wrap="wrap">
-                {members.map((m) => (
-                  <Stat
-                    key={m.id}
-                    variant={{ kind: 'solid', color: m.color }}
-                    label={`${m.name || 'Member'} ${stats.perMember[m.id] ?? 0}/${stats.total}`}
-                  />
-                ))}
-                {members.length > 1 && (
-                  <Stat variant={togetherVariant(members)} label={`Together ${stats.together}/${stats.total}`} />
-                )}
-              </Group>
-            </Group>
-            <Button onClick={() => setLogOpen(true)} radius={10}>
-              + Log visit
-            </Button>
-          </Group>
+              {!loadingData && (
+                <Group gap={16} wrap="wrap">
+                  {members.map((m) => (
+                    <Stat
+                      key={m.id}
+                      variant={{ kind: 'solid', color: m.color }}
+                      label={`${m.name || 'Member'} ${stats.perMember[m.id] ?? 0}/${stats.total}`}
+                    />
+                  ))}
+                  {members.length > 1 && (
+                    <Stat variant={togetherVariant(members)} label={`Together ${stats.together}/${stats.total}`} />
+                  )}
+                </Group>
+              )}
+            </>
+          }
+          right={<Button onClick={() => setLogOpen(true)}>+ Log visit</Button>}
+        />
 
-          {screen === 'map' ? (
-            <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
-              <ParkMap statuses={statuses} members={members} onOpen={setDetailPark} />
-            </Suspense>
-          ) : (
-            <ParkList statuses={statuses} members={members} onOpen={setDetailPark} />
-          )}
-        </Box>
-      </Box>
+        {loadingData ? (
+          <Splash text="Loading your space…" mih="40vh" />
+        ) : screen === 'map' ? (
+          <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
+            <ParkMap statuses={statuses} members={members} onOpen={setDetailPark} />
+          </Suspense>
+        ) : (
+          <ParkList statuses={statuses} members={members} onOpen={setDetailPark} />
+        )}
+      </PageFrame>
 
       <ParkModal
         park={detailPark}

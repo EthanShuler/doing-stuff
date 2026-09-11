@@ -72,7 +72,7 @@ test('/music-practice renders the bassoon wheel', async ({ page }) => {
 })
 
 test('placeholder routes render ComingSoon', async ({ page }) => {
-  // exact — the header nav's "French Toast" button would match a loose search
+  // Off the nav since Phase 2, but the route (and its page) still resolve.
   await page.goto('/french-toast')
   await expect(page.getByText('French toast', { exact: true })).toBeVisible()
 })
