@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Box } from '@mantine/core'
 import { useNavigate } from 'react-router'
 import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../types'
@@ -14,7 +14,11 @@ import { Dashboard } from './Dashboard'
 import { EntryModal } from './EntryModal'
 import { RepeatModal } from './RepeatModal'
 import { ManageModal } from './ManageModal'
-import { MapView } from './MapView'
+
+// Leaflet (JS + its stylesheet) is a big dependency only the map screen
+// needs, so it loads on demand. Module scope: a lazy() per render would
+// remount the map — and refit its bounds — on every state change.
+const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })))
 import { CalendarView } from './CalendarView'
 import { Wishlist } from './Wishlist'
 import { HeaderActions } from './HeaderActions'
@@ -240,12 +244,14 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
               onDelete={store.deleteWishlistItem}
             />
           ) : screen === 'map' ? (
-            <MapView
-              home={store.home}
-              categories={store.categories}
-              markers={markers}
-              onEditEntry={openEdit}
-            />
+            <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
+              <MapView
+                home={store.home}
+                categories={store.categories}
+                markers={markers}
+                onEditEntry={openEdit}
+              />
+            </Suspense>
           ) : screen === 'calendar' ? (
             <CalendarView
               categories={store.categories}

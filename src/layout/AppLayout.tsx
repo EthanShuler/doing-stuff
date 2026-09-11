@@ -1,9 +1,11 @@
+import { Suspense } from 'react'
 import type { ReactNode } from 'react'
 import { AppShell, Burger, Button, Group, Text, UnstyledButton } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { useLocation, useNavigate } from 'react-router'
 import { ACCENT, colors, fonts } from '../theme'
 import { supabase } from '../lib/supabase'
+import { Splash } from '../components/Splash'
 
 /** Top-level features behind the shell nav. Doing Stuff spans four routes;
  *  a match also claims its sub-paths (so /recipes/:id lights up Recipes —
@@ -109,7 +111,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
         ))}
       </AppShell.Navbar>
 
-      <AppShell.Main>{children}</AppShell.Main>
+      {/* The routes are lazy chunks (see App.tsx); the boundary lives here so
+          the header/nav stay mounted while one loads. react-router wraps
+          in-app navigations in a transition, so this fallback is really only
+          seen on a hard load of a route. */}
+      <AppShell.Main>
+        <Suspense fallback={<Splash text="Loading…" mih="60vh" />}>{children}</Suspense>
+      </AppShell.Main>
     </AppShell>
   )
 }

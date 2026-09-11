@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Box, Button, Group, SegmentedControl, Text } from '@mantine/core'
 import { colors, fonts } from '../../theme'
 import { FloatingBanner } from '../../components/FloatingBanner'
@@ -9,7 +9,10 @@ import { PARKS } from './parks'
 import { buildMembers, parkStats, parkStatuses } from './derive'
 import type { DotVariant } from './StatusDot'
 import { StatusDot, togetherVariant } from './StatusDot'
-import { ParkMap } from './ParkMap'
+
+// Leaflet only ships to whoever opens the map (module scope — see the note
+// in DoingStuffPage).
+const ParkMap = lazy(() => import('./ParkMap').then((m) => ({ default: m.ParkMap })))
 import { ParkList } from './ParkList'
 import { ParkModal } from './ParkModal'
 import { LogVisitModal } from './LogVisitModal'
@@ -112,7 +115,9 @@ export function ParksPage({
           </Group>
 
           {screen === 'map' ? (
-            <ParkMap statuses={statuses} members={members} onOpen={setDetailPark} />
+            <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
+              <ParkMap statuses={statuses} members={members} onOpen={setDetailPark} />
+            </Suspense>
           ) : (
             <ParkList statuses={statuses} members={members} onOpen={setDetailPark} />
           )}

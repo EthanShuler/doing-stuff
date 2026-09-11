@@ -224,7 +224,10 @@ in-memory seed when keyless.
 Shared Leaflet plumbing lives in `src/components/MapCanvas.tsx` (framed
 MapContainer + CARTO tiles, `Recenter`, `FitToPins`, a divIcon cache with
 `emojiIcon`) — all three feature maps (doing-stuff, spoons, parks) render
-through it; new maps should too.
+through it; new maps should too. Each of those three map components is
+`React.lazy`-loaded at its page's module scope with a `Suspense` around just
+the map branch, so Leaflet (JS **and** its stylesheet) only downloads for
+someone who actually opens a map — keep that shape for a new one.
 
 Visual direction: **earthy & natural** (terracotta clay, sage green, warm
 paper), ported from the Claude Design "Compass" direction.
@@ -273,6 +276,15 @@ paper), ported from the Claude Design "Compass" direction.
   tables must be in the `supabase_realtime` publication (see `schema.sql`).
 - **Hosting target: Cloudflare Pages** (build `npm run build`, output `dist`).
   Deliberately not Vercel.
+- **Load budget.** The routes and the three maps are lazy chunks, and
+  `vite.config.ts` splits `vendor-react` / `-mantine` / `-leaflet` / `-dnd` /
+  `-supabase` out of the app code (mostly for deploy-to-deploy cache
+  stability). `index.html` preconnects to the font, poster/cover, and Supabase
+  origins. Every `<img>` gets
+  `loading="lazy" decoding="async"`, and poster/cover `src`s are shrunk to the
+  rendered box at render time (`src/lib/imageUrl.ts`) — **stored URLs are
+  never rewritten**, since `photos.ts` parses them back. Keep new `<img>`s and
+  new heavy dependencies to the same rules.
 
 ## Commands
 
@@ -338,8 +350,16 @@ special-casing. A dropped-then-rejoined channel refetches the full snapshot
 (`fetchAll`/`applySnapshot`) to cover anything missed while offline. Keyless
 seed mode skips all of this.
 
+The snapshot is fetched **on channel join, not on mount**: `useSpaceSync`
+subscribes first and runs `fetchAll` when the channel reports `SUBSCRIBED`, so
+the read provably follows the join (nothing can slip between the two) and each
+page mount costs one round of queries instead of two. Realtime is never a gate
+on seeing data — a `CHANNEL_ERROR`/`TIMED_OUT` before the first load, or a
+1.5 s fallback timer if no status arrives at all, loads anyway; `loading`
+flips false once that first load settles either way.
+
 This load/realtime plumbing is shared: `src/data/spaceSync.ts` owns
-`useSpaceSync` (initial snapshot + channel + reconnect-refetch), `syncTable`
+`useSpaceSync` (subscribe → snapshot on join → reconnect-refetch), `syncTable`
 (one table's INSERT/UPDATE/DELETE handlers), `upsertById`/`removeById`, the
 profile row mapper, and `idFactory` for seed-mode ids. A new feature's store
 supplies only its row mappers, `fetchAll`, a `wire` callback, actions, and
@@ -408,6 +428,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 ```
 src/
   App.tsx                  gate (auth → space) → BrowserRouter → AppLayout → routes
+                           (the 7 feature pages are React.lazy at module scope)
   types.ts                 domain types (mirror DB columns)
   theme.ts                 earthy palette, fonts, shared colors, swatchFor()
   mantineTheme.ts          Mantine theme override mirroring theme.ts
@@ -418,6 +439,7 @@ src/
     fuzzy.ts               fuzzyMatch() subsequence title search (Log + recipes)
     geocode.ts             Nominatim address → lat/lng (on save only)
     image.ts               client-side photo downscale (≤1200px JPEG) for uploads
+    imageUrl.ts            posterSrc() render-time TMDB/Open Library size rewrite
     photos.ts              shared Storage bucket photo upload / best-effort delete
     profile.ts             displayNameFor() — profile → short display label
     tmdb.ts                TMDB title search (movie/TV posters) for ItemModal

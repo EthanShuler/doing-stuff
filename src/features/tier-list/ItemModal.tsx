@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Box, Button, Group, TagsInput, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
+import { useDebouncedValue } from '@mantine/hooks'
 import type { TierItem, TierKind } from '../../types'
 import { colors, DANGER, fonts } from '../../theme'
 import { ModalShell } from '../../components/ModalShell'
@@ -145,12 +146,15 @@ export function ItemModal({
   const saveLabel = isEditing ? 'Save changes' : isWatchlist ? `Add to ${copy.listLabel.toLowerCase()}` : `Add ${noun}`
   const deleteLabel = isWatchlist ? `Remove from ${copy.listLabel.toLowerCase()}` : `Delete ${noun}`
 
-  // Live preview of the card exactly as it will render on the board.
+  // Live preview of the card exactly as it will render on the board. The
+  // image URL is debounced so typing or pasting a link fires one request when
+  // you stop, not one per keystroke.
+  const [previewUrl] = useDebouncedValue(draft.imageUrl.trim(), 400)
   const previewItem: TierItem = {
     id: 'preview',
     kind,
     title: draft.title.trim() || 'Title…',
-    imageUrl: draft.imageUrl.trim(),
+    imageUrl: previewUrl,
     watchedOn: null,
     tags: [],
     creator: draft.creator.trim(),
@@ -213,6 +217,8 @@ export function ItemModal({
                       <img
                         src={result.thumbUrl}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         style={{ width: 30, height: 44, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
                       />
                     ) : (
@@ -290,8 +296,9 @@ export function ItemModal({
             {searchEnabled && ` ${copy.attribution}`}
           </Text>
         </Box>
-        {/* Keyed on the URL so pasting a new link retries a broken image. */}
-        <Box key={draft.imageUrl.trim()} mt={4}>
+        {/* No key: MediaImage already remembers "broken" per URL, so a new
+            link retries on its own without remounting the whole card. */}
+        <Box mt={4}>
           <CardVisual item={previewItem} />
         </Box>
       </Group>

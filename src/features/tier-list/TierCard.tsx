@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
 import { colors, fonts } from '../../theme'
+import { posterSrc } from '../../lib/imageUrl'
 import { KIND_COPY } from './copy'
 
 /** Card footprint — constant so tier rows pack densely and wrap cleanly. */
@@ -22,6 +23,7 @@ export function MediaImage({
   height,
   radius = 0,
   emojiSize = 26,
+  srcWidth,
 }: {
   imageUrl: string
   title: string
@@ -31,6 +33,10 @@ export function MediaImage({
   height: number
   radius?: number
   emojiSize?: number
+  /** Rendered width in CSS px, used to ask the CDN for a right-sized file
+   *  (see posterSrc). Defaults to a numeric `width`, else the card width —
+   *  pass it explicitly whenever `width` is a percentage. */
+  srcWidth?: number
 }) {
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
   if (!imageUrl || brokenUrl === imageUrl) {
@@ -52,12 +58,16 @@ export function MediaImage({
       </Box>
     )
   }
+  // The rewritten src is a render-time detail; `brokenUrl` stays keyed on the
+  // STORED url so the retry-on-new-link behaviour doesn't depend on sizing.
   return (
     <img
-      src={imageUrl}
+      src={posterSrc(imageUrl, srcWidth ?? (typeof width === 'number' ? width : CARD_WIDTH))}
       alt={title}
       onError={() => setBrokenUrl(imageUrl)}
       draggable={false}
+      loading="lazy"
+      decoding="async"
       style={{ width, height, objectFit: 'cover', borderRadius: radius, flexShrink: 0, display: 'block' }}
     />
   )
@@ -96,6 +106,7 @@ export function CardVisual({
         emoji={KIND_COPY[item.kind].emoji}
         width="100%"
         height={POSTER_HEIGHT}
+        srcWidth={CARD_WIDTH}
       />
       <Text
         fz={10.5}

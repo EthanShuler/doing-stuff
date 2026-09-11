@@ -1,3 +1,4 @@
+import { lazy } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import type { Screen, TierKind } from './types'
@@ -7,13 +8,27 @@ import { AppLayout } from './layout/AppLayout'
 import { AuthScreen } from './components/AuthScreen'
 import { ComingSoon } from './components/ComingSoon'
 import { Splash } from './components/Splash'
-import { DoingStuffPage } from './features/doing-stuff/DoingStuffPage'
-import { TierListPage } from './features/tier-list/TierListPage'
-import { SpoonsPage } from './features/spoons/SpoonsPage'
-import { ParksPage } from './features/parks/ParksPage'
-import { RecipesPage } from './features/recipes/RecipesPage'
-import { MusicPracticePage } from './features/music-practice/MusicPracticePage'
-import { LittleGuysPage } from './features/little-guys/LittleGuysPage'
+
+// Each feature is its own async chunk, so a hard load of / doesn't ship the
+// tier boards, the maps, or dnd-kit. These MUST stay at module scope: a
+// lazy() call inside the component would mint a new component type on every
+// render, remounting the page (and its store + realtime channel) constantly.
+// AppLayout holds the Suspense boundary, so the shell never unmounts.
+const DoingStuffPage = lazy(() =>
+  import('./features/doing-stuff/DoingStuffPage').then((m) => ({ default: m.DoingStuffPage })),
+)
+const TierListPage = lazy(() =>
+  import('./features/tier-list/TierListPage').then((m) => ({ default: m.TierListPage })),
+)
+const SpoonsPage = lazy(() => import('./features/spoons/SpoonsPage').then((m) => ({ default: m.SpoonsPage })))
+const ParksPage = lazy(() => import('./features/parks/ParksPage').then((m) => ({ default: m.ParksPage })))
+const RecipesPage = lazy(() => import('./features/recipes/RecipesPage').then((m) => ({ default: m.RecipesPage })))
+const MusicPracticePage = lazy(() =>
+  import('./features/music-practice/MusicPracticePage').then((m) => ({ default: m.MusicPracticePage })),
+)
+const LittleGuysPage = lazy(() =>
+  import('./features/little-guys/LittleGuysPage').then((m) => ({ default: m.LittleGuysPage })),
+)
 
 export default function App() {
   const { session, loading, configured } = useSession()

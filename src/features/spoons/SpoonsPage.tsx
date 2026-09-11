@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Box, Button, Group, SegmentedControl } from '@mantine/core'
 import type { Spoon } from '../../types'
 import { colors, fonts } from '../../theme'
@@ -9,7 +9,10 @@ import { useSpoonStore } from './useSpoonStore'
 import type { SpoonDraft } from './useSpoonStore'
 import { sortSpoons, spoonMarkers } from './derive'
 import { SpoonGrid } from './SpoonGrid'
-import { SpoonMap } from './SpoonMap'
+
+// Leaflet only ships to whoever opens the map (module scope — see the note
+// in DoingStuffPage).
+const SpoonMap = lazy(() => import('./SpoonMap').then((m) => ({ default: m.SpoonMap })))
 import { SpoonModal } from './SpoonModal'
 
 type Screen = 'list' | 'map'
@@ -121,7 +124,9 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
           </Group>
 
           {screen === 'map' ? (
-            <SpoonMap markers={markers} onEdit={openEdit} />
+            <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
+              <SpoonMap markers={markers} onEdit={openEdit} />
+            </Suspense>
           ) : (
             <SpoonGrid spoons={sorted} onEdit={openEdit} />
           )}
