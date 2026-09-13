@@ -44,3 +44,10 @@ export function tierRow(page: Page, tier: string): Locator {
 export function boardShelf(page: Page, shelf: 'unranked' | 'unwatched'): Locator {
   return page.locator(`[data-board-shelf="${shelf}"]`)
 }
+
+/** Expand a shelf (they start collapsed) so its cards render. The heading is
+ *  the shelf's only button — cards are plain divs. */
+export async function openShelf(page: Page, shelf: 'unranked' | 'unwatched') {
+  const toggle = boardShelf(page, shelf).locator('[data-shelf-toggle]')
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+}

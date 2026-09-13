@@ -61,9 +61,20 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   ("Bugs", "Fruits"), shared data with the uniform RLS: either member can
   create, re-word, or delete one. Behavior is **fixed to the ice-cream
   template** (shared pool, S–F tiers, a "Not <past>" shelf, hand-pasted
-  image URLs, no search provider, no visible dates), so the row carries only
+  image URLs, no search provider, no visible dates), so the row carries
   WORDS — `name`, `emoji`, singular `noun`, `past` — which `customCopy()` in
-  the tier-list `copy.ts` templates into a full `KindCopy`. Its items carry
+  the tier-list `copy.ts` templates into a full `KindCopy` — plus ONE
+  behavior flag, **`shared`** (the "Shared board" checkbox in `ListModal`):
+  a shared list has **one board the space ranks together** instead of a
+  board per member. Its placements are `tier_placements` rows with a **null
+  `user_id`** (the unique index is `nulls not distinct`, so still one row
+  per item); RLS lets any member write null-owner rows, but only for items
+  on a list flagged shared (`is_shared_board_item()`). App-side
+  `isSharedBoard(key, lists)` / `placementOwner(shared, viewerId)` in the
+  tier-list `derive.ts` are the switch: the page hides the You/Partner
+  toggle, always renders the drag board, and passes `shared` to the
+  placement actions. Flipping the flag never moves rankings — the other
+  mode's rows stay in the DB and reappear if it's flipped back. Its items carry
   `kind = 'custom'` plus a `list_id` FK, so **deleting a list is one
   statement** and Postgres cascades the items (and every member's
   placements/completions of them); the store mirrors that with `pruneList()`.
@@ -101,10 +112,15 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   second dashed **Unwatched** (books: **Unread**, ice cream: **Not tried**)
   shelf instead (a placement
   wins over a missing date). Dragging out of that shelf stamps today's date;
-  dropping onto it unranks the card and clears the date. RLS is split:
+  dropping onto it unranks the card and clears the date. Both shelves are
+  **collapsible and start collapsed** (heading + count; the page owns the
+  open state, so it survives the You/Partner and filter switches and resets
+  on a board switch). The heading sits inside the droppable area, so a
+  collapsed shelf still accepts drops. RLS is split:
   members **read** everyone's placements but
   **write only their own** — the partner's board is read-only at the security
-  boundary, not just in the UI.
+  boundary, not just in the UI. (Shared custom lists are the one exception —
+  see Custom list above.)
 - **Completion** (`tier_item_completions`) — **one person's** "I'm done with
   this" for an item; today only BOOKS use it (a `done_on` date, upsert on
   `unique (item_id, user_id)` — deliberately the same column name as the
@@ -484,7 +500,9 @@ schema in `supabase/schema.sql` is already applied to the current project.
   exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_completions` / `music_practice_days`** (members
   read all, but insert/update/delete require `user_id = auth.uid()` — rankings,
-  book read state, and daily practice are personal), and **`list_items`**
+  book read state, and daily practice are personal; `tier_placements` alone
+  also admits **null-owner rows for items on a `shared` custom list**, via
+  `is_shared_board_item()`), and **`list_items`**
   (members read all; writes to BOOK rows additionally require
   `created_by = auth.uid()` — reading lists are personal, other lists stay
   shared). Follow that pattern for any future per-person opinion data.
@@ -575,14 +593,14 @@ src/
     tier-list/             movie/TV/book/ice-cream + custom boards (one per route)
       TierListPage.tsx     owns the store, You/Partner toggle, item modal state
       useTierListStore.ts  data seam: lists + pool + placements + completions CRUD
-      derive.ts            board building, moveItem, list keys, pruneList
+      derive.ts            board building, moveItem, list keys, shared boards, pruneList
       derive.test.ts       vitest coverage for derive.ts
       copy.ts              per-kind wording + customCopy/copyFor for custom lists
       copy.test.ts         vitest coverage for copy.ts
       ListPicker.tsx       thin PickerRow wrapper: built-in boards + custom boards
       ListModal.tsx        create / re-word / delete a space-defined list
       TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
-      BoardView.tsx        pure board layout (tier rows + unranked/unread shelves)
+      BoardView.tsx        pure board layout (tier rows + collapsible shelves)
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
       ItemModal.tsx        add/edit pool item (title via TitleSearchInput)
     lists/                 the want-to queues: movie/TV/book + free-form lists

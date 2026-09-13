@@ -16,21 +16,21 @@ import {
 import type { CollisionDetection, DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Tier, TierItem } from '../../types'
-import type { Board, ContainerId } from './derive'
+import type { Board, ContainerId, ShelfId } from './derive'
 import { positionBetween } from '../../lib/order'
 import { containerItems, findContainer, moveItem } from './derive'
-import { BoardView, ROW_AREA_STYLE } from './BoardView'
-import type { RowAreaProps } from './BoardView'
+import { BoardView, rowAreaStyle } from './BoardView'
+import type { RowAreaProps, ShelfOpenState } from './BoardView'
 import { CardVisual, SortableCard } from './TierCard'
 
 /** A tier row's (or the shelf's) card area as a drop target: droppable under
  *  the container's own id — so empty rows still catch drops — plus a sortable
  *  context for the cards it holds. rectSorting because full rows wrap. */
-function DroppableRowArea({ container, items, children }: RowAreaProps) {
+function DroppableRowArea({ container, items, compact = false, children }: RowAreaProps) {
   const { setNodeRef } = useDroppable({ id: container })
   return (
     <SortableContext id={container} items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
-      <div ref={setNodeRef} style={ROW_AREA_STYLE}>
+      <div ref={setNodeRef} style={rowAreaStyle(compact)}>
         {children}
       </div>
     </SortableContext>
@@ -60,6 +60,8 @@ export function TierBoard({
   shelfHint,
   unwatchedHint,
   unwatchedLabel,
+  openShelves,
+  onToggleShelf,
 }: {
   /** The viewer's board as derived from the store (the source of truth). */
   board: Board
@@ -80,6 +82,8 @@ export function TierBoard({
   shelfHint?: string
   unwatchedHint?: string
   unwatchedLabel?: string
+  openShelves: ShelfOpenState
+  onToggleShelf: (shelf: ShelfId) => void
 }) {
   // While dragging, render a frozen local copy: onDragOver mutates it for the
   // cross-row preview, and realtime updates landing in the store can't yank
@@ -228,6 +232,8 @@ export function TierBoard({
         shelfHint={shelfHint}
         unwatchedHint={unwatchedHint}
         unwatchedLabel={unwatchedLabel}
+        openShelves={openShelves}
+        onToggleShelf={onToggleShelf}
         renderCard={(item: TierItem, _container: ContainerId) => (
           <SortableCard key={item.id} item={item} emoji={cardEmoji} onClick={() => onCardClick(item)} />
         )}

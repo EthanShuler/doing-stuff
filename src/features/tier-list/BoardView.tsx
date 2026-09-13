@@ -1,13 +1,13 @@
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
-import { Box, Text } from '@mantine/core'
+import { Box, Text, UnstyledButton } from '@mantine/core'
 import type { TierItem } from '../../types'
-import type { Board, ContainerId } from './derive'
+import type { Board, ContainerId, ShelfId } from './derive'
 import { TIERS, tierSwatch } from './derive'
 import { colors, fonts } from '../../theme'
 
 /** Layout for a row's card area — shared by the plain and droppable variants
  *  so the board looks identical with and without drag wiring. */
-export const ROW_AREA_STYLE: CSSProperties = {
+const ROW_AREA_STYLE: CSSProperties = {
   flex: 1,
   display: 'flex',
   flexWrap: 'wrap',
@@ -18,17 +18,32 @@ export const ROW_AREA_STYLE: CSSProperties = {
   minHeight: 116,
 }
 
+/** A collapsed shelf keeps the same flex wrap (its heading is the only child)
+ *  but no card-height floor, so it folds down to one line. */
+const COMPACT_ROW_AREA_STYLE: CSSProperties = { ...ROW_AREA_STYLE, minHeight: 0 }
+
+export const rowAreaStyle = (compact: boolean): CSSProperties =>
+  compact ? COMPACT_ROW_AREA_STYLE : ROW_AREA_STYLE
+
 export interface RowAreaProps {
   container: ContainerId
   items: TierItem[]
+  /** A collapsed shelf: heading only, no minimum height. */
+  compact?: boolean
   children: ReactNode
 }
 
 /** Default (read-only) card area: just the flex wrap. The interactive board
  *  substitutes a version that adds useDroppable + SortableContext. */
-function PlainRowArea({ children }: RowAreaProps) {
-  return <div style={ROW_AREA_STYLE}>{children}</div>
+function PlainRowArea({ compact = false, children }: RowAreaProps) {
+  return <div style={rowAreaStyle(compact)}>{children}</div>
 }
+
+/** Which shelves are expanded. Both start collapsed — a long unranked shelf
+ *  otherwise pushes the tiers off the screen. */
+export type ShelfOpenState = Record<ShelfId, boolean>
+
+export const SHELVES_COLLAPSED: ShelfOpenState = { unranked: false, unwatched: false }
 
 /**
  * The board itself: six tier rows + the unranked and unwatched shelves. Purely
@@ -43,6 +58,8 @@ export function BoardView({
   shelfHint,
   unwatchedHint,
   unwatchedLabel = 'Unwatched',
+  openShelves,
+  onToggleShelf,
 }: {
   board: Board
   renderCard: (item: TierItem, container: ContainerId) => ReactNode
@@ -53,6 +70,10 @@ export function BoardView({
   unwatchedHint?: string
   /** The second shelf's heading — 'Unread' on the books board. */
   unwatchedLabel?: string
+  /** Which shelves are expanded — the page owns this so it survives the
+   *  You/Partner and filter switches and resets on a board switch. */
+  openShelves: ShelfOpenState
+  onToggleShelf: (shelf: ShelfId) => void
 }) {
   return (
     <Box mt={20}>
@@ -101,27 +122,50 @@ export function BoardView({
           { container: 'unranked', label: 'Unranked', items: board.unranked, hint: shelfHint },
           { container: 'unwatched', label: unwatchedLabel, items: board.unwatched, hint: unwatchedHint },
         ] as const
-      ).map(({ container, label, items, hint }) => (
-        <Box
-          key={container}
-          data-board-shelf={container}
-          mt={16}
-          style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14, background: 'transparent' }}
-        >
-          <Text fz={11} fw={700} c={colors.muted} px={12} pt={10} tt="uppercase" style={{ letterSpacing: '0.08em' }}>
-            {label}
-          </Text>
-          <RowArea container={container} items={items}>
-            {items.length === 0 && hint ? (
-              <Text fz={13} c={colors.faint} p="24px 8px" style={{ fontFamily: fonts.sans }}>
-                {hint}
-              </Text>
-            ) : (
-              items.map((item) => renderCard(item, container))
-            )}
-          </RowArea>
-        </Box>
-      ))}
+      ).map(({ container, label, items, hint }) => {
+        const open = openShelves[container]
+        return (
+          <Box
+            key={container}
+            data-board-shelf={container}
+            data-shelf-open={open}
+            mt={16}
+            style={{ border: `1px dashed ${colors.dotted}`, borderRadius: 14, background: 'transparent' }}
+          >
+            {/* The heading sits INSIDE the card area so a collapsed shelf is
+                still a drop target: a card can be unranked, or sent back to
+                Not tried, without expanding the shelf first. */}
+            <RowArea container={container} items={items} compact={!open}>
+              <UnstyledButton
+                data-shelf-toggle
+                onClick={() => onToggleShelf(container)}
+                aria-expanded={open}
+                px={4}
+                py={2}
+                style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <Text component="span" fz={11} c={colors.muted} aria-hidden style={{ width: 10 }}>
+                  {open ? '▾' : '▸'}
+                </Text>
+                <Text component="span" fz={11} fw={700} c={colors.muted} tt="uppercase" style={{ letterSpacing: '0.08em' }}>
+                  {label}
+                </Text>
+                <Text component="span" fz={11} c={colors.faint} style={{ fontFamily: fonts.sans }}>
+                  · {items.length}
+                </Text>
+              </UnstyledButton>
+              {open &&
+                (items.length === 0 && hint ? (
+                  <Text fz={13} c={colors.faint} p="16px 8px 24px" style={{ fontFamily: fonts.sans }}>
+                    {hint}
+                  </Text>
+                ) : (
+                  items.map((item) => renderCard(item, container))
+                ))}
+            </RowArea>
+          </Box>
+        )
+      })}
     </Box>
   )
 }

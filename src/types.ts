@@ -115,6 +115,10 @@ export interface TierList {
   noun: string
   /** Past participle, lowercase: the "Not tried" shelf. */
   past: string
+  /** True = ONE board the whole space ranks together (placements carry a
+   *  null userId and either member may write them); false = the usual board
+   *  per person. */
+  shared: boolean
   /** auth.users id of the member who created it (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp; orders the picker pills. */
@@ -174,7 +178,9 @@ export interface TierCompletion {
 export interface TierPlacement {
   id: string
   itemId: string
-  userId: string
+  /** Whose ranking this is. Null = the shared board of a `shared` custom
+   *  list — one ranking for the whole space (see isSharedBoard in derive). */
+  userId: string | null
   tier: Tier
   /** Fractional ordering within the tier (midpoint insertion on drop). */
   position: number

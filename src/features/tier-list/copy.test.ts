@@ -8,6 +8,7 @@ const list = (over: Partial<TierList> = {}): TierList => ({
   emoji: '🍎',
   noun: 'fruit',
   past: 'tried',
+  shared: false,
   createdBy: 'u1',
   createdAt: '2026-06-09T09:00:00Z',
   ...over,
@@ -36,6 +37,15 @@ describe('customCopy', () => {
     // No provider knows this list's titles, so the modal has nothing to
     // suggest as a placeholder.
     expect(copy.example).toBe('')
+  })
+
+  it('a shared list has one board, so its hint names one shelf', () => {
+    expect(customCopy(list()).boardHint).toContain('both of your unranked shelves')
+    const copy = customCopy(list({ shared: true }))
+    expect(copy.boardHint).toContain('land on the unranked shelf')
+    expect(copy.boardHint).not.toContain('both')
+    // Everything else is unchanged — sharing is about rankings, not words.
+    expect(copy.shelfLabel).toBe('Not tried')
   })
 
   it('falls back to a generic emoji when the row leaves it blank', () => {
