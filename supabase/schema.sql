@@ -165,6 +165,12 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 -- rows are shared space data with the uniform policy; their items carry
 -- kind = 'custom' plus a `list_id`, so deleting a list is ONE statement and
 -- Postgres cascades everything under it.
+--
+-- A custom list can also be `shared`: ONE board the space ranks together
+-- instead of a board per member. Its placements carry user_id = NULL (the
+-- unique index treats nulls as equal, so it's still one row per item) and the
+-- placement policies let any member write those null-owner rows — but only
+-- for items on a list flagged shared (`is_shared_board_item`).
 -- ---------------------------------------------------------------------------
 
 -- A space-defined tier list. Behavior is fixed to the ice-cream template
@@ -184,6 +190,11 @@ create table if not exists public.tier_lists (
   -- (`verb` lived here until 2026-09-12, when boards lost their to-<verb>
   --  list to the Lists feature; the migration drops it.)
   past        text not null default 'tried',
+  -- True = one board both members rank together (null-owner placements);
+  -- false = the usual board per person. Flipping it never moves rankings —
+  -- the other mode's rows stay put and show again if it's flipped back.
+  -- On an existing DB: see migrations/20260912_shared_tier_lists.sql.
+  shared      boolean not null default false,
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
@@ -235,14 +246,19 @@ create table if not exists public.tier_placements (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
   item_id     uuid not null references public.tier_items (id) on delete cascade,
-  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  -- Whose ranking. NULL = the one shared board of a `shared` custom list;
+  -- the client sets it explicitly (never left to the default) so a shared
+  -- row isn't stamped with the writer.
+  user_id     uuid references auth.users (id) on delete cascade default auth.uid(),
   tier        text not null check (tier in ('S', 'A', 'B', 'C', 'D', 'F')),
   -- Fractional ordering within the tier (midpoint insertion; the client
   -- renormalizes a tier to integers if float precision ever runs out).
   position    double precision not null,
   created_at  timestamptz not null default now(),
   -- One ranking per person per item — also the upsert conflict target.
-  unique (item_id, user_id)
+  -- NULLS NOT DISTINCT so a shared board's null owner is one owner too
+  -- (and so ON CONFLICT (item_id, user_id) can infer this index for it).
+  unique nulls not distinct (item_id, user_id)
 );
 
 -- PER-PERSON completion state — today only BOOK items use it. Movies/TV are
@@ -269,6 +285,26 @@ create index if not exists tier_placements_space_idx on public.tier_placements (
 create index if not exists tier_placements_item_idx  on public.tier_placements (item_id);
 create index if not exists tier_item_completions_space_idx on public.tier_item_completions (space_id);
 create index if not exists tier_item_completions_item_idx  on public.tier_item_completions (item_id);
+
+-- Whether an item sits on a custom list flagged `shared` — the gate for
+-- writing a null-owner placement of it. SECURITY DEFINER like
+-- is_space_member so the policy check doesn't recurse through the item and
+-- list tables' own RLS; the calling policy still requires space membership.
+create or replace function public.is_shared_board_item(target_item uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.tier_items i
+    join public.tier_lists l on l.id = i.list_id
+    where i.id = target_item
+      and l.shared
+  );
+$$;
 
 -- Migration (2026-09-11): the per-person date table was `tier_item_reads`
 -- (book-specific in name only) and the shared one `tier_items.watched_on`.
@@ -746,22 +782,36 @@ create policy "space members all" on public.tier_items
 -- Placements are per-person: members read everyone's (the partner's board
 -- renders read-only), but each user can write only rows carrying their own
 -- user_id. The `with check` on update also blocks reassigning a row's owner.
+-- The one exception is a SHARED custom list's board: its null-owner rows are
+-- writable by any member of the space (and only for items on such a list).
 drop policy if exists "members read placements" on public.tier_placements;
 create policy "members read placements" on public.tier_placements
   for select using (public.is_space_member(space_id));
 
 drop policy if exists "insert own placements" on public.tier_placements;
 create policy "insert own placements" on public.tier_placements
-  for insert with check (public.is_space_member(space_id) and user_id = auth.uid());
+  for insert with check (
+    public.is_space_member(space_id)
+    and (user_id = auth.uid() or (user_id is null and public.is_shared_board_item(item_id)))
+  );
 
 drop policy if exists "update own placements" on public.tier_placements;
 create policy "update own placements" on public.tier_placements
-  for update using (user_id = auth.uid())
-  with check (public.is_space_member(space_id) and user_id = auth.uid());
+  for update using (
+    user_id = auth.uid()
+    or (user_id is null and public.is_space_member(space_id) and public.is_shared_board_item(item_id))
+  )
+  with check (
+    public.is_space_member(space_id)
+    and (user_id = auth.uid() or (user_id is null and public.is_shared_board_item(item_id)))
+  );
 
 drop policy if exists "delete own placements" on public.tier_placements;
 create policy "delete own placements" on public.tier_placements
-  for delete using (user_id = auth.uid());
+  for delete using (
+    user_id = auth.uid()
+    or (user_id is null and public.is_space_member(space_id) and public.is_shared_board_item(item_id))
+  );
 
 -- Completions are per-person like placements: members read everyone's (the
 -- partner's Unread shelf renders from theirs), but write only their own. The
@@ -860,6 +910,7 @@ grant select, insert, update, delete on
 grant select, update on public.profiles to authenticated;
 grant execute on function public.is_space_member(uuid) to authenticated;
 grant execute on function public.shares_space_with(uuid) to authenticated;
+grant execute on function public.is_shared_board_item(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime: add the space-scoped tables to the `supabase_realtime` publication

@@ -112,7 +112,7 @@ const LIST_EMOJI = '🏷️'
 
 /** Build one custom list's wording from its row. */
 export function customCopy(list: TierList): KindCopy {
-  const { name, noun, past } = list
+  const { name, noun, past, shared } = list
   return {
     pageTitle: name,
     // Custom lists follow ice cream: the shared done date is only a
@@ -128,7 +128,10 @@ export function customCopy(list: TierList): KindCopy {
     shelfLabel: `Not ${past}`,
     past,
     dateLabel: `${capitalize(past)} on`,
-    boardHint: `New ${noun}s land on both of your unranked shelves — drag one to Not ${past} if you haven't ${past} it yet.`,
+    // A shared list has one board, so there's only one shelf to land on.
+    boardHint: shared
+      ? `New ${noun}s land on the unranked shelf — drag one to Not ${past} if you haven't ${past} it yet.`
+      : `New ${noun}s land on both of your unranked shelves — drag one to Not ${past} if you haven't ${past} it yet.`,
     attribution: '',
   }
 }
@@ -145,6 +148,6 @@ export function copyFor(key: ListKey, lists: TierList[]): KindCopy {
   if (!listId) return KIND_COPY[key as TierKind]
   const list = lists.find((l) => l.id === listId)
   return customCopy(
-    list ?? { id: listId, name: 'List', emoji: '', noun: 'item', past: 'tried', createdBy: null, createdAt: '' },
+    list ?? { id: listId, name: 'List', emoji: '', noun: 'item', past: 'tried', shared: false, createdBy: null, createdAt: '' },
   )
 }

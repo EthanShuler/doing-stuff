@@ -5,7 +5,7 @@ import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCom
 import { supabase } from '../../lib/supabase'
 import { firstGrapheme } from '../../lib/text'
 import { renormalizedPositions } from '../../lib/order'
-import { datesArePersonal, keyOf, kindColumn, listIdOf, normalizeTags, pruneList } from './derive'
+import { datesArePersonal, keyOf, kindColumn, listIdOf, normalizeTags, placementOwner, pruneList } from './derive'
 import type { ListDraft } from './ListModal'
 import { PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
@@ -20,6 +20,11 @@ import type { ProfileRow } from '../../data/spaceSync'
 // The store holds items of ALL kinds and placements/completions of ALL users;
 // the page derives one (kind, viewer) board at a time, so switching Movies ↔
 // TV ↔ Books or You ↔ Partner never refetches.
+//
+// A `shared` custom list has ONE board instead of one per member: its
+// placements carry user_id = null (the DB's unique index treats nulls as
+// equal, so it's still one row per item) and RLS lets either member write
+// them. The placement actions take a `shared` flag and address those rows.
 //
 // The "we're done with this" date splits by kind (see datesArePersonal in
 // derive.ts): movies/TV/ice cream carry one SHARED `done_on` on the item;
@@ -41,7 +46,9 @@ function seed(): Snapshot {
     // One space-defined list, so /tiers/:id and the picker are demoable
     // offline exactly like the built-ins.
     lists: [
-      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      // A SHARED list too: one board both members rank (null-owner placements).
+      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', past: 'played', shared: true, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
@@ -73,6 +80,11 @@ function seed(): Snapshot {
       { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
       { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
       { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
+      // The shared Board games list: Catan ranked, Wingspan played but
+      // unranked, Twilight Imperium not yet played.
+      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few items stay unranked — and some undated → unwatched — to exercise
@@ -98,6 +110,8 @@ function seed(): Snapshot {
       { id: 'p18', itemId: 'i1', userId: 'u2', tier: 'A', position: 1 },
       { id: 'p19', itemId: 'f1', userId: 'u1', tier: 'S', position: 1 },
       { id: 'p20', itemId: 'f1', userId: 'u2', tier: 'B', position: 1 },
+      // The shared board's ranking has no owner.
+      { id: 'p21', itemId: 'g1', userId: null, tier: 'S', position: 1 },
     ],
     // Book completions: b1 read by both, b2/b4 only by u1, b3 only by u2, b5
     // by neither — so each seed board shows a different Unread shelf.
@@ -119,6 +133,7 @@ type TierListRow = {
   emoji: string | null
   noun: string
   past: string
+  shared: boolean
   created_by: string | null
   created_at: string
 }
@@ -137,7 +152,8 @@ type TierItemRow = {
 type TierPlacementRow = {
   id: string
   item_id: string
-  user_id: string
+  /** Null on a shared list's board. */
+  user_id: string | null
   tier: string
   position: number
 }
@@ -154,6 +170,7 @@ const toTierList = (r: TierListRow): TierList => ({
   emoji: r.emoji ?? '',
   noun: r.noun,
   past: r.past,
+  shared: r.shared,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -183,7 +200,7 @@ const toTierCompletion = (r: TierCompletionRow): TierCompletion => ({
   doneOn: r.done_on,
 })
 
-const TIER_LIST_COLUMNS = 'id,name,emoji,noun,past,created_by,created_at'
+const TIER_LIST_COLUMNS = 'id,name,emoji,noun,past,shared,created_by,created_at'
 const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
@@ -192,9 +209,10 @@ const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
 const nextId = idFactory('tx', 500)
 
 // A placement's logical identity is (itemId, userId) — the DB enforces it
-// unique. Upserting by that pair (rather than row id) keeps local state
-// duplicate-free even when an optimistic write and its realtime echo carry
-// different ids for the same ranking.
+// unique (nulls included: a shared board's null owner is one owner). Upserting
+// by that pair (rather than row id) keeps local state duplicate-free even when
+// an optimistic write and its realtime echo carry different ids for the same
+// ranking.
 const upsertPlacement = (set: Dispatch<SetStateAction<TierPlacement[]>>, p: TierPlacement) =>
   set((prev) => [...prev.filter((x) => !(x.itemId === p.itemId && x.userId === p.userId)), p])
 
@@ -234,13 +252,14 @@ export interface TierListStore {
    *  read records) of it. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
 
-  /** Rank (or re-rank) an item on the caller's own board. Inline flow: records
+  /** Rank (or re-rank) an item on the caller's own board — or, with `shared`,
+   *  on the list's one shared board (null-owner rows). Inline flow: records
    *  the error and resyncs instead of throwing; the card snaps back. */
-  placeItem: (itemId: string, tier: Tier, position: number) => Promise<void>
+  placeItem: (itemId: string, tier: Tier, position: number, shared?: boolean) => Promise<void>
   /** Drop an item back to the unranked shelf (deletes the placement row). */
-  unplaceItem: (itemId: string) => Promise<void>
+  unplaceItem: (itemId: string, shared?: boolean) => Promise<void>
   /** Rewrite one tier's ordering at integer positions (float-precision rescue). */
-  placeTier: (tier: Tier, orderedItemIds: string[]) => Promise<void>
+  placeTier: (tier: Tier, orderedItemIds: string[], shared?: boolean) => Promise<void>
   /** Set or clear the pool item's SHARED done date (drag on/off the unwatched
    *  shelf). Movies/TV/ice cream. Inline flow — records the error and resyncs
    *  instead of throwing. */
@@ -269,6 +288,7 @@ const cleanListDraft = (draft: ListDraft) => ({
   emoji: firstGrapheme(draft.emoji),
   noun: draft.noun.trim().toLowerCase(),
   past: draft.past.trim() || 'tried',
+  shared: draft.shared,
 })
 
 export function useTierListStore(spaceId: string | null, userId: string | null = null): TierListStore {
@@ -505,19 +525,21 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   //     visibly snaps back and the banner says why. ---
 
   const placeItem = useCallback(
-    async (itemId: string, tier: Tier, position: number) => {
-      if (!selfId) return
+    async (itemId: string, tier: Tier, position: number, shared = false) => {
+      if (!shared && !selfId) return
+      const owner = placementOwner(shared, selfId)
       setError(null)
       // Optimistic: the drop settles instantly. A temp id is fine — realtime
       // echoes and reconciliation upsert by (itemId, userId), not row id.
-      upsertPlacement(setPlacements, { id: nextId(), itemId, userId: selfId, tier, position })
+      upsertPlacement(setPlacements, { id: nextId(), itemId, userId: owner, tier, position })
       if (!supabase || !spaceId) return
       const { data, error: err } = await supabase
         .from('tier_placements')
         .upsert(
           // user_id explicitly (not left to the DB default) so the ON CONFLICT
-          // (item_id, user_id) target matches on re-ranks.
-          { space_id: spaceId, item_id: itemId, user_id: selfId, tier, position },
+          // (item_id, user_id) target matches on re-ranks — and so a shared
+          // board's null owner isn't defaulted to auth.uid().
+          { space_id: spaceId, item_id: itemId, user_id: owner, tier, position },
           { onConflict: 'item_id,user_id' },
         )
         .select(TIER_PLACEMENT_COLUMNS)
@@ -533,16 +555,14 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   )
 
   const unplaceItem = useCallback(
-    async (itemId: string) => {
-      if (!selfId) return
+    async (itemId: string, shared = false) => {
+      if (!shared && !selfId) return
+      const owner = placementOwner(shared, selfId)
       setError(null)
-      setPlacements((prev) => prev.filter((p) => !(p.itemId === itemId && p.userId === selfId)))
+      setPlacements((prev) => prev.filter((p) => !(p.itemId === itemId && p.userId === owner)))
       if (!supabase || !spaceId) return
-      const { error: err } = await supabase
-        .from('tier_placements')
-        .delete()
-        .eq('item_id', itemId)
-        .eq('user_id', selfId)
+      const query = supabase.from('tier_placements').delete().eq('item_id', itemId)
+      const { error: err } = await (owner === null ? query.is('user_id', null) : query.eq('user_id', owner))
       if (err) {
         setError(err.message)
         resync()
@@ -552,12 +572,13 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   )
 
   const placeTier = useCallback(
-    async (tier: Tier, orderedItemIds: string[]) => {
-      if (!selfId) return
+    async (tier: Tier, orderedItemIds: string[], shared = false) => {
+      if (!shared && !selfId) return
+      const owner = placementOwner(shared, selfId)
       setError(null)
       const rewrites = renormalizedPositions(orderedItemIds)
       for (const { itemId, position } of rewrites) {
-        upsertPlacement(setPlacements, { id: nextId(), itemId, userId: selfId, tier, position })
+        upsertPlacement(setPlacements, { id: nextId(), itemId, userId: owner, tier, position })
       }
       if (!supabase || !spaceId) return
       const { data, error: err } = await supabase
@@ -566,7 +587,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           rewrites.map(({ itemId, position }) => ({
             space_id: spaceId,
             item_id: itemId,
-            user_id: selfId,
+            user_id: owner,
             tier,
             position,
           })),

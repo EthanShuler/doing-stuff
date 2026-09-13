@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TierItem, TierPlacement, TierCompletion } from '../../types'
+import type { TierItem, TierList, TierPlacement, TierCompletion } from '../../types'
 import {
   TIERS,
   datesArePersonal,
@@ -7,12 +7,14 @@ import {
   distinctTags,
   filterByTags,
   findContainer,
+  isSharedBoard,
   keyOf,
   kindColumn,
   listIdOf,
   listKeyFor,
   moveItem,
   normalizeTags,
+  placementOwner,
   pruneList,
   tierSwatch,
 } from './derive'
@@ -47,6 +49,10 @@ function placement(over: Partial<TierPlacement> = {}): TierPlacement {
 function completion(over: Partial<TierCompletion> = {}): TierCompletion {
   seq += 1
   return { id: `r${seq}`, itemId: 'i1', userId: 'u1', doneOn: '2026-06-20', ...over }
+}
+
+function list(over: Partial<TierList> = {}): TierList {
+  return { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z', ...over }
 }
 
 // --- deriveBoard ---------------------------------------------------------------
@@ -133,6 +139,13 @@ describe('deriveBoard', () => {
     const a = item()
     const board = deriveBoard([a], [placement({ itemId: a.id })], [], null, 'movie')
     expect(board.unranked).toEqual([a])
+  })
+
+  it('a null viewer does not pick up shared (null-owner) placements', () => {
+    const a = item()
+    const board = deriveBoard([a], [placement({ itemId: a.id, userId: null })], [], null, 'movie')
+    expect(board.unranked).toEqual([a])
+    expect(board.tiers.A).toEqual([])
   })
 })
 
@@ -292,6 +305,74 @@ describe('deriveBoard for a custom list', () => {
     const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'A' })], [], 'u1', 'list:l1')
     expect(board.tiers.A).toEqual([a])
     expect(board.unwatched).toEqual([])
+  })
+})
+
+// --- shared boards -----------------------------------------------------------------
+
+describe('isSharedBoard', () => {
+  it('is false for every built-in board', () => {
+    const lists = [list({ shared: true })]
+    for (const key of ['movie', 'tv', 'book', 'ice-cream'] as const) {
+      expect(isSharedBoard(key, lists)).toBe(false)
+    }
+  })
+
+  it('reads the list row’s flag', () => {
+    expect(isSharedBoard('list:l1', [list({ shared: true })])).toBe(true)
+    expect(isSharedBoard('list:l1', [list({ shared: false })])).toBe(false)
+  })
+
+  it('is false for a list whose row is gone', () => {
+    expect(isSharedBoard('list:deleted', [list({ shared: true })])).toBe(false)
+  })
+})
+
+describe('placementOwner', () => {
+  it('is the viewer on a personal board and null on a shared one', () => {
+    expect(placementOwner(false, 'u1')).toBe('u1')
+    expect(placementOwner(true, 'u1')).toBeNull()
+    expect(placementOwner(false, null)).toBeNull()
+  })
+})
+
+describe('deriveBoard for a shared list', () => {
+  it('reads the null-owner placements, whoever is looking', () => {
+    const a = item({ kind: 'list:l2', doneOn: '2026-06-09' })
+    const b = item({ kind: 'list:l2', doneOn: '2026-06-09' })
+    const placements = [placement({ itemId: a.id, userId: null, tier: 'S' })]
+    for (const viewer of ['u1', 'u2', null]) {
+      const board = deriveBoard([a, b], placements, [], viewer, 'list:l2', true)
+      expect(board.tiers.S).toEqual([a])
+      expect(board.unranked).toEqual([b])
+    }
+  })
+
+  it('ignores every member’s personal placements', () => {
+    const a = item({ kind: 'list:l2', doneOn: '2026-06-09' })
+    const board = deriveBoard(
+      [a],
+      [placement({ itemId: a.id, userId: 'u1', tier: 'S' }), placement({ itemId: a.id, userId: 'u2', tier: 'A' })],
+      [],
+      'u1',
+      'list:l2',
+      true,
+    )
+    expect(board.tiers.S).toEqual([])
+    expect(board.tiers.A).toEqual([])
+    expect(board.unranked).toEqual([a])
+  })
+
+  it('a personal board ignores the shared placements', () => {
+    const a = item({ kind: 'list:l1', doneOn: '2026-06-09' })
+    const board = deriveBoard([a], [placement({ itemId: a.id, userId: null, tier: 'S' })], [], 'u1', 'list:l1')
+    expect(board.unranked).toEqual([a])
+  })
+
+  it('still splits the shelves on the shared done date', () => {
+    const notYet = item({ kind: 'list:l2', doneOn: null })
+    const board = deriveBoard([notYet], [], [], 'u1', 'list:l2', true)
+    expect(board.unwatched).toEqual([notYet])
   })
 })
 

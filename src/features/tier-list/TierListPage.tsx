@@ -14,10 +14,12 @@ import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
-import { datesArePersonal, deriveBoard, distinctTags, filterByTags, listIdOf, listKeyFor } from './derive'
+import { datesArePersonal, deriveBoard, distinctTags, filterByTags, isSharedBoard, listIdOf, listKeyFor, placementOwner } from './derive'
+import type { ShelfId } from './derive'
 import { copyFor } from './copy'
 import { TierBoard } from './TierBoard'
-import { BoardView } from './BoardView'
+import { BoardView, SHELVES_COLLAPSED } from './BoardView'
+import type { ShelfOpenState } from './BoardView'
 import { CardVisual } from './TierCard'
 import { ItemModal } from './ItemModal'
 import type { ItemDraft } from './ItemModal'
@@ -69,13 +71,23 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const noun = copy.noun
   // Books track "have I read it" per person; everything else shares one date.
   const personal = datesArePersonal(key)
+  // A shared custom list has ONE board both members drag on (null-owner
+  // placements) — no You/Partner toggle, nothing read-only.
+  const shared = isSharedBoard(key, store.lists)
 
   // Whose board is showing. Yours is drag-and-drop; the partner's renders the
   // same layout read-only (their placements are also read-only under RLS).
   const [viewer, setViewer] = useState<'you' | 'partner'>('you')
   const partner = store.profiles.find((p) => p.id !== store.selfId) ?? null
   const partnerName = displayNameFor(partner) || 'Partner'
-  const showingPartner = viewer === 'partner' && partner !== null
+  const showingPartner = viewer === 'partner' && partner !== null && !shared
+
+  // The two shelves under the tiers start collapsed (a long unranked shelf
+  // otherwise pushes the tiers off screen). Owned here rather than in
+  // BoardView so expanding one survives the You/Partner and filter switches
+  // — which swap board components — and resets on a board switch.
+  const [openShelves, setOpenShelves] = useState<ShelfOpenState>(SHELVES_COLLAPSED)
+  const toggleShelf = (shelf: ShelfId) => setOpenShelves((prev) => ({ ...prev, [shelf]: !prev[shelf] }))
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -101,19 +113,22 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     setModalOpen(false)
     setEditingId(null)
     setListModalOpen(false)
+    setOpenShelves(SHELVES_COLLAPSED)
   }, [key])
   const kindTags = useMemo(() => distinctTags(store.items, key), [store.items, key])
 
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
-    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, key),
-    [store.items, tagFilter, store.placements, store.completions, viewerId, key],
+    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, key, shared),
+    [store.items, tagFilter, store.placements, store.completions, viewerId, key, shared],
   )
 
-  // Your placement position per item — neighbor lookup when a drop lands.
+  // Placement position per item on the board you drag — yours, or the shared
+  // one — for the neighbor lookup when a drop lands.
+  const owner = placementOwner(shared, store.selfId)
   const positions = useMemo(
-    () => new Map(store.placements.filter((p) => p.userId === store.selfId).map((p) => [p.itemId, p.position])),
-    [store.placements, store.selfId],
+    () => new Map(store.placements.filter((p) => p.userId === owner).map((p) => [p.itemId, p.position])),
+    [store.placements, owner],
   )
 
   const openAdd = () => {
@@ -256,7 +271,11 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
           left={
             <>
               {!loadingData &&
-                (partner ? (
+                (shared ? (
+                  <Text fz={text.small} c={colors.muted} visibleFrom="sm" style={{ fontFamily: fonts.sans }}>
+                    Shared board — you both rank together.
+                  </Text>
+                ) : partner ? (
                   <SegmentedControl
                     value={viewer}
                     onChange={(value) => setViewer(value as 'you' | 'partner')}
@@ -314,6 +333,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                   shelfHint={`${partnerName} hasn't ranked everything yet.`}
                   unwatchedHint={`Nothing waiting to be ${copy.past}.`}
                   unwatchedLabel={copy.shelfLabel}
+                  openShelves={openShelves}
+                  onToggleShelf={toggleShelf}
                 />
               </>
             ) : filterActive ? (
@@ -331,20 +352,24 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                   shelfHint={`No unranked ${noun}s match this filter.`}
                   unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this filter.`}
                   unwatchedLabel={copy.shelfLabel}
+                  openShelves={openShelves}
+                  onToggleShelf={toggleShelf}
                 />
               </>
             ) : (
               <TierBoard
                 board={board}
                 positions={positions}
+                // `shared` routes the writes at the list's one shared board
+                // (null-owner rows) instead of your own.
                 onPlace={(itemId: string, tier: Tier, position: number) => {
-                  void store.placeItem(itemId, tier, position)
+                  void store.placeItem(itemId, tier, position, shared)
                 }}
                 onUnrank={(itemId: string) => {
-                  void store.unplaceItem(itemId)
+                  void store.unplaceItem(itemId, shared)
                 }}
                 onRenormalize={(tier: Tier, orderedIds: string[]) => {
-                  void store.placeTier(tier, orderedIds)
+                  void store.placeTier(tier, orderedIds, shared)
                 }}
                 // Dragging out of the unwatched/unread shelf means "finished it"
                 // → stamp today; dragging onto it clears the date. Movies/TV
@@ -366,6 +391,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 }
                 unwatchedHint={`Drag a ${noun} here if you haven't actually ${copy.past} it yet.`}
                 unwatchedLabel={copy.shelfLabel}
+                openShelves={openShelves}
+                onToggleShelf={toggleShelf}
               />
             )}
           </>

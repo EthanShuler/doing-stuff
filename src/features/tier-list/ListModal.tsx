@@ -1,4 +1,4 @@
-import { Group, Text, TextInput } from '@mantine/core'
+import { Checkbox, Group, Text, TextInput } from '@mantine/core'
 import type { TierList } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
@@ -16,15 +16,18 @@ export interface ListDraft {
   noun: string
   /** Past participle: "tried" → the "Not tried" shelf. */
   past: string
+  /** One board you both rank together, instead of a board each. */
+  shared: boolean
 }
 
-export const emptyListDraft = (): ListDraft => ({ name: '', emoji: '', noun: '', past: '' })
+export const emptyListDraft = (): ListDraft => ({ name: '', emoji: '', noun: '', past: '', shared: false })
 
 export const draftFromList = (list: TierList): ListDraft => ({
   name: list.name,
   emoji: list.emoji,
   noun: list.noun,
   past: list.past,
+  shared: list.shared,
 })
 
 /**
@@ -97,9 +100,23 @@ export function ListModal({
       <Text fz={text.caption} c={colors.faint} mb={14} style={{ fontFamily: fonts.sans }}>
         'tried', 'eaten', 'visited'.
       </Text>
-      <Text fz={text.caption} c={colors.muted} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-        Add a {noun} · "Not {past}" shelf
+      <Text fz={text.caption} c={colors.muted} mb={18} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
+        Add a {noun} · "Not {past}" shelf{draft.shared ? ' · one shared board' : ''}
       </Text>
+
+      {/* Shared = ONE board the space ranks together (no You/Partner toggle).
+          Flipping it later doesn't move any rankings: the other mode's rows
+          stay put in the DB and come back if you flip it again. */}
+      <Checkbox
+        label="Shared board"
+        description={
+          isEditing
+            ? 'One set of tiers you both edit, instead of a board each. Rankings from the other mode are kept if you switch back.'
+            : 'One set of tiers you both edit, instead of a board each.'
+        }
+        checked={draft.shared}
+        onChange={(e) => onChange({ shared: e.currentTarget.checked })}
+      />
 
       <ModalFooter
         onCancel={onClose}

@@ -148,6 +148,7 @@ export interface Database {
           emoji: string
           noun: string
           past: string
+          shared: boolean
           created_by: string | null
           created_at: string
         }
@@ -158,6 +159,7 @@ export interface Database {
           emoji?: string
           noun: string
           past?: string
+          shared?: boolean
           created_by?: string | null
           created_at?: string
         }
@@ -168,6 +170,7 @@ export interface Database {
           emoji?: string
           noun?: string
           past?: string
+          shared?: boolean
           created_by?: string | null
           created_at?: string
         }
@@ -220,7 +223,7 @@ export interface Database {
           id: string
           space_id: string
           item_id: string
-          user_id: string
+          user_id: string | null
           tier: string
           position: number
           created_at: string
@@ -229,7 +232,7 @@ export interface Database {
           id?: string
           space_id: string
           item_id: string
-          user_id?: string
+          user_id?: string | null
           tier: string
           position: number
           created_at?: string
@@ -238,7 +241,7 @@ export interface Database {
           id?: string
           space_id?: string
           item_id?: string
-          user_id?: string
+          user_id?: string | null
           tier?: string
           position?: number
           created_at?: string

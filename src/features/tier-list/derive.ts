@@ -1,4 +1,4 @@
-import type { ListKey, Tier, TierItem, TierPlacement, TierCompletion } from '../../types'
+import type { ListKey, Tier, TierItem, TierList, TierPlacement, TierCompletion } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
@@ -9,6 +9,9 @@ export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
 /** A droppable container on the board: a tier row, the unranked shelf, or the
  *  unwatched (for books: unread) shelf. */
 export type ContainerId = Tier | 'unranked' | 'unwatched'
+
+/** Just the two shelves — the collapsible containers under the tier rows. */
+export type ShelfId = Exclude<ContainerId, Tier>
 
 // --- List keys ---------------------------------------------------------------
 // A board is identified app-side by a ListKey: one of the four built-in kinds,
@@ -42,6 +45,25 @@ export const keyOf = (kind: string, listId: string | null): ListKey =>
  * `doneOn` is just its tried/not-tried marker (see `usesDates` in copy.ts).
  */
 export const datesArePersonal = (key: ListKey): boolean => key === 'book'
+
+// --- Shared boards -------------------------------------------------------------
+// A custom list can be `shared`: ONE board the space ranks together instead of
+// a board per person. Its placements carry a null userId (the DB's unique
+// (item_id, user_id) treats nulls as equal, so it's still one row per item),
+// and RLS lets either member write them. Built-in boards are never shared.
+
+/** Whether a key's board is the space's single shared one. False for the
+ *  built-ins and for a list row that's gone. */
+export function isSharedBoard(key: ListKey, lists: TierList[]): boolean {
+  const listId = listIdOf(key)
+  if (!listId) return false
+  return lists.find((l) => l.id === listId)?.shared ?? false
+}
+
+/** Whose placement rows a board reads and writes: the viewer's own, or —
+ *  on a shared board — the space's null-owner rows. */
+export const placementOwner = (shared: boolean, viewerId: string | null): string | null =>
+  shared ? null : viewerId
 
 /** Palette index per tier — a classic hot→cool ramp through the theme swatches. */
 const TIER_COLOR_INDEX: Record<Tier, number> = { S: 5, A: 1, B: 3, C: 0, D: 4, F: 2 }
@@ -101,6 +123,10 @@ export interface Board {
  * one board and unread on the other. A placement always wins: a ranked item
  * stays in its tier even if its date is cleared. Placements and completions
  * referencing missing items — or belonging to other viewers — are ignored.
+ *
+ * `shared` builds the space's one shared board instead: the null-owner
+ * placements count and every member's personal ones are ignored. Without it
+ * a null viewer (no session) matches no placements at all.
  */
 export function deriveBoard(
   items: TierItem[],
@@ -108,10 +134,14 @@ export function deriveBoard(
   completions: TierCompletion[],
   viewerId: string | null,
   key: ListKey,
+  shared = false,
 ): Board {
+  const owner = placementOwner(shared, viewerId)
   const placementByItem = new Map<string, TierPlacement>()
-  for (const p of placements) {
-    if (p.userId === viewerId) placementByItem.set(p.itemId, p)
+  if (shared || owner !== null) {
+    for (const p of placements) {
+      if (p.userId === owner) placementByItem.set(p.itemId, p)
+    }
   }
   const personal = datesArePersonal(key)
   const completedItems = new Set<string>()
