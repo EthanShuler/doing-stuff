@@ -9,7 +9,8 @@ import { boardShelf, openShelf, pickList, pickSegment, tierRow } from './helpers
 //   Everything Everywhere is dated with no Avery placement (→ her Unranked).
 // - Books: read state is per person — Project Hail Mary is ranked A by Avery
 //   (she read it) but Unread for Jordan.
-// - Ice cream: no dates in the UI — the item’s shared doneOn is just the tried marker.
+// - Ice cream is a CUSTOM list (seed l0, /tiers/l0): no dates in the UI — the
+//   item’s shared doneOn is just the tried marker.
 //   Rum raisin is untried (→ Not tried for both); Strawberry cheesecake is
 //   tried but unranked by Avery.
 // - Both shelves under the tiers start COLLAPSED (heading + count only), so a
@@ -89,7 +90,7 @@ test('book read state is per person (Unread shelf differs by viewer)', async ({ 
 })
 
 test('ice cream board splits tried/not-tried with no dates shown', async ({ page }) => {
-  await page.goto('/ice-cream')
+  await page.goto('/tiers/l0')
   await expect(tierRow(page, 'S').getByText('Mint chocolate chip')).toBeVisible()
   await openShelf(page, 'unranked')
   await openShelf(page, 'unwatched')
@@ -104,7 +105,7 @@ test('ice cream board splits tried/not-tried with no dates shown', async ({ page
 })
 
 test('ice cream add/edit modal has no date field', async ({ page }) => {
-  await page.goto('/ice-cream')
+  await page.goto('/tiers/l0')
   await page.getByRole('button', { name: '+ Add flavor' }).click()
   await expect(page.getByRole('heading', { name: 'Add a flavor' })).toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Tags' })).toBeVisible()
@@ -164,7 +165,7 @@ test('the picker reaches a space-defined board without leaving the page', async 
   await openShelf(page, 'unranked')
   await openShelf(page, 'unwatched')
   await expect(boardShelf(page, 'unranked').getByText('Honeycrisp apple')).toBeVisible()
-  // A custom list follows the ice-cream template: a "Not <past>" shelf.
+  // A custom list has a "Not <past>" shelf.
   await expect(boardShelf(page, 'unwatched').getByText('Not tried')).toBeVisible()
   await expect(boardShelf(page, 'unwatched').getByText('Durian')).toBeVisible()
 })

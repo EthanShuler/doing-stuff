@@ -4,17 +4,16 @@ import type { PickerEntry } from '../../components/PickerRow'
 import { KIND_COPY } from './copy'
 import { listKeyFor } from './derive'
 
-/** The four built-in boards, in nav order. Each keeps its own URL, so the
+/** The three built-in boards, in nav order. Each keeps its own URL, so the
  *  pills navigate rather than set local state — back/forward keeps working and
  *  the store (one component across all the routes) never refetches. */
 const BUILT_INS: { kind: TierKind; path: string; label: string }[] = [
   { kind: 'movie', path: '/movies', label: 'Movies' },
   { kind: 'tv', path: '/tv', label: 'TV' },
   { kind: 'book', path: '/books', label: 'Books' },
-  { kind: 'ice-cream', path: '/ice-cream', label: 'Ice Cream' },
 ]
 
-/** The in-page board picker: the four built-ins, then the space's own lists.
+/** The in-page board picker: the three built-ins, then the space's own lists.
  *  A thin wrapper over the shared PickerRow — all it does is turn boards into
  *  pill entries. */
 export function ListPicker({

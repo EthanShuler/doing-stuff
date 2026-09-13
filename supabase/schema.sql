@@ -152,7 +152,7 @@ create index if not exists entry_repeats_space_idx on public.entry_repeats (spac
 create index if not exists entry_repeats_entry_idx on public.entry_repeats (entry_id);
 
 -- ---------------------------------------------------------------------------
--- Tier lists (movies + TV + books + ice cream): a SHARED pool of items,
+-- Tier lists (movies + TV + books + space-defined lists): a SHARED pool of items,
 -- PER-PERSON rankings. `tier_items` is the pool — any space member can add/edit.
 -- `tier_placements` holds one member's ranking of one item (tier + fractional
 -- position within the tier); "unranked" is simply the absence of a placement
@@ -160,8 +160,9 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 -- other's but WRITE only their own — the partner's board is read-only at the
 -- security boundary.
 --
--- Besides the four built-in boards (kind 'movie'/'tv'/'book'/'ice-cream'),
--- a space can define its own lists ("Bugs", "Fruits") in `tier_lists`. Those
+-- Besides the three built-in boards (kind 'movie'/'tv'/'book' — built in for
+-- their title-search providers and want-to lists), a space can define its own
+-- lists ("Ice Cream", "Bugs", "Fruits") in `tier_lists`. Those
 -- rows are shared space data with the uniform policy; their items carry
 -- kind = 'custom' plus a `list_id`, so deleting a list is ONE statement and
 -- Postgres cascades everything under it.
@@ -173,10 +174,12 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 -- for items on a list flagged shared (`is_shared_board_item`).
 -- ---------------------------------------------------------------------------
 
--- A space-defined tier list. Behavior is fixed to the ice-cream template
--- (shared pool, S–F tiers, a "Not <past>" shelf, no visible dates), so the
--- row carries only WORDS — the app templates all its
--- copy from them (customCopy in the tier-list copy.ts).
+-- A space-defined tier list. Behavior is fixed to one template (shared pool,
+-- S–F tiers, a "Not <past>" shelf, no visible dates), so the row carries
+-- WORDS — the app templates all its copy from them (customCopy in the
+-- tier-list copy.ts) — plus the `shared` flag. Ice cream was a built-in kind
+-- until 2026-09-13; migrations/20260913_ice_cream_custom_list.sql turned it
+-- into one of these rows.
 create table if not exists public.tier_lists (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces (id) on delete cascade,
@@ -207,8 +210,8 @@ create table if not exists public.tier_items (
   -- On an existing DB, admit a new kind with:
   --   alter table public.tier_items drop constraint tier_items_kind_check;
   --   alter table public.tier_items add constraint tier_items_kind_check
-  --     check (kind in ('movie', 'tv', 'book', 'ice-cream', 'custom'));
-  kind        text not null check (kind in ('movie', 'tv', 'book', 'ice-cream', 'custom')),
+  --     check (kind in ('movie', 'tv', 'book', 'custom'));
+  kind        text not null check (kind in ('movie', 'tv', 'book', 'custom')),
   -- Set exactly when kind = 'custom' (the CHECK below enforces the pairing):
   -- which space-defined list this item is on. ON DELETE CASCADE is what makes
   -- deleting a list one statement.
@@ -220,7 +223,7 @@ create table if not exists public.tier_items (
   -- the client defaults it to today on add / a Lists check-off. Movies/TV
   -- only — books are read separately, so their dates are per person in
   -- `tier_item_completions.done_on` (same column name on purpose) and this
-  -- stays null. Ice cream shows no dates in the UI but reuses this as its
+  -- stays null. Custom lists show no dates in the UI but reuse this as their
   -- shared tried/not-tried marker. Renamed from `watched_on` on 2026-09-11 —
   -- see the migration note at the end of this section.
   done_on     date,

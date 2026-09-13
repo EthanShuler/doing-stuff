@@ -7,7 +7,7 @@ import { isTmdbConfigured, searchTmdb } from '../lib/tmdb'
 import { searchOpenLibrary } from '../lib/openLibrary'
 
 /** Which provider backs the suggestions — null means "plain input, no lookup"
- *  (ice cream, a space-defined list, a free-form list). */
+ *  (a space-defined tier list, a free-form list). */
 export type SearchKind = 'movie' | 'tv' | 'book' | null
 
 /** One dropdown row, whichever provider it came from (TMDB or Open Library). */

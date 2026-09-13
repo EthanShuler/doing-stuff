@@ -30,7 +30,7 @@ describe('customCopy', () => {
     expect(copy.boardHint).toContain('Not eaten')
   })
 
-  it('follows the ice-cream template: no dates, no search provider, no example', () => {
+  it('follows the custom template: no dates, no search provider, no example', () => {
     const copy = customCopy(list())
     expect(copy.usesDates).toBe(false)
     expect(copy.attribution).toBe('')
@@ -58,7 +58,6 @@ describe('copyFor', () => {
   it('passes built-in keys straight through to KIND_COPY', () => {
     expect(copyFor('movie', [])).toBe(KIND_COPY.movie)
     expect(copyFor('book', [list()])).toBe(KIND_COPY.book)
-    expect(copyFor('ice-cream', [])).toBe(KIND_COPY['ice-cream'])
   })
 
   it('templates a custom key from its row', () => {

@@ -15,8 +15,8 @@ const ROUTES = [
   '/movies',
   '/tv',
   '/books',
-  '/ice-cream',
-  // The picker row is longest here — built-ins + the seed's custom list.
+  // The picker row is longest here — built-ins + the seed's custom lists.
+  '/tiers/l0',
   '/tiers/l1',
   '/lists/movies',
   '/lists/books',

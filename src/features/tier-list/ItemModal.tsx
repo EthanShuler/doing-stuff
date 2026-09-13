@@ -16,7 +16,7 @@ export interface ItemDraft {
   /** ISO date it was finished; '' = not yet (the item sits on the unwatched/
    *  unread shelf until it's dated or dragged into a tier). For movies/TV this
    *  is the item's shared done date; for books it's the EDITOR's own one;
-   *  dateless kinds (ice cream) show no field and just pass the existing
+   *  dateless boards (custom lists) show no field and just pass the existing
    *  tried marker through unchanged. */
   doneOn: string
   /** Shared filter labels ("disney", "fantasy"). */
@@ -60,8 +60,8 @@ export function ItemModal({
   const canSave = Boolean(draft.title.trim())
 
   // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
-  // books (keyless, so always on). No provider covers ice cream or a
-  // space-defined list — hand entry only (see TitleSearchInput).
+  // books (keyless, so always on). No provider covers a space-defined list —
+  // hand entry only (see TitleSearchInput).
   const searchKind: SearchKind = kind === 'movie' || kind === 'tv' || kind === 'book' ? kind : null
 
   const heading = isEditing ? `Edit ${noun}` : `Add a ${noun}`
@@ -122,7 +122,7 @@ export function ItemModal({
             placeholder="Optional"
             mb={18}
           />
-          {/* Dateless kinds (ice cream) get no field here: tried/not-tried is
+          {/* Dateless boards (custom lists) get no field here: tried/not-tried is
               managed by dragging on/off the shelf, and the draft passes the
               existing marker through untouched. */}
           {copy.usesDates && (

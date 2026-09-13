@@ -40,9 +40,10 @@ export const keyOf = (kind: string, listId: string | null): ListKey =>
  * Whether a kind's "done with it" date belongs to one person rather than the
  * shared item. Movies and TV are watched together, so `TierItem.doneOn` (the
  * shared date) is the truth; books are read separately, so each member's date
- * is their own TierCompletion row and the shared one is ignored. Ice cream is
- * tried together — shared like movies/TV — but shows no dates in the UI:
- * `doneOn` is just its tried/not-tried marker (see `usesDates` in copy.ts).
+ * is their own TierCompletion row and the shared one is ignored. A custom
+ * list ("Ice Cream") is tried together — shared like movies/TV — but shows no
+ * dates in the UI: `doneOn` is just its tried/not-tried marker (see
+ * `usesDates` in copy.ts).
  */
 export const datesArePersonal = (key: ListKey): boolean => key === 'book'
 
