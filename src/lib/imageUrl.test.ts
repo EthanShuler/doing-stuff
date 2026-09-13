@@ -12,7 +12,7 @@ describe('posterSrc — TMDB', () => {
     expect(posterSrc(TMDB, 76, 2)).toBe('https://image.tmdb.org/t/p/w154/abc123.jpg')
   })
 
-  it('shrinks to w92 for the 38px watchlist thumb at 2x', () => {
+  it('shrinks to w92 for the 38px list-row thumb at 2x', () => {
     expect(posterSrc(TMDB, 38, 2)).toBe('https://image.tmdb.org/t/p/w92/abc123.jpg')
   })
 

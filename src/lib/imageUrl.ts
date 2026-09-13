@@ -32,7 +32,7 @@ function effectiveDpr(dpr?: number): number {
  * `targetWidth` CSS-pixel box on this display.
  *
  * @param targetWidth the rendered width in CSS pixels (76 for a board card,
- *   38 for a watchlist thumb).
+ *   38 for a list-row thumb).
  * @param dpr device pixel ratio override — pass it explicitly in tests;
  *   defaults to `window.devicePixelRatio`, capped at 2.
  */

@@ -76,12 +76,6 @@ test('ice cream add/edit modal has no date field', async ({ page }) => {
   await expect(page.locator('input[type="date"]')).toHaveCount(0)
 })
 
-test('ice cream watchlist is the To-try list', async ({ page }) => {
-  await page.goto('/ice-cream')
-  await pickSegment(page, 'To-try list')
-  await expect(page.getByText('Ube')).toBeVisible()
-})
-
 test('tag filter makes the board read-only and hides non-matches', async ({ page }) => {
   await page.goto('/movies')
   await page.getByText('sci-fi', { exact: true }).click()
@@ -117,45 +111,20 @@ test('tag pills cycle include → exclude → off', async ({ page }) => {
   await expect(page.getByText('Filtered by tag — clear the filter to rearrange.')).not.toBeVisible()
 })
 
-test('watchlist tab lists open wishes; books call it Reading list', async ({ page }) => {
-  // Movie watchlist is shared: both members' wishes show, in queue order
-  // (position, top = next up), with the drag-to-reorder hint. The drag itself
-  // is covered by derive.test.ts — dnd-kit drags are flaky under automation.
-  await page.goto('/movies')
-  await pickSegment(page, 'Watchlist')
-  await expect(page.getByText('Dune: Part Two')).toBeVisible()
-  await expect(page.getByText('Past Lives')).toBeVisible()
-  await expect(page.getByText("Drag to reorder — the top of the list is what you'll watch next.")).toBeVisible()
-
-  // Reading list is per person: only the viewer's (u1's) wish shows — the
-  // partner's "Babel" stays on their own list. One open row = nothing to
-  // reorder, so no hint.
-  await page.goto('/books')
-  await pickSegment(page, 'Reading list')
-  await expect(page.getByText('The Priory of the Orange Tree')).toBeVisible()
-  await expect(page.getByText('Babel')).not.toBeVisible()
-  await expect(page.getByText(/Drag to reorder/)).not.toBeVisible()
-})
-
 // --- custom lists ------------------------------------------------------------
 // Seed list l1 is "Fruits": Mango tried + ranked S by Avery, Durian untried
-// (→ Not tried), Honeycrisp apple tried but unranked, and one open wish
-// (Rambutan) on its To-try list.
+// (→ Not tried), and Honeycrisp apple tried but unranked.
 
 test('the picker reaches a space-defined board without leaving the page', async ({ page }) => {
   await page.goto('/movies')
   await pickList(page, 'Fruits')
-  await expect(page).toHaveURL('/lists/l1')
+  await expect(page).toHaveURL('/tiers/l1')
 
   await expect(tierRow(page, 'S').getByText('Mango')).toBeVisible()
   await expect(boardShelf(page, 'unranked').getByText('Honeycrisp apple')).toBeVisible()
   // A custom list follows the ice-cream template: a "Not <past>" shelf.
   await expect(boardShelf(page, 'unwatched').getByText('Not tried')).toBeVisible()
   await expect(boardShelf(page, 'unwatched').getByText('Durian')).toBeVisible()
-
-  // Its list tab is worded from the row too, and no date field appears.
-  await pickSegment(page, 'To-try list')
-  await expect(page.getByText('Rambutan')).toBeVisible()
 })
 
 test('create, rename, and delete a custom list', async ({ page }) => {
@@ -168,7 +137,7 @@ test('create, rename, and delete a custom list', async ({ page }) => {
   await page.getByLabel('Singular noun').fill('bug')
   await page.getByRole('button', { name: 'Create list' }).click()
 
-  await expect(page).toHaveURL(/\/lists\//)
+  await expect(page).toHaveURL(/\/tiers\//)
   await expect(page.getByRole('button', { name: '+ Add bug' })).toBeVisible()
 
   // Rename → the picker pill follows.

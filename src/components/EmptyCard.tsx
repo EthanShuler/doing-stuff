@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Box, Text } from '@mantine/core'
 import { colors, fonts } from '../theme'
 
-/** Dashed empty-state card shared by the Log, wishlist, and watchlist views.
+/** Dashed empty-state card shared by the Log, wishlist, and collection views.
  *  `children` renders below the blurb (e.g. a call-to-action button). */
 export function EmptyCard({
   title,

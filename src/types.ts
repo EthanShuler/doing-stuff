@@ -89,10 +89,10 @@ export interface WishlistItem {
 export type TierKind = 'movie' | 'tv' | 'book' | 'ice-cream'
 
 /**
- * Which board a pool item or watchlist row belongs to: one of the four
- * built-ins, or `list:<tier_lists.id>` for a space-defined one. This is the
- * app-side key only — in the DB it's a `kind` column ('custom' for a custom
- * list) plus a nullable `list_id`; the tier-list derive.ts converts
+ * Which board a pool item belongs to: one of the four built-ins, or
+ * `list:<tier_lists.id>` for a space-defined one. This is the app-side key
+ * only — in the DB it's a `kind` column ('custom' for a custom list) plus a
+ * nullable `list_id`; the tier-list derive.ts converts
  * (`keyOf` / `kindColumn` / `listIdOf`).
  */
 export type ListKey = TierKind | `list:${string}`
@@ -101,10 +101,9 @@ export type ListKey = TierKind | `list:${string}`
  * A space-defined tier list ("Bugs", "Fruits") — one row in `tier_lists`.
  * Shared space data like the item pool: either member can create, rename, or
  * delete one, and deleting cascades its items (and everyone's rankings of
- * them) plus its to-try list. Behavior is fixed to the ice-cream template —
- * shared pool, S–F tiers, a "Not <past>" shelf, a shared to-<verb> list, no
- * dates in the UI — so the row only carries WORDS (see customCopy in the
- * tier-list copy.ts).
+ * them). Behavior is fixed to the ice-cream template — shared pool, S–F
+ * tiers, a "Not <past>" shelf, no dates in the UI — so the row only carries
+ * WORDS (see customCopy in the tier-list copy.ts).
  */
 export interface TierList {
   id: string
@@ -114,8 +113,6 @@ export interface TierList {
   emoji: string
   /** Lowercase singular noun used inline: "Add a fruit". */
   noun: string
-  /** Infinitive: "to-try list", "Add a fruit to try". */
-  verb: string
   /** Past participle, lowercase: the "Not tried" shelf. */
   past: string
   /** auth.users id of the member who created it (null for legacy rows). */
@@ -183,31 +180,66 @@ export interface TierPlacement {
   position: number
 }
 
+// --- Lists (the want-to lists: watchlist, reading list, free-form) -----------
+
 /**
- * A "want to watch" (or, for books, "want to read") item in the space's SHARED
- * watchlist — one row in `watchlist_items`. Checking it off creates a
- * `tier_items` row in the pool and links to it via `tierItemId` (null = still
- * open). The whole list is shared, so any member can add / edit / check off.
+ * Which list a row is on: one of the three BUILT-IN lists, or
+ * `custom:<lists.id>` for a free-form list the space defined.
+ *
+ * Deliberately NOT `ListKey` — that names a tier BOARD (and its `list:` prefix
+ * points at a `tier_lists` row). A `custom:` ref points at a `lists` row, a
+ * different table entirely; the two must never be swapped by accident, so
+ * they're separate types with different prefixes.
+ *
+ * In the DB it's a `kind` column ('custom' for a free-form list) plus a
+ * nullable `list_id` — the lists feature's derive.ts converts (`refOf` /
+ * `kindColumn` / `listIdOf`).
  */
-export interface WatchlistItem {
+export type ListRef = 'movie' | 'tv' | 'book' | `custom:${string}`
+
+/**
+ * A free-form list the space defined ("Groceries") — one row in `lists`.
+ * Shared space data with the uniform member policy: either member can create,
+ * rename, or delete one, and deleting cascades its rows. It carries only a
+ * name and an emoji; all its other wording is templated (customListCopy in
+ * the lists copy.ts).
+ */
+export interface ListDef {
   id: string
-  /** Which list it's on (a built-in kind, or `list:<id>` — see ListKey). */
-  kind: ListKey
-  title: string
-  /** Optional poster/cover URL; carried onto the tier card when checked off. '' = none. */
-  imageUrl: string
-  /** Who made it — author/director/etc. (per-kind label in copy.ts). Carried
-   *  onto the tier item when checked off, like the image. '' = unknown. */
-  creator: string
-  /** Queue order within the kind's list — top (lowest) = watch next.
-   *  Fractional midpoint insertion on drag reorder; new items append at the
-   *  end (max + 1). */
-  position: number
-  /** The tier item this produced when checked off; null while still "want to watch". */
-  tierItemId: string | null
-  /** auth.users id of the member who added it (null for legacy rows). */
+  /** Display name, as typed: "Groceries". */
+  name: string
+  /** Single emoji for the picker pill. '' = 🏷️. */
+  emoji: string
+  /** auth.users id of the member who created it (null for legacy rows). */
   createdBy: string | null
-  /** ISO timestamp; tiebreak ordering for same-position rows. */
+  /** ISO timestamp; orders the picker pills. */
+  createdAt: string
+}
+
+/** One thing on a list — a row in `list_items`. */
+export interface ListItem {
+  id: string
+  /** Which list it's on (a built-in kind, or `custom:<id>` — see ListRef). */
+  key: ListRef
+  title: string
+  /** Poster/cover URL, pasted or filled from a title search. '' = none.
+   *  Free-form rows never show one. */
+  imageUrl: string
+  /** Who made it — author/director (per-kind label in the lists copy.ts).
+   *  On a free-form row this doubles as the optional NOTE line. '' = none. */
+  creator: string
+  /** Fractional queue position; lowest = next up (midpoint insertion on drag). */
+  position: number
+  /** The tier item this produced when checked off; null while still open.
+   *  Movie/TV/book only — deleting that tier item reopens the row (the DB's
+   *  `on delete set null`). */
+  tierItemId: string | null
+  /** Free-form rows only: the day it was done. null = still open. */
+  doneOn: string | null
+  /** auth.users id of the member who added it — the OWNER of a book row
+   *  (the reading list is per person). */
+  createdBy: string | null
+  /** ISO timestamp; the tiebreak when positions collide. */
   createdAt: string
 }
 

@@ -162,14 +162,14 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 --
 -- Besides the four built-in boards (kind 'movie'/'tv'/'book'/'ice-cream'),
 -- a space can define its own lists ("Bugs", "Fruits") in `tier_lists`. Those
--- rows are shared space data with the uniform policy; their items and
--- to-do rows carry kind = 'custom' plus a `list_id`, so deleting a list is
--- ONE statement and Postgres cascades everything under it.
+-- rows are shared space data with the uniform policy; their items carry
+-- kind = 'custom' plus a `list_id`, so deleting a list is ONE statement and
+-- Postgres cascades everything under it.
 -- ---------------------------------------------------------------------------
 
 -- A space-defined tier list. Behavior is fixed to the ice-cream template
--- (shared pool, S–F tiers, a "Not <past>" shelf, a shared to-<verb> list, no
--- visible dates), so the row carries only WORDS — the app templates all its
+-- (shared pool, S–F tiers, a "Not <past>" shelf, no visible dates), so the
+-- row carries only WORDS — the app templates all its
 -- copy from them (customCopy in the tier-list copy.ts).
 create table if not exists public.tier_lists (
   id          uuid primary key default gen_random_uuid(),
@@ -180,8 +180,9 @@ create table if not exists public.tier_lists (
   emoji       text not null default '',
   -- Singular noun, lowercase: "fruit" → "Add a fruit".
   noun        text not null,
-  -- Infinitive + past participle: "try"/"tried" → "To-try list", "Not tried".
-  verb        text not null default 'try',
+  -- Past participle: "tried" → the "Not tried" shelf.
+  -- (`verb` lived here until 2026-09-12, when boards lost their to-<verb>
+  --  list to the Lists feature; the migration drops it.)
   past        text not null default 'tried',
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
@@ -205,7 +206,7 @@ create table if not exists public.tier_items (
   -- Poster/cover image, pasted as a URL ('' = none; the card shows a fallback).
   image_url   text not null default '',
   -- The day we finished it (SHARED, like the item itself). Null = unknown;
-  -- the client defaults it to today on add / watchlist check-off. Movies/TV
+  -- the client defaults it to today on add / a Lists check-off. Movies/TV
   -- only — books are read separately, so their dates are per person in
   -- `tier_item_completions.done_on` (same column name on purpose) and this
   -- stays null. Ice cream shows no dates in the UI but reuses this as its
@@ -282,67 +283,85 @@ create index if not exists tier_item_completions_item_idx  on public.tier_item_c
 -- `supabase_realtime` publication membership, which follows the OID.
 
 -- ---------------------------------------------------------------------------
--- Watchlist (movies + TV + books + ice cream): a list of things we want to
--- watch, read, or try, per kind. Movie/TV/ice-cream lists are SHARED (any
--- member can add/edit/check off); the book reading list is PER PERSON — each
--- member keeps their own, owned via `created_by`, and RLS lets only the owner
--- write a book row (the UI shows only the viewer's). Mirrors the wishlist →
--- entry pattern: checking one off creates a `tier_items` row in the shared
--- pool (so it lands on both members' shelves) and links to it via
--- `tier_item_id` (null = still "want to", set = added to the board). ON DELETE
--- SET NULL means removing that tier item later reopens the watchlist item
--- rather than orphaning it.
+-- Lists: the want-to lists. Their own feature since 2026-09-12 — the tier
+-- boards are tiers only now. Two tables:
+--   * `lists` — free-form lists the space defines from the UI ("Groceries").
+--     Shared space data with the uniform member policy. The movie, TV and book
+--     lists are BUILT IN and need no row here.
+--   * `list_items` — one row per thing on a list. Movie/TV rows are SHARED
+--     (either member adds, reorders, checks off); the book reading list is PER
+--     PERSON — each member keeps their own, owned via `created_by`, and RLS
+--     lets only the owner write a book row (the UI shows only the viewer's).
+--     Free-form rows (kind 'custom' + `list_id`) are shared like the list.
+--
+-- "Done" reads two ways, by kind:
+--   * movie / tv / book: checking off creates a `tier_items` row in the shared
+--     pool (so it lands on the board's unranked shelf) and links to it via
+--     `tier_item_id` — null = still want-to, set = done. ON DELETE SET NULL
+--     means deleting that tier item later REOPENS the row rather than
+--     orphaning it, and the cascaded UPDATE reaches an open Lists page as a
+--     plain realtime event, so the client never needs a cross-table read.
+--   * custom: there's no board to promote onto, so the row carries its own
+--     `done_on` date stamp instead (null = still open).
+-- Same shape as the doing-stuff wishlist -> entry pattern.
 -- ---------------------------------------------------------------------------
 
-create table if not exists public.watchlist_items (
-  id           uuid primary key default gen_random_uuid(),
-  space_id     uuid not null references public.spaces (id) on delete cascade,
-  -- Same kind set as tier_items — migrate both constraints together (see above).
-  kind         text not null check (kind in ('movie', 'tv', 'book', 'ice-cream', 'custom')),
-  -- Set exactly when kind = 'custom', like tier_items.list_id.
-  list_id      uuid references public.tier_lists (id) on delete cascade,
-  title        text not null,
-  -- Optional poster, pasted as a URL; carried onto the tier card when checked off.
-  image_url    text not null default '',
-  -- Who made it (author/director — see `creatorLabel` in the tier-list
-  -- copy.ts), carried onto the tier item when checked off, like the image.
-  -- On an existing DB:
-  --   alter table public.watchlist_items add column creator text not null default '';
-  creator      text not null default '',
-  -- Queue order within the kind's list — the list is a priority queue, top
-  -- (lowest position) = watch/read/try next. Fractional midpoint insertion on
-  -- drag, like tier_placements.position; the client appends new rows at
-  -- max + 1. On an existing DB:
-  --   alter table public.watchlist_items add column position double precision not null default 0;
-  --   update public.watchlist_items w set position = sub.rn
-  --     from (select id, row_number() over (partition by space_id, kind order by created_at) as rn
-  --           from public.watchlist_items) sub
-  --     where w.id = sub.id;
-  position     double precision not null default 0,
-  -- The tier item this produced when checked off; null while still open.
-  tier_item_id uuid references public.tier_items (id) on delete set null,
-  created_by   uuid references auth.users (id) on delete set null default auth.uid(),
-  created_at   timestamptz not null default now(),
-  constraint watchlist_items_list_kind_check check ((kind = 'custom') = (list_id is not null))
+create table if not exists public.lists (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  -- Display name, as typed: "Groceries".
+  name        text not null,
+  -- Single emoji for the picker pill ('' = the app's fallback tag emoji).
+  emoji       text not null default '',
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at  timestamptz not null default now()
 );
 
-create index if not exists watchlist_items_space_idx on public.watchlist_items (space_id);
-create index if not exists watchlist_items_tier_item_idx on public.watchlist_items (tier_item_id);
-create index if not exists watchlist_items_list_idx on public.watchlist_items (list_id);
+create index if not exists lists_space_idx on public.lists (space_id);
 
--- Migration (2026-09-11): custom tier lists. On an existing DB, run once —
--- `tier_lists` must exist before the FKs, and the constraint names must match
--- the auto-named originals:
---   alter table public.tier_items add column if not exists list_id uuid
---     references public.tier_lists (id) on delete cascade;
---   alter table public.tier_items drop constraint if exists tier_items_kind_check;
---   alter table public.tier_items add constraint tier_items_kind_check
---     check (kind in ('movie', 'tv', 'book', 'ice-cream', 'custom'));
---   alter table public.tier_items add constraint tier_items_list_kind_check
---     check ((kind = 'custom') = (list_id is not null));
---   -- then the same three for public.watchlist_items.
--- Book reading-list RLS is untouched: custom rows are kind 'custom', never
--- 'book', so the `kind <> 'book'` disjunct keeps them shared.
+create table if not exists public.list_items (
+  id           uuid primary key default gen_random_uuid(),
+  space_id     uuid not null references public.spaces (id) on delete cascade,
+  -- The three built-in lists, plus 'custom' for a row on a `lists` row.
+  kind         text not null check (kind in ('movie', 'tv', 'book', 'custom')),
+  -- Set exactly when kind = 'custom' (the CHECK below enforces the pairing):
+  -- which free-form list this row is on. ON DELETE CASCADE is what makes
+  -- deleting a list ONE statement.
+  list_id      uuid references public.lists (id) on delete cascade,
+  title        text not null,
+  -- Optional poster/cover, pasted as a URL; carried onto the tier item when
+  -- checked off. Free-form rows show no image.
+  image_url    text not null default '',
+  -- Who made it (author/director — see `creatorLabel` in the lists copy.ts),
+  -- carried onto the tier item when checked off, like the image. Free-form
+  -- rows reuse the column as an optional free-text note.
+  creator      text not null default '',
+  -- Queue order within the list — it's a priority queue, top (lowest
+  -- position) = watch/read/do next. Fractional midpoint insertion on drag,
+  -- like tier_placements.position; the client appends new rows at max + 1.
+  position     double precision not null default 0,
+  -- The tier item this produced when checked off; null while still open.
+  -- Movie/TV/book rows only.
+  tier_item_id uuid references public.tier_items (id) on delete set null,
+  -- Free-form rows only: the day it was done (null = still open). Media rows
+  -- leave this null and mark done with `tier_item_id` instead.
+  done_on      date,
+  created_by   uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at   timestamptz not null default now(),
+  constraint list_items_list_kind_check check ((kind = 'custom') = (list_id is not null))
+);
+
+create index if not exists list_items_space_idx on public.list_items (space_id);
+create index if not exists list_items_tier_item_idx on public.list_items (tier_item_id);
+create index if not exists list_items_list_idx on public.list_items (list_id);
+
+-- Migration (2026-09-12): the Lists feature — run
+-- supabase/migrations/20260912_lists_feature.sql once on an existing DB. It
+-- creates `lists`, renames `watchlist_items` to `list_items` (a rename keeps
+-- the rows, grants, RLS policies, indexes and the `supabase_realtime`
+-- membership — all follow the table OID), drops its ice-cream and
+-- custom-tier-board rows, re-points `list_id` at `lists`, adds `done_on`, and
+-- drops the now-unused `tier_lists.verb`.
 
 -- ---------------------------------------------------------------------------
 -- Spoons: the souvenir spoon collection. Each row is one physical spoon —
@@ -621,7 +640,8 @@ alter table public.tier_lists       enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_completions enable row level security;
-alter table public.watchlist_items  enable row level security;
+alter table public.lists            enable row level security;
+alter table public.list_items       enable row level security;
 alter table public.music_practice_days enable row level security;
 
 -- spaces ---------------------------------------------------------------------
@@ -764,24 +784,30 @@ drop policy if exists "delete own reads" on public.tier_item_completions;
 create policy "delete own reads" on public.tier_item_completions
   for delete using (user_id = auth.uid());
 
--- Watchlists: movie/TV/ice-cream rows are shared (any member writes); book
+-- lists ------------------------------------------------------------------------
+-- The free-form list rows themselves are shared space data.
+drop policy if exists "space members all" on public.lists;
+create policy "space members all" on public.lists
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+-- List items: movie/TV and free-form rows are shared (any member writes); book
 -- rows are per-person reading-list entries, writable only by their owner
 -- (`created_by`, which defaults to auth.uid()). Members still read every row —
 -- the shared kinds need it, and realtime delivers one stream per table.
-drop policy if exists "space members all" on public.watchlist_items;
-drop policy if exists "members read watchlist" on public.watchlist_items;
-create policy "members read watchlist" on public.watchlist_items
+drop policy if exists "space members all" on public.list_items;
+drop policy if exists "members read list items" on public.list_items;
+create policy "members read list items" on public.list_items
   for select using (public.is_space_member(space_id));
 
-drop policy if exists "insert shared or own watchlist" on public.watchlist_items;
-create policy "insert shared or own watchlist" on public.watchlist_items
+drop policy if exists "insert shared or own list items" on public.list_items;
+create policy "insert shared or own list items" on public.list_items
   for insert with check (
     public.is_space_member(space_id)
     and (kind <> 'book' or created_by = auth.uid())
   );
 
-drop policy if exists "update shared or own watchlist" on public.watchlist_items;
-create policy "update shared or own watchlist" on public.watchlist_items
+drop policy if exists "update shared or own list items" on public.list_items;
+create policy "update shared or own list items" on public.list_items
   for update using (
     public.is_space_member(space_id)
     and (kind <> 'book' or created_by = auth.uid())
@@ -791,8 +817,8 @@ create policy "update shared or own watchlist" on public.watchlist_items
     and (kind <> 'book' or created_by = auth.uid())
   );
 
-drop policy if exists "delete shared or own watchlist" on public.watchlist_items;
-create policy "delete shared or own watchlist" on public.watchlist_items
+drop policy if exists "delete shared or own list items" on public.list_items;
+create policy "delete shared or own list items" on public.list_items
   for delete using (
     public.is_space_member(space_id)
     and (kind <> 'book' or created_by = auth.uid())
@@ -828,7 +854,7 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_lists, public.tier_items, public.tier_placements,
-  public.tier_item_completions, public.watchlist_items, public.spoons, public.park_visits,
+  public.tier_item_completions, public.lists, public.list_items, public.spoons, public.park_visits,
   public.recipes, public.music_practice_days, public.little_guys
   to authenticated;
 grant select, update on public.profiles to authenticated;
@@ -849,7 +875,7 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'watchlist_items', 'spoons',
+          'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'lists', 'list_items', 'spoons',
           'park_visits', 'recipes', 'little_guys']
   loop
     if not exists (

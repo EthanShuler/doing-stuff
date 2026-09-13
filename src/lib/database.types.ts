@@ -147,7 +147,6 @@ export interface Database {
           name: string
           emoji: string
           noun: string
-          verb: string
           past: string
           created_by: string | null
           created_at: string
@@ -158,7 +157,6 @@ export interface Database {
           name: string
           emoji?: string
           noun: string
-          verb?: string
           past?: string
           created_by?: string | null
           created_at?: string
@@ -169,7 +167,6 @@ export interface Database {
           name?: string
           emoji?: string
           noun?: string
-          verb?: string
           past?: string
           created_by?: string | null
           created_at?: string
@@ -275,7 +272,34 @@ export interface Database {
         }
         Relationships: []
       }
-      watchlist_items: {
+      lists: {
+        Row: {
+          id: string
+          space_id: string
+          name: string
+          emoji: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          space_id: string
+          name: string
+          emoji?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          space_id?: string
+          name?: string
+          emoji?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      list_items: {
         Row: {
           id: string
           space_id: string
@@ -286,6 +310,7 @@ export interface Database {
           creator: string
           position: number
           tier_item_id: string | null
+          done_on: string | null
           created_by: string | null
           created_at: string
         }
@@ -299,6 +324,7 @@ export interface Database {
           creator?: string
           position?: number
           tier_item_id?: string | null
+          done_on?: string | null
           created_by?: string | null
           created_at?: string
         }
@@ -312,6 +338,7 @@ export interface Database {
           creator?: string
           position?: number
           tier_item_id?: string | null
+          done_on?: string | null
           created_by?: string | null
           created_at?: string
         }

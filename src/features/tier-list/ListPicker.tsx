@@ -1,8 +1,6 @@
-import { Button, Group } from '@mantine/core'
-import { useNavigate } from 'react-router'
 import type { ListKey, TierKind, TierList } from '../../types'
-import { ACCENT, colors, fonts, text } from '../../theme'
-import { Pill } from '../../components/Pill'
+import { PickerRow } from '../../components/PickerRow'
+import type { PickerEntry } from '../../components/PickerRow'
 import { KIND_COPY } from './copy'
 import { listKeyFor } from './derive'
 
@@ -16,9 +14,9 @@ const BUILT_INS: { kind: TierKind; path: string; label: string }[] = [
   { kind: 'ice-cream', path: '/ice-cream', label: 'Ice Cream' },
 ]
 
-/** The in-page board picker, standing in for the header nav items the four
- *  tier lists used to have. Presentational: the page hands it the active key
- *  and the space's own lists; every pill is a plain navigation. */
+/** The in-page board picker: the four built-ins, then the space's own lists.
+ *  A thin wrapper over the shared PickerRow — all it does is turn boards into
+ *  pill entries. */
 export function ListPicker({
   lists,
   activeKey,
@@ -34,43 +32,26 @@ export function ListPicker({
   /** Re-word the list showing now — only offered on a custom board. */
   onEdit: () => void
 }) {
-  const navigate = useNavigate()
-  const onCustom = activeKey.startsWith('list:')
+  const entries: PickerEntry[] = [
+    ...BUILT_INS.map((entry) => ({
+      key: entry.kind,
+      label: `${KIND_COPY[entry.kind].emoji} ${entry.label}`,
+      path: entry.path,
+    })),
+    ...lists.map((list) => ({
+      key: listKeyFor(list.id),
+      label: `${list.emoji || '🏷️'} ${list.name}`,
+      path: `/tiers/${list.id}`,
+    })),
+  ]
 
   return (
-    <Group gap={8} wrap="wrap" mb={14}>
-      {BUILT_INS.map((entry) => (
-        <Pill
-          key={entry.path}
-          label={`${KIND_COPY[entry.kind].emoji} ${entry.label}`}
-          active={activeKey === entry.kind}
-          activeBg={ACCENT}
-          onClick={() => navigate(entry.path)}
-        />
-      ))}
-      {lists.map((list) => (
-        <Pill
-          key={list.id}
-          label={`${list.emoji || '🏷️'} ${list.name}`}
-          active={activeKey === listKeyFor(list.id)}
-          activeBg={ACCENT}
-          onClick={() => navigate(`/lists/${list.id}`)}
-        />
-      ))}
-      <Button variant="chip" onClick={onNew}>
-        + New list
-      </Button>
-      {onCustom && (
-        <Button
-          variant="subtle"
-          size="compact-sm"
-          onClick={onEdit}
-          c={colors.faint}
-          style={{ fontFamily: fonts.sans, fontSize: text.caption }}
-        >
-          Edit list
-        </Button>
-      )}
-    </Group>
+    <PickerRow
+      entries={entries}
+      activeKey={activeKey}
+      onNew={onNew}
+      // Only a space-defined list can be re-worded; the built-ins are fixed.
+      onEdit={activeKey.startsWith('list:') ? onEdit : undefined}
+    />
   )
 }

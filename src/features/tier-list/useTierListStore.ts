@@ -1,11 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
+import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCompletion } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { today } from '../../lib/format'
 import { firstGrapheme } from '../../lib/text'
-import { datesArePersonal, keyOf, kindColumn, listIdOf, nextWatchlistPosition, normalizeTags, pruneList, renormalizedPositions } from './derive'
+import { renormalizedPositions } from '../../lib/order'
+import { datesArePersonal, keyOf, kindColumn, listIdOf, normalizeTags, pruneList } from './derive'
 import type { ListDraft } from './ListModal'
 import { PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
@@ -33,16 +33,15 @@ interface Snapshot {
   placements: TierPlacement[]
   completions: TierCompletion[]
   profiles: Profile[]
-  watchlist: WatchlistItem[]
 }
 
 function seed(): Snapshot {
   return {
     profiles: SEED_PROFILES,
-    // One space-defined list, so /lists/:id and the picker are demoable
+    // One space-defined list, so /tiers/:id and the picker are demoable
     // offline exactly like the built-ins.
     lists: [
-      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', verb: 'try', past: 'tried', createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
@@ -109,18 +108,6 @@ function seed(): Snapshot {
       { id: 'r4', itemId: 'b3', userId: 'u2', doneOn: '2026-06-20' },
       { id: 'r5', itemId: 'b4', userId: 'u1', doneOn: '2026-06-25' },
     ],
-    // A couple open wishes per kind so the watchlist is demoable offline.
-    // Reading lists are per person (owner = createdBy): the seed viewer u1
-    // sees only w4 on /books — u2's w6 exercises the filter.
-    watchlist: [
-      { id: 'w1', kind: 'movie', title: 'Dune: Part Two', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T09:00:00Z' },
-      { id: 'w2', kind: 'movie', title: 'Past Lives', imageUrl: '', creator: '', position: 2, tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T09:00:00Z' },
-      { id: 'w3', kind: 'tv', title: 'The Bear', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'w4', kind: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', creator: 'Samantha Shannon', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
-      { id: 'w5', kind: 'ice-cream', title: 'Ube', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
-      { id: 'w6', kind: 'book', title: 'Babel', imageUrl: '', creator: 'R. F. Kuang', position: 2, tierItemId: null, createdBy: 'u2', createdAt: '2026-06-11T11:00:00Z' },
-      { id: 'w7', kind: 'list:l1', title: 'Rambutan', imageUrl: '', creator: '', position: 1, tierItemId: null, createdBy: 'u1', createdAt: '2026-06-11T12:00:00Z' },
-    ],
   }
 }
 
@@ -131,7 +118,6 @@ type TierListRow = {
   name: string
   emoji: string | null
   noun: string
-  verb: string
   past: string
   created_by: string | null
   created_at: string
@@ -161,25 +147,12 @@ type TierCompletionRow = {
   user_id: string
   done_on: string
 }
-type WatchlistItemRow = {
-  id: string
-  kind: string
-  list_id: string | null
-  title: string
-  image_url: string | null
-  creator: string | null
-  position: number
-  tier_item_id: string | null
-  created_by: string | null
-  created_at: string
-}
 
 const toTierList = (r: TierListRow): TierList => ({
   id: r.id,
   name: r.name,
   emoji: r.emoji ?? '',
   noun: r.noun,
-  verb: r.verb,
   past: r.past,
   createdBy: r.created_by,
   createdAt: r.created_at,
@@ -209,23 +182,11 @@ const toTierCompletion = (r: TierCompletionRow): TierCompletion => ({
   userId: r.user_id,
   doneOn: r.done_on,
 })
-const toWatchlistItem = (r: WatchlistItemRow): WatchlistItem => ({
-  id: r.id,
-  kind: keyOf(r.kind, r.list_id),
-  title: r.title,
-  imageUrl: r.image_url ?? '',
-  creator: r.creator ?? '',
-  position: r.position,
-  tierItemId: r.tier_item_id,
-  createdBy: r.created_by,
-  createdAt: r.created_at,
-})
 
-const TIER_LIST_COLUMNS = 'id,name,emoji,noun,verb,past,created_by,created_at'
+const TIER_LIST_COLUMNS = 'id,name,emoji,noun,past,created_by,created_at'
 const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
-const WATCHLIST_COLUMNS = 'id,kind,list_id,title,image_url,creator,position,tier_item_id,created_by,created_at'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('tx', 500)
@@ -252,10 +213,6 @@ export interface TierListStore {
   /** All members' personal completions (book read records today); deriveBoard
    *  picks one viewer's. */
   completions: TierCompletion[]
-  /** Every member's watchlist rows — all kinds. Movie/TV/ice-cream lists are
-   *  shared; book reading lists are per person, so the UI additionally filters
-   *  those to `createdBy === selfId` (see listIsPersonal in derive.ts). */
-  watchlist: WatchlistItem[]
   profiles: Profile[]
   /** Whose board "You" is: the auth user, or the seed self in keyless mode. */
   selfId: string | null
@@ -294,43 +251,23 @@ export interface TierListStore {
    *  and resyncs. */
   setDoneOn: (itemId: string, doneOn: string | null) => Promise<void>
 
-  /** Add a "want to watch" item to the watchlist (books: YOUR OWN reading
-   *  list — created_by marks the owner). `creator` is carried onto the tier
-   *  item on check-off, like the image. Throws on failure. */
-  addWatchlistItem: (key: ListKey, title: string, imageUrl: string, creator: string) => Promise<void>
-  /** Edit a watchlist item's title/poster/creator (open items only). Throws on failure. */
-  updateWatchlistItem: (id: string, title: string, imageUrl: string, creator: string) => Promise<void>
-  /** Remove a watchlist item (does not touch any tier item it created). Throws on failure. */
-  deleteWatchlistItem: (id: string) => Promise<void>
-  /** Reorder: move one open item to a new queue position (top = next up).
-   *  Inline flow — records the error and resyncs instead of throwing. */
-  moveWatchlistItem: (id: string, position: number) => Promise<void>
-  /** Rewrite one list's ordering at integer positions (float-precision rescue). */
-  renormalizeWatchlist: (orderedIds: string[]) => Promise<void>
-  /** Check off an open item: create the tier item in the pool and link to it.
-   *  Inline flow — records the error instead of throwing. */
-  checkOffWatchlistItem: (item: WatchlistItem) => Promise<void>
-  /** Reopen a checked item (clears the link; the tier item stays on the board). */
-  uncheckWatchlistItem: (id: string) => Promise<void>
-
   /** Create a space-defined list. Resolves the created row so the caller can
    *  navigate to its board. Throws on failure (the modal stays open). */
   addList: (draft: ListDraft) => Promise<TierList>
   /** Rename / re-word a list. Throws on failure. */
   updateList: (id: string, draft: ListDraft) => Promise<void>
   /** Delete a list — ONE DB delete; Postgres cascades its items (and everyone's
-   *  placements/completions of them) and its to-do list. Mirrored locally with
-   *  pruneList. Throws on failure. */
+   *  placements/completions of them). Mirrored locally with pruneList.
+   *  Throws on failure. */
   deleteList: (id: string) => Promise<void>
 }
 
-/** Normalize a list draft for saving: trimmed words, one emoji, sane
- *  fallbacks for the two grammar fields. */
+/** Normalize a list draft for saving: trimmed words, one emoji, a sane
+ *  fallback for the participle. */
 const cleanListDraft = (draft: ListDraft) => ({
   name: draft.name.trim(),
   emoji: firstGrapheme(draft.emoji),
   noun: draft.noun.trim().toLowerCase(),
-  verb: draft.verb.trim() || 'try',
   past: draft.past.trim() || 'tried',
 })
 
@@ -342,7 +279,6 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   const [items, setItems] = useState<TierItem[]>(initial?.items ?? [])
   const [placements, setPlacements] = useState<TierPlacement[]>(initial?.placements ?? [])
   const [completions, setCompletions] = useState<TierCompletion[]>(initial?.completions ?? [])
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(initial?.watchlist ?? [])
   const [profiles, setProfiles] = useState<Profile[]>(initial?.profiles ?? [])
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
@@ -355,28 +291,25 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // optimistic drop. Throws on the first failed query.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [ls, its, places, comps_, profs, watches] = await Promise.all([
+    const [ls, its, places, comps_, profs] = await Promise.all([
       supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
       supabase.from('tier_item_completions').select(TIER_COMPLETION_COLUMNS).eq('space_id', spaceId).order('created_at'),
       // RLS scopes this to the current user + anyone they share a space with.
       supabase.from('profiles').select(PROFILE_COLUMNS),
-      supabase.from('watchlist_items').select(WATCHLIST_COLUMNS).eq('space_id', spaceId).order('position').order('created_at'),
     ])
     if (ls.error) throw ls.error
     if (its.error) throw its.error
     if (places.error) throw places.error
     if (comps_.error) throw comps_.error
     if (profs.error) throw profs.error
-    if (watches.error) throw watches.error
     return {
       lists: (ls.data as TierListRow[]).map(toTierList),
       items: (its.data as TierItemRow[]).map(toTierItem),
       placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
       completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
       profiles: (profs.data as ProfileRow[]).map(toProfile),
-      watchlist: (watches.data as WatchlistItemRow[]).map(toWatchlistItem),
     }
   }, [spaceId])
 
@@ -386,7 +319,6 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     setPlacements(snap.placements)
     setCompletions(snap.completions)
     setProfiles(snap.profiles)
-    setWatchlist(snap.watchlist)
   }, [])
 
   // Resync after a failed inline write: the optimistic local change is wrong,
@@ -402,13 +334,12 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // Wire this store's tables onto the realtime channel (see useSpaceSync).
   // Placements and read records pass their (itemId, userId)-keyed upserts;
   // a cascaded tier-item delete needs no special-casing — the DB emits the
-  // dependent deletes (and the watchlist set-null UPDATE) as their own events.
+  // dependent deletes as their own events.
   const wire = useCallback((channel: RealtimeChannel, spaceFilter: string) => {
     channel = syncTable(channel, spaceFilter, 'tier_lists', toTierList, setLists)
     channel = syncTable(channel, spaceFilter, 'tier_items', toTierItem, setItems)
     channel = syncTable(channel, spaceFilter, 'tier_placements', toTierPlacement, setPlacements, upsertPlacement)
     channel = syncTable(channel, spaceFilter, 'tier_item_completions', toTierCompletion, setCompletions, upsertCompletion)
-    channel = syncTable(channel, spaceFilter, 'watchlist_items', toWatchlistItem, setWatchlist)
     return channel
   }, [])
 
@@ -565,9 +496,6 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setItems((prev) => prev.filter((x) => x.id !== id))
       setPlacements((prev) => prev.filter((p) => p.itemId !== id))
       setCompletions((prev) => prev.filter((r) => r.itemId !== id))
-      // The FK is ON DELETE SET NULL, so any watchlist item that produced this
-      // tier item reopens. Mirror that locally too.
-      setWatchlist((prev) => prev.map((w) => (w.tierItemId === id ? { ...w, tierItemId: null } : w)))
     },
     [spaceId],
   )
@@ -670,208 +598,6 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     [spaceId, resync],
   )
 
-  // --- Watchlist actions. Add/update/delete throw so the modal can stay open;
-  //     check-off / uncheck are inline (checkbox) and record the error instead. ---
-
-  const addWatchlistItem = useCallback(
-    async (key: ListKey, title: string, imageUrl: string, creator: string) => {
-      const trimmed = title.trim()
-      if (!trimmed) return
-      setError(null)
-      const image = imageUrl.trim()
-      const maker = creator.trim()
-      // New wishes join the back of the queue (the top is "next up").
-      const position = nextWatchlistPosition(watchlist, key)
-      if (supabase && spaceId) {
-        const { data, error: err } = await supabase
-          .from('watchlist_items')
-          .insert({ space_id: spaceId, kind: kindColumn(key), list_id: listIdOf(key), title: trimmed, image_url: image, creator: maker, position })
-          .select(WATCHLIST_COLUMNS)
-          .single()
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-        upsertById(setWatchlist, toWatchlistItem(data as WatchlistItemRow))
-        return
-      }
-      setWatchlist((prev) => [
-        ...prev,
-        { id: nextId(), kind: key, title: trimmed, imageUrl: image, creator: maker, position, tierItemId: null, createdBy: selfId, createdAt: new Date().toISOString() },
-      ])
-    },
-    [spaceId, selfId, watchlist],
-  )
-
-  const updateWatchlistItem = useCallback(
-    async (id: string, title: string, imageUrl: string, creator: string) => {
-      const trimmed = title.trim()
-      if (!trimmed) return
-      setError(null)
-      const image = imageUrl.trim()
-      const maker = creator.trim()
-      if (supabase && spaceId) {
-        const { error: err } = await supabase
-          .from('watchlist_items')
-          .update({ title: trimmed, image_url: image, creator: maker })
-          .eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, title: trimmed, imageUrl: image, creator: maker } : w)))
-    },
-    [spaceId],
-  )
-
-  const deleteWatchlistItem = useCallback(
-    async (id: string) => {
-      setError(null)
-      if (supabase && spaceId) {
-        const { error: err } = await supabase.from('watchlist_items').delete().eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      setWatchlist((prev) => prev.filter((w) => w.id !== id))
-    },
-    [spaceId],
-  )
-
-  // --- Reorder (drag) actions. Inline flows like the board's drops: optimistic
-  //     local move first; on failure record the error and resync — the row
-  //     snaps back and the banner says why. ---
-
-  const moveWatchlistItem = useCallback(
-    async (id: string, position: number) => {
-      setError(null)
-      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, position } : w)))
-      if (!supabase || !spaceId) return
-      const { error: err } = await supabase.from('watchlist_items').update({ position }).eq('id', id)
-      if (err) {
-        setError(err.message)
-        resync()
-      }
-    },
-    [spaceId, resync],
-  )
-
-  const renormalizeWatchlist = useCallback(
-    async (orderedIds: string[]) => {
-      setError(null)
-      const rewrites = renormalizedPositions(orderedIds)
-      const positionById = new Map(rewrites.map((r) => [r.itemId, r.position]))
-      setWatchlist((prev) => prev.map((w) => (positionById.has(w.id) ? { ...w, position: positionById.get(w.id)! } : w)))
-      if (!supabase || !spaceId) return
-      // Row-by-row updates: unlike placements there's no upsert target that
-      // wouldn't need every NOT NULL column. Rare path (float precision ran
-      // out), tiny lists — sequential is fine.
-      for (const { itemId, position } of rewrites) {
-        const { error: err } = await supabase.from('watchlist_items').update({ position }).eq('id', itemId)
-        if (err) {
-          setError(err.message)
-          resync()
-          return
-        }
-      }
-    },
-    [spaceId, resync],
-  )
-
-  // Wishes with a check-off in flight: local state stays unchanged until the
-  // insert round-trips, so without this a double-click on a slow connection
-  // would create two pool items for one wish.
-  const checkingOff = useRef<Set<string>>(new Set())
-
-  const checkOffWatchlistItem = useCallback(
-    async (wi: WatchlistItem) => {
-      // Already checked off (or mid-check-off) — nothing to do.
-      if (wi.tierItemId || checkingOff.current.has(wi.id)) return
-      checkingOff.current.add(wi.id)
-      try {
-        setError(null)
-        // Checking off means "just finished it" → dated today. For movies/TV
-        // that's the shared watched date; for books it's the CHECKER's own read
-        // record — the partner's copy lands on their Unread shelf.
-        const personal = datesArePersonal(wi.kind)
-        if (supabase && spaceId) {
-          // 1. Create the tier item in the shared pool.
-          const { data: itemData, error: itemErr } = await supabase
-            .from('tier_items')
-            .insert({
-              space_id: spaceId,
-              kind: kindColumn(wi.kind),
-              list_id: listIdOf(wi.kind),
-              title: wi.title,
-              image_url: wi.imageUrl,
-              creator: wi.creator,
-              done_on: personal ? null : today(),
-            })
-            .select(TIER_ITEM_COLUMNS)
-            .single()
-          if (itemErr) {
-            setError(itemErr.message)
-            return
-          }
-          const created = toTierItem(itemData as TierItemRow)
-          upsertById(setItems, created)
-          // 2. Your read record (books). A failure surfaces the banner and
-          //    resyncs inside setDoneOn; the item is on the board regardless.
-          if (personal) await setDoneOn(created.id, today())
-          // 3. Link the watchlist item to it (marks it done).
-          const { error: linkErr } = await supabase
-            .from('watchlist_items')
-            .update({ tier_item_id: created.id })
-            .eq('id', wi.id)
-          if (linkErr) {
-            // The tier item exists; the link write failed. Surface it and resync
-            // so local state matches the DB (the item is on the board regardless).
-            setError(linkErr.message)
-            resync()
-            return
-          }
-          setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
-          return
-        }
-        // Seed mode: create the pool item and link locally.
-        const created: TierItem = {
-          id: nextId(),
-          kind: wi.kind,
-          title: wi.title,
-          imageUrl: wi.imageUrl,
-          doneOn: personal ? null : today(),
-          tags: [],
-          creator: wi.creator,
-          createdBy: selfId,
-          createdAt: new Date().toISOString(),
-        }
-        setItems((prev) => [...prev, created])
-        if (personal) await setDoneOn(created.id, today())
-        setWatchlist((prev) => prev.map((w) => (w.id === wi.id ? { ...w, tierItemId: created.id } : w)))
-      } finally {
-        checkingOff.current.delete(wi.id)
-      }
-    },
-    [spaceId, selfId, resync, setDoneOn],
-  )
-
-  const uncheckWatchlistItem = useCallback(
-    async (id: string) => {
-      setError(null)
-      // Reopen the wish; the tier item it created stays on the board.
-      setWatchlist((prev) => prev.map((w) => (w.id === id ? { ...w, tierItemId: null } : w)))
-      if (!supabase || !spaceId) return
-      const { error: err } = await supabase.from('watchlist_items').update({ tier_item_id: null }).eq('id', id)
-      if (err) {
-        setError(err.message)
-        resync()
-      }
-    },
-    [spaceId, resync],
-  )
-
   // --- List actions. The list row itself is shared space data (uniform RLS),
   //     so either member can create, re-word, or delete one. Add/update throw
   //     so the modal can stay open; delete throws too (it's modal-driven). ---
@@ -928,18 +654,17 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           throw err
         }
       }
-      // One DB delete; Postgres cascades the list's items (and with them
-      // every member's placements and completions) plus its to-do rows. The
-      // dependent deletes arrive as their own realtime events, but mirror
-      // them now so this tab doesn't render a board of orphans for a beat.
+      // One DB delete; Postgres cascades the list's items and with them every
+      // member's placements and completions. The dependent deletes arrive as
+      // their own realtime events, but mirror them now so this tab doesn't
+      // render a board of orphans for a beat.
       setLists((prev) => prev.filter((l) => l.id !== id))
-      const pruned = pruneList({ items, placements, completions, watchlist }, id)
+      const pruned = pruneList({ items, placements, completions }, id)
       setItems(pruned.items)
       setPlacements(pruned.placements)
       setCompletions(pruned.completions)
-      setWatchlist(pruned.watchlist)
     },
-    [spaceId, items, placements, completions, watchlist],
+    [spaceId, items, placements, completions],
   )
 
   return {
@@ -947,7 +672,6 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     items,
     placements,
     completions,
-    watchlist,
     profiles,
     selfId,
     loading,
@@ -961,13 +685,6 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     placeTier,
     setSharedDoneOn,
     setDoneOn,
-    addWatchlistItem,
-    updateWatchlistItem,
-    deleteWatchlistItem,
-    moveWatchlistItem,
-    renormalizeWatchlist,
-    checkOffWatchlistItem,
-    uncheckWatchlistItem,
     addList,
     updateList,
     deleteList,

@@ -1,4 +1,4 @@
-import type { ListKey, Tier, TierItem, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
+import type { ListKey, Tier, TierItem, TierPlacement, TierCompletion } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
@@ -42,17 +42,6 @@ export const keyOf = (kind: string, listId: string | null): ListKey =>
  * `doneOn` is just its tried/not-tried marker (see `usesDates` in copy.ts).
  */
 export const datesArePersonal = (key: ListKey): boolean => key === 'book'
-
-/**
- * Whether a kind's "want to" list belongs to one person rather than the space.
- * Movies, TV, and ice cream are watched/tried together, so their watchlists
- * are shared; books are read separately, so each member keeps their own
- * reading list — the UI shows only rows whose `createdBy` is the viewer, and
- * RLS lets only the owner write a book's row. Custom lists are never personal
- * (they follow the ice-cream template), which is also why the book-only
- * watchlist RLS needs no change for them.
- */
-export const listIsPersonal = (key: ListKey): boolean => key === 'book'
 
 /** Palette index per tier — a classic hot→cool ramp through the theme swatches. */
 const TIER_COLOR_INDEX: Record<Tier, number> = { S: 5, A: 1, B: 3, C: 0, D: 4, F: 2 }
@@ -220,66 +209,19 @@ export function moveItem(
   return next
 }
 
-/**
- * Midpoint position for inserting between two neighbors (null = no neighbor
- * on that side). Returns null when float precision is exhausted — the caller
- * should then renormalize the whole tier instead.
- */
-export function positionBetween(before: number | null, after: number | null): number | null {
-  if (before === null && after === null) return 1
-  if (before === null) return (after as number) - 1
-  if (after === null) return before + 1
-  const mid = (before + after) / 2
-  if (mid <= before || mid >= after) return null
-  return mid
-}
-
-/** Rewrite a tier's ordering at clean integer positions (renormalize path). */
-export function renormalizedPositions(itemIds: string[]): { itemId: string; position: number }[] {
-  return itemIds.map((itemId, i) => ({ itemId, position: i + 1 }))
-}
-
-// --- Watchlist ordering -------------------------------------------------------
-// The list is a priority queue: open items sort by `position` (top = watch/
-// read/try next; drag to reorder via the same midpoint-insertion scheme as
-// tier placements). Checked-off items sink below the open ones, keeping their
-// queue order so unchecking restores an item's old slot.
-
-/** Order one kind's watchlist for display: open first, then by position, with
- *  createdAt (then id) breaking ties — e.g. legacy rows all at position 0. */
-export function sortWatchlist(items: WatchlistItem[]): WatchlistItem[] {
-  const rank = (w: WatchlistItem) => (w.tierItemId === null ? 0 : 1)
-  return [...items].sort((a, b) => {
-    if (rank(a) !== rank(b)) return rank(a) - rank(b)
-    if (a.position !== b.position) return a.position - b.position
-    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1
-    return a.id < b.id ? -1 : 1
-  })
-}
-
-/** Position that appends a new wish at the bottom of one kind's queue. */
-export function nextWatchlistPosition(items: WatchlistItem[], key: ListKey): number {
-  let max = 0
-  for (const w of items) {
-    if (w.kind === key && w.position > max) max = w.position
-  }
-  return max + 1
-}
-
 // --- Deleting a list ---------------------------------------------------------
 
 /**
  * Drop everything belonging to one custom list from a store snapshot — the
  * local mirror of the DB cascade (`tier_lists` → `tier_items` → placements /
- * completions, and `tier_lists` → `watchlist_items`). Rows on other boards
- * are untouched; the list row itself is removed by the caller.
+ * completions). Rows on other boards are untouched; the list row itself is
+ * removed by the caller.
  */
 export function pruneList<
   S extends {
     items: TierItem[]
     placements: TierPlacement[]
     completions: TierCompletion[]
-    watchlist: WatchlistItem[]
   },
 >(state: S, listId: string): S {
   const key = listKeyFor(listId)
@@ -289,6 +231,5 @@ export function pruneList<
     items: state.items.filter((item) => item.kind !== key),
     placements: state.placements.filter((p) => !gone.has(p.itemId)),
     completions: state.completions.filter((c) => !gone.has(c.itemId)),
-    watchlist: state.watchlist.filter((w) => w.kind !== key),
   }
 }
