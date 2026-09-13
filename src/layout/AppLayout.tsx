@@ -8,14 +8,17 @@ import { supabase } from '../lib/supabase'
 import { Splash } from '../components/Splash'
 
 /** Top-level features behind the shell nav — one entry per feature, not one
- *  per route. Doing Stuff spans four routes and Tier Lists four kinds (an
- *  in-page picker chooses between them, see ListPicker); a match also claims
- *  its sub-paths (so /recipes/:id lights up Recipes — '/' is exempt or it
+ *  per route. Doing Stuff spans four routes, Tier Lists four boards, and Lists
+ *  three built-ins plus the space's own (an in-page picker chooses between
+ *  them, see PickerRow); a match also claims
+ *  its sub-paths (so /recipes/:id lights up Recipes, and every /lists/* route
+ *  lights up Lists — '/' is exempt or it
  *  would claim everything). The unbuilt placeholder routes (/french-toast,
  *  /board-games, /cats) still exist in App.tsx but are off the nav. */
 const FEATURES = [
   { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
   { label: 'Tier Lists', path: '/movies', matches: ['/movies', '/tv', '/books', '/ice-cream', '/tiers'] },
+  { label: 'Lists', path: '/lists/movies', matches: ['/lists'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
   { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },
@@ -27,7 +30,7 @@ const isActive = (matches: string[], pathname: string) =>
   matches.some((m) => m === pathname || (m !== '/' && pathname.startsWith(`${m}/`)))
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.
- *  Seven nav items need ~920px, so the drawer holds them until `md`. */
+ *  Eight nav items need ~980px, so the drawer holds them until `md`. */
 export function AppLayout({ children }: { children: ReactNode }) {
   const [navOpened, { toggle, close }] = useDisclosure(false)
   const { pathname } = useLocation()

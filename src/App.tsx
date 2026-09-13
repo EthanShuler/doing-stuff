@@ -20,6 +20,7 @@ const DoingStuffPage = lazy(() =>
 const TierListPage = lazy(() =>
   import('./features/tier-list/TierListPage').then((m) => ({ default: m.TierListPage })),
 )
+const ListsPage = lazy(() => import('./features/lists/ListsPage').then((m) => ({ default: m.ListsPage })))
 const SpoonsPage = lazy(() => import('./features/spoons/SpoonsPage').then((m) => ({ default: m.SpoonsPage })))
 const ParksPage = lazy(() => import('./features/parks/ParksPage').then((m) => ({ default: m.ParksPage })))
 const RecipesPage = lazy(() => import('./features/recipes/RecipesPage').then((m) => ({ default: m.RecipesPage })))
@@ -75,6 +76,14 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <TierListPage kind={kind} spaceId={spaceId} userId={userId} configured={configured} />
   )
 
+  // And again for the Lists feature: /lists/movies, /lists/tv, /lists/books
+  // and /lists/:id render one component, so its store survives switching
+  // lists. No kind = the free-form route, which reads the list id out of the
+  // URL.
+  const lists = (kind?: 'movie' | 'tv' | 'book') => (
+    <ListsPage kind={kind} spaceId={spaceId} userId={userId} configured={configured} />
+  )
+
   const recipes = <RecipesPage spaceId={spaceId} configured={configured} />
 
   return (
@@ -93,6 +102,14 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
               four above, so switching between them keeps the store alive; an
               unknown id redirects from inside the page (after its load). */}
           <Route path="/tiers/:id" element={tierList()} />
+          {/* Lists: the want-to lists. /lists on its own picks the first one. */}
+          <Route path="/lists" element={<Navigate to="/lists/movies" replace />} />
+          <Route path="/lists/movies" element={lists('movie')} />
+          <Route path="/lists/tv" element={lists('tv')} />
+          <Route path="/lists/books" element={lists('book')} />
+          {/* Space-defined lists. Same element type in the same slot as the
+              three above; an unknown id redirects from inside the page. */}
+          <Route path="/lists/:id" element={lists()} />
           <Route
             path="/french-toast"
             element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}

@@ -180,6 +180,69 @@ export interface TierPlacement {
   position: number
 }
 
+// --- Lists (the want-to lists: watchlist, reading list, free-form) -----------
+
+/**
+ * Which list a row is on: one of the three BUILT-IN lists, or
+ * `custom:<lists.id>` for a free-form list the space defined.
+ *
+ * Deliberately NOT `ListKey` — that names a tier BOARD (and its `list:` prefix
+ * points at a `tier_lists` row). A `custom:` ref points at a `lists` row, a
+ * different table entirely; the two must never be swapped by accident, so
+ * they're separate types with different prefixes.
+ *
+ * In the DB it's a `kind` column ('custom' for a free-form list) plus a
+ * nullable `list_id` — the lists feature's derive.ts converts (`refOf` /
+ * `kindColumn` / `listIdOf`).
+ */
+export type ListRef = 'movie' | 'tv' | 'book' | `custom:${string}`
+
+/**
+ * A free-form list the space defined ("Groceries") — one row in `lists`.
+ * Shared space data with the uniform member policy: either member can create,
+ * rename, or delete one, and deleting cascades its rows. It carries only a
+ * name and an emoji; all its other wording is templated (customListCopy in
+ * the lists copy.ts).
+ */
+export interface ListDef {
+  id: string
+  /** Display name, as typed: "Groceries". */
+  name: string
+  /** Single emoji for the picker pill. '' = 🏷️. */
+  emoji: string
+  /** auth.users id of the member who created it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; orders the picker pills. */
+  createdAt: string
+}
+
+/** One thing on a list — a row in `list_items`. */
+export interface ListItem {
+  id: string
+  /** Which list it's on (a built-in kind, or `custom:<id>` — see ListRef). */
+  key: ListRef
+  title: string
+  /** Poster/cover URL, pasted or filled from a title search. '' = none.
+   *  Free-form rows never show one. */
+  imageUrl: string
+  /** Who made it — author/director (per-kind label in the lists copy.ts).
+   *  On a free-form row this doubles as the optional NOTE line. '' = none. */
+  creator: string
+  /** Fractional queue position; lowest = next up (midpoint insertion on drag). */
+  position: number
+  /** The tier item this produced when checked off; null while still open.
+   *  Movie/TV/book only — deleting that tier item reopens the row (the DB's
+   *  `on delete set null`). */
+  tierItemId: string | null
+  /** Free-form rows only: the day it was done. null = still open. */
+  doneOn: string | null
+  /** auth.users id of the member who added it — the OWNER of a book row
+   *  (the reading list is per person). */
+  createdBy: string | null
+  /** ISO timestamp; the tiebreak when positions collide. */
+  createdAt: string
+}
+
 // --- Spoons (the souvenir spoon collection) ----------------------------------
 
 /** One physical souvenir spoon — one row in `spoons`. Shared space data. */

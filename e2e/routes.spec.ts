@@ -60,6 +60,31 @@ test('an unknown list id redirects to /movies', async ({ page }) => {
   await expect(page.getByText('Spirited Away')).toBeVisible()
 })
 
+test('/lists redirects to the movie watchlist', async ({ page }) => {
+  await page.goto('/lists')
+  await expect(page).toHaveURL('/lists/movies')
+  await expect(page.getByText('Dune: Part Two')).toBeVisible()
+})
+
+test('/lists/books shows only the viewer’s reading list', async ({ page }) => {
+  await page.goto('/lists/books')
+  // Seed: Priory is Avery's (the keyless viewer), Babel is Jordan's.
+  await expect(page.getByText('The Priory of the Orange Tree')).toBeVisible()
+  await expect(page.getByText('Babel')).toHaveCount(0)
+})
+
+test('/lists/:id renders a free-form list', async ({ page }) => {
+  // Seed list g1 is "Groceries".
+  await page.goto('/lists/g1')
+  await expect(page.getByText('Oat milk')).toBeVisible()
+})
+
+test('an unknown list id redirects to /lists/movies', async ({ page }) => {
+  await page.goto('/lists/nope')
+  await expect(page).toHaveURL('/lists/movies')
+  await expect(page.getByText('Dune: Part Two')).toBeVisible()
+})
+
 test('/spoons renders the spoon collection', async ({ page }) => {
   await page.goto('/spoons')
   await expect(page.getByText('Eiffel Tower')).toBeVisible()

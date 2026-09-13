@@ -10,7 +10,7 @@ export const PAGE_MAX_WIDTH = 1200
 
 /** Every feature page's outer frame: the page padding, ink color, and sans
  *  stack, plus the centered content column. One place to change the rhythm of
- *  all seven pages. */
+ *  all eight pages. */
 export function PageFrame({ children, maw = PAGE_MAX_WIDTH }: { children: ReactNode; maw?: number }) {
   return (
     <Box pt={30} pb={80} px={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
