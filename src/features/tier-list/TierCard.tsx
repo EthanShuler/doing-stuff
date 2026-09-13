@@ -1,76 +1,14 @@
-import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Box, Text } from '@mantine/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
 import { colors, fonts, shadows, text } from '../../theme'
-import { posterSrc } from '../../lib/imageUrl'
+import { MediaImage } from '../../components/MediaImage'
 
 /** Card footprint — constant so tier rows pack densely and wrap cleanly. */
 export const CARD_WIDTH = 76
 const POSTER_HEIGHT = 100
-
-/** A poster/cover image with a graceful emoji fallback for '' or broken URLs —
- *  shared by the board cards (full-width) and the watchlist rows (thumbnail).
- *  The broken state is remembered per URL, so pasting a new link retries. */
-export function MediaImage({
-  imageUrl,
-  title,
-  emoji,
-  width,
-  height,
-  radius = 0,
-  emojiSize = 26,
-  srcWidth,
-}: {
-  imageUrl: string
-  title: string
-  /** Kind emoji shown when there's no usable image (see KIND_COPY). */
-  emoji: string
-  width: number | string
-  height: number
-  radius?: number
-  emojiSize?: number
-  /** Rendered width in CSS px, used to ask the CDN for a right-sized file
-   *  (see posterSrc). Defaults to a numeric `width`, else the card width —
-   *  pass it explicitly whenever `width` is a percentage. */
-  srcWidth?: number
-}) {
-  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
-  if (!imageUrl || brokenUrl === imageUrl) {
-    return (
-      <Box
-        w={width}
-        h={height}
-        bg={colors.chip}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          borderRadius: radius,
-          fontSize: emojiSize,
-        }}
-      >
-        {emoji}
-      </Box>
-    )
-  }
-  // The rewritten src is a render-time detail; `brokenUrl` stays keyed on the
-  // STORED url so the retry-on-new-link behaviour doesn't depend on sizing.
-  return (
-    <img
-      src={posterSrc(imageUrl, srcWidth ?? (typeof width === 'number' ? width : CARD_WIDTH))}
-      alt={title}
-      onError={() => setBrokenUrl(imageUrl)}
-      draggable={false}
-      loading="lazy"
-      decoding="async"
-      style={{ width, height, objectFit: 'cover', borderRadius: radius, flexShrink: 0, display: 'block' }}
-    />
-  )
-}
 
 /** The plain card — used directly on the read-only partner board and inside
  *  the DragOverlay; SortableCard wraps it with the drag wiring. */

@@ -220,25 +220,6 @@ export function moveItem(
   return next
 }
 
-/**
- * Midpoint position for inserting between two neighbors (null = no neighbor
- * on that side). Returns null when float precision is exhausted — the caller
- * should then renormalize the whole tier instead.
- */
-export function positionBetween(before: number | null, after: number | null): number | null {
-  if (before === null && after === null) return 1
-  if (before === null) return (after as number) - 1
-  if (after === null) return before + 1
-  const mid = (before + after) / 2
-  if (mid <= before || mid >= after) return null
-  return mid
-}
-
-/** Rewrite a tier's ordering at clean integer positions (renormalize path). */
-export function renormalizedPositions(itemIds: string[]): { itemId: string; position: number }[] {
-  return itemIds.map((itemId, i) => ({ itemId, position: i + 1 }))
-}
-
 // --- Watchlist ordering -------------------------------------------------------
 // The list is a priority queue: open items sort by `position` (top = watch/
 // read/try next; drag to reorder via the same midpoint-insertion scheme as

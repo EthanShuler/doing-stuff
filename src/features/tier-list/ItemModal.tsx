@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
-import { Box, Group, TagsInput, Text, TextInput, UnstyledButton } from '@mantine/core'
+import { Box, Group, TagsInput, Text, TextInput } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 import type { ListKey, TierItem } from '../../types'
-import { colors, fonts, radii, shadows, text } from '../../theme'
+import { colors, fonts, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
-import { isTmdbConfigured, searchTmdb } from '../../lib/tmdb'
-import { searchOpenLibrary } from '../../lib/openLibrary'
+import { TitleSearchInput, canSearch } from '../../components/TitleSearchInput'
+import type { SearchKind } from '../../components/TitleSearchInput'
 import type { KindCopy } from './copy'
 import { CardVisual } from './TierCard'
 
@@ -25,19 +24,6 @@ export interface ItemDraft {
   tags: string[]
   /** Who made it — author/director/etc. (label per kind in copy.ts). Both
    *  variants: a watchlist row carries it onto the tier item on check-off. */
-  creator: string
-}
-
-/** One dropdown row, whichever provider it came from (TMDB or Open Library). */
-interface Suggestion {
-  key: string
-  title: string
-  /** Secondary line — release year for TMDB, "author · year" for books. */
-  meta: string
-  imageUrl: string
-  thumbUrl: string
-  /** Creator to prefill on pick — the author for books; '' for TMDB results
-   *  (its search response doesn't carry a director). */
   creator: string
 }
 
@@ -81,65 +67,9 @@ export function ItemModal({
   const isWatchlist = variant === 'watchlist'
 
   // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
-  // books (keyless, so always on). No provider covers ice cream — hand entry
-  // only. Only shown after the user actually types (so an edit modal opening
-  // with a full title doesn't pop the dropdown), and hidden again on blur or
-  // pick. Lookup is a convenience — hand-typed titles and pasted URLs work
-  // exactly as before.
-  const searchEnabled = kind === 'book' || ((kind === 'movie' || kind === 'tv') && isTmdbConfigured)
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-
-  useEffect(() => {
-    if (opened) {
-      setSuggestions([])
-      setShowSuggestions(false)
-    }
-  }, [opened])
-
-  useEffect(() => {
-    if (!opened || !showSuggestions || !searchEnabled) return
-    const query = draft.title.trim()
-    if (query.length < 2) {
-      setSuggestions([])
-      return
-    }
-    // Debounce, and drop responses that land after the query changed again.
-    let cancelled = false
-    const timer = setTimeout(async () => {
-      const results: Suggestion[] =
-        kind === 'book'
-          ? (await searchOpenLibrary(query)).map((b) => ({
-              key: b.id,
-              title: b.title,
-              meta: [b.author, b.year].filter(Boolean).join(' · '),
-              imageUrl: b.coverUrl,
-              thumbUrl: b.thumbUrl,
-              creator: b.author,
-            }))
-          : (await searchTmdb(kind as 'movie' | 'tv', query)).map((r) => ({
-              key: String(r.id),
-              title: r.title,
-              meta: r.year,
-              imageUrl: r.posterUrl,
-              thumbUrl: r.thumbUrl,
-              creator: '',
-            }))
-      if (!cancelled) setSuggestions(results)
-    }, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [draft.title, kind, opened, showSuggestions, searchEnabled])
-
-  const pickSuggestion = (result: Suggestion) => {
-    // Only overwrite the creator when the provider knows one, so a TMDB pick
-    // doesn't blank a hand-typed director.
-    onChange({ title: result.title, imageUrl: result.imageUrl, ...(result.creator ? { creator: result.creator } : {}) })
-    setSuggestions([])
-    setShowSuggestions(false)
-  }
+  // books (keyless, so always on). No provider covers ice cream or a
+  // space-defined list — hand entry only (see TitleSearchInput).
+  const searchKind: SearchKind = kind === 'movie' || kind === 'tv' || kind === 'book' ? kind : null
 
   const heading = isWatchlist
     ? isEditing
@@ -172,89 +102,26 @@ export function ItemModal({
     <ModalShell opened={opened} onClose={onClose} title={heading}>
       <Group gap={20} align="flex-start" wrap="nowrap">
         <Box flex={1}>
-          <Box pos="relative" mb={18}>
-            <TextInput
-              label="Title"
+          <Box mb={18}>
+            <TitleSearchInput
+              searchKind={searchKind}
               value={draft.title}
-              onChange={(e) => {
-                onChange({ title: e.currentTarget.value })
-                setShowSuggestions(true)
-              }}
-              onBlur={() => setShowSuggestions(false)}
+              onChange={(title) => onChange({ title })}
+              // Only overwrite the creator when the provider knows one, so a
+              // TMDB pick doesn't blank a hand-typed director.
+              onPick={(result) =>
+                onChange({
+                  title: result.title,
+                  imageUrl: result.imageUrl,
+                  ...(result.creator ? { creator: result.creator } : {}),
+                })
+              }
+              label="Title"
               // A custom list has no example title to suggest.
               placeholder={copy.example ? `e.g. ${copy.example}` : `Name of the ${noun}`}
-              data-autofocus
-              autoComplete="off"
+              autoFocus
+              emoji={copy.emoji}
             />
-            {showSuggestions && suggestions.length > 0 && (
-              <Box
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  left: 0,
-                  right: 0,
-                  zIndex: 30,
-                  background: colors.surface,
-                  border: `1px solid ${colors.cardBorder}`,
-                  borderRadius: radii.chip,
-                  boxShadow: shadows.popover,
-                  overflowY: 'auto',
-                  maxHeight: 264,
-                }}
-              >
-                {suggestions.map((result) => (
-                  <UnstyledButton
-                    key={result.key}
-                    // onMouseDown (with preventDefault) so the pick lands
-                    // before the input's blur hides the dropdown.
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      pickSuggestion(result)
-                    }}
-                    w="100%"
-                    px={10}
-                    py={7}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: fonts.sans }}
-                  >
-                    {result.thumbUrl ? (
-                      <img
-                        src={result.thumbUrl}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        style={{ width: 30, height: 44, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
-                      />
-                    ) : (
-                      <Box
-                        w={30}
-                        h={44}
-                        bg={colors.chip}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: 4,
-                          flexShrink: 0,
-                          fontSize: 15,
-                        }}
-                      >
-                        {copy.emoji}
-                      </Box>
-                    )}
-                    <Box>
-                      <Text fz={text.small} fw={600} c={colors.ink} lh={1.3}>
-                        {result.title}
-                      </Text>
-                      {result.meta && (
-                        <Text fz={text.caption} c={colors.faint}>
-                          {result.meta}
-                        </Text>
-                      )}
-                    </Box>
-                  </UnstyledButton>
-                ))}
-              </Box>
-            )}
           </Box>
           <TextInput
             label={copy.imageLabel}
@@ -296,7 +163,7 @@ export function ItemModal({
           )}
           <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>
             {hint}
-            {searchEnabled && ` ${copy.attribution}`}
+            {canSearch(searchKind) && ` ${copy.attribution}`}
           </Text>
         </Box>
         {/* No key: MediaImage already remembers "broken" per URL, so a new

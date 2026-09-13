@@ -25,9 +25,9 @@ import type { WatchlistItem } from '../../types'
 import { ACCENT, colors, fonts, shadows } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { EmptyCard } from '../../components/EmptyCard'
-import { positionBetween } from './derive'
+import { MediaImage } from '../../components/MediaImage'
+import { positionBetween } from '../../lib/order'
 import type { KindCopy } from './copy'
-import { MediaImage } from './TierCard'
 
 interface WatchlistProps {
   /** Already sorted for display (see sortWatchlist): the open queue on top —
