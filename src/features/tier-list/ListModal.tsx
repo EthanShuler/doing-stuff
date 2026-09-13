@@ -5,7 +5,7 @@ import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 
 /** The draft backing the new/edit list modal. A list configures WORDS only —
- *  its behavior is fixed to the ice-cream template (shared pool, S–F tiers, a
+ *  its behavior is fixed to one template (shared pool, S–F tiers, a
  *  "Not <past>" shelf, no dates). */
 export interface ListDraft {
   /** Display name: "Fruits". */
@@ -34,8 +34,8 @@ export const draftFromList = (list: TierList): ListDraft => ({
  * Create or re-word a space-defined tier list. Presentational: the page owns
  * the draft, the save, and the delete confirm.
  *
- * The past participle is the whole trick — "tried" gives an ice-cream shaped
- * list, "eaten" or "visited" reads just as naturally — so the modal previews
+ * The past participle is the whole trick — "tried" suits an ice-cream list,
+ * "eaten" or "visited" reads just as naturally — so the modal previews
  * the sentence it produces rather than explaining it.
  */
 export function ListModal({

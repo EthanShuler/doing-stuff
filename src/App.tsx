@@ -68,7 +68,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <DoingStuffPage screen={screen} spaceId={spaceId} userId={userId} configured={configured} />
   )
 
-  // Same trick for the tier lists: /movies, /tv, /books, /ice-cream and
+  // Same trick for the tier lists: /movies, /tv, /books and
   // /tiers/:id render one component, so its store survives switching boards —
   // the board just re-derives. No kind = the custom-list route, which reads
   // the list id out of the URL.
@@ -97,10 +97,10 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           <Route path="/movies" element={tierList('movie')} />
           <Route path="/tv" element={tierList('tv')} />
           <Route path="/books" element={tierList('book')} />
-          <Route path="/ice-cream" element={tierList('ice-cream')} />
-          {/* Space-defined boards. Same element type in the same slot as the
-              four above, so switching between them keeps the store alive; an
-              unknown id redirects from inside the page (after its load). */}
+          {/* Space-defined boards (ice cream lives here too). Same element
+              type in the same slot as the three above, so switching between
+              them keeps the store alive; an unknown id redirects from inside
+              the page (after its load). */}
           <Route path="/tiers/:id" element={tierList()} />
           {/* Lists: the want-to lists. /lists on its own picks the first one. */}
           <Route path="/lists" element={<Navigate to="/lists/movies" replace />} />

@@ -38,8 +38,7 @@ const emptyDraft = (): ItemDraft => ({
 })
 
 /** The built-in kinds whose want-to list lives in the Lists feature: what that
- *  list is called there, and its route. Ice cream and custom boards have none.
- *  (The routes land in Phase C; until then `*` redirects home.) */
+ *  list is called there, and its route. Custom boards have none. */
 const LIST_LINK: Partial<Record<TierKind, { label: string; path: string }>> = {
   movie: { label: 'Watchlist', path: '/lists/movies' },
   tv: { label: 'Watchlist', path: '/lists/tv' },

@@ -42,9 +42,14 @@ test('/books renders the book board', async ({ page }) => {
   await expect(page.getByText('Piranesi')).toBeVisible()
 })
 
-test('/ice-cream renders the ice cream board', async ({ page }) => {
-  await page.goto('/ice-cream')
+test('ice cream is a space-defined board at /tiers/:id, not a route of its own', async ({ page }) => {
+  // Seed list l0 is "Ice Cream" (🍦 / flavor / tried).
+  await page.goto('/tiers/l0')
   await expect(page.getByText('Mint chocolate chip')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Add flavor' })).toBeVisible()
+  // The old built-in route is gone — unknown paths redirect home.
+  await page.goto('/ice-cream')
+  await expect(page).toHaveURL('/')
 })
 
 test('/tiers/:id renders a space-defined board', async ({ page }) => {

@@ -27,7 +27,7 @@ import type { ProfileRow } from '../../data/spaceSync'
 // them. The placement actions take a `shared` flag and address those rows.
 //
 // The "we're done with this" date splits by kind (see datesArePersonal in
-// derive.ts): movies/TV/ice cream carry one SHARED `done_on` on the item;
+// derive.ts): movies/TV/custom lists carry one SHARED `done_on` on the item;
 // books ignore it and track each member's OWN `done_on` in
 // `tier_item_completions`. Same column name on both sides on purpose.
 
@@ -46,6 +46,9 @@ function seed(): Snapshot {
     // One space-defined list, so /tiers/:id and the picker are demoable
     // offline exactly like the built-ins.
     lists: [
+      // Ice cream is a space-defined list like any other (it used to be a
+      // built-in kind — the 2026-09-13 migration converted it).
+      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
       { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
       // A SHARED list too: one board both members rank (null-owner placements).
       { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', past: 'played', shared: true, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
@@ -69,13 +72,13 @@ function seed(): Snapshot {
       { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
       { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
       { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
-      // Ice cream: dates never show — doneOn is just the shared tried
+      // Ice cream (custom list l0): dates never show — doneOn is just the shared tried
       // marker (null = the Not tried shelf).
-      { id: 'i1', kind: 'ice-cream', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
-      { id: 'i2', kind: 'ice-cream', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
-      { id: 'i3', kind: 'ice-cream', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
-      { id: 'i4', kind: 'ice-cream', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
-      // The custom "Fruits" list — same shape as ice cream (shared tried
+      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
+      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
+      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
+      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
+      // The custom "Fruits" list — same shape as Ice Cream (shared tried
       // marker, no dates in the UI), keyed by `list:<id>` instead of a kind.
       { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
       { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
@@ -261,7 +264,7 @@ export interface TierListStore {
   /** Rewrite one tier's ordering at integer positions (float-precision rescue). */
   placeTier: (tier: Tier, orderedItemIds: string[], shared?: boolean) => Promise<void>
   /** Set or clear the pool item's SHARED done date (drag on/off the unwatched
-   *  shelf). Movies/TV/ice cream. Inline flow — records the error and resyncs
+   *  shelf). Movies/TV/custom lists. Inline flow — records the error and resyncs
    *  instead of throwing. */
   setSharedDoneOn: (itemId: string, doneOn: string | null) => Promise<void>
   /** Set or clear YOUR OWN completion of an item — a book's read record (drag

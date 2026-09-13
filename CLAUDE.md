@@ -13,7 +13,7 @@ the `ListPicker` pill row, and the Lists routes likewise share one "Lists"
 item. The three unbuilt placeholder routes are off the nav
 but still resolve. Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
-`/ice-cream`, and `/tiers/:id` (a space-defined board) are the **Tier Lists**
+and `/tiers/:id` (a space-defined board — ice cream lives here) are the **Tier Lists**
 feature; `/lists/movies`, `/lists/tv`, `/lists/books`, and `/lists/:id` (a
 free-form list) are the **Lists** feature (`/lists` redirects to
 `/lists/movies`); `/spoons` is the **Spoons**
@@ -49,17 +49,17 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`, `/tiers/:id`) —
+**Tier Lists** (`/movies`, `/tv`, `/books`, `/tiers/:id`) —
 drag-n-drop S/A/B/C/D/F boards — **tiers only**; the want-to queues are the
 separate Lists feature below, and each movie/TV/book board links to its list
-from the control bar. Five routes, ONE header nav item: which board
-you're on is chosen in-page by the `ListPicker` pill row (four built-ins, then
+from the control bar. Four routes, ONE header nav item: which board
+you're on is chosen in-page by the `ListPicker` pill row (three built-ins, then
 the space's own lists, then "+ New list" and — on a custom board — a faint
 "Edit list"). The domain model splits pool from opinion:
 
 - **Custom list** (`tier_lists`) — a board the space defines from the UI
-  ("Bugs", "Fruits"), shared data with the uniform RLS: either member can
-  create, re-word, or delete one. Behavior is **fixed to the ice-cream
+  ("Ice Cream", "Bugs", "Fruits"), shared data with the uniform RLS: either
+  member can create, re-word, or delete one. Behavior is **fixed to one
   template** (shared pool, S–F tiers, a "Not <past>" shelf, hand-pasted
   image URLs, no search provider, no visible dates), so the row carries
   WORDS — `name`, `emoji`, singular `noun`, `past` — which `customCopy()` in
@@ -79,19 +79,19 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   statement** and Postgres cascades the items (and every member's
   placements/completions of them); the store mirrors that with `pruneList()`.
   App-side a board is one **`ListKey`**: a `TierKind` or `` `list:${id}` ``
-  (`TierKind` itself stays a closed 4-member union). `copyFor(key, lists)`
+  (`TierKind` itself stays a closed 3-member union — movies/TV/books are built in only for their search providers and want-to lists; everything else, ice cream included, is a `tier_lists` row). `copyFor(key, lists)`
   resolves either into wording — and never throws for a list row that's gone,
   so a partner's tab survives the beat between a realtime DELETE and the
   `<Navigate>` back to `/movies`.
-- **Tier item** (`tier_items`) — a movie, show, book, ice cream flavor, or
+- **Tier item** (`tier_items`) — a movie, show, book, or
   custom-list item in the
-  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'|'custom'`
+  space's **shared pool** (a `kind 'movie'|'tv'|'book'|'custom'`
   column plus a nullable `list_id`, a
   title, a hand-pasted poster/cover `image_url`, a nullable `done_on` date —
   the SHARED "we finished it" date; defaults to today on a board add or a
   Lists check-off.
   Movies/TV only — books leave it null and use per-person completions instead,
-  and ice cream never shows a date: `done_on` is just its shared
+  and a custom list never shows a date: `done_on` is just its shared
   tried/not-tried marker, managed by dragging on/off the Not tried shelf
   (`usesDates: false` in the tier-list `copy.ts` hides the modal's date
   field) — and free-text
@@ -109,7 +109,7 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
   to integers if float precision ever runs out). "Unranked" is the absence of a
   placement row; an unplaced item with **no date for the viewer** lands on a
-  second dashed **Unwatched** (books: **Unread**, ice cream: **Not tried**)
+  second dashed **Unwatched** (books: **Unread**, custom lists: **Not tried**)
   shelf instead (a placement
   wins over a missing date). Dragging out of that shelf stamps today's date;
   dropping onto it unranks the card and clears the date. Both shelves are
@@ -133,7 +133,7 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   completion row and never touch the item's shared `done_on`.
   Same split RLS as placements (read everyone's, write only your own).
 
-All five routes render the same `TierListPage` (a `kind` prop for a built-in,
+All four routes render the same `TierListPage` (a `kind` prop for a built-in,
 the URL's list id for `/tiers/:id`), so the store —
 holding every kind plus all users' placements and completions — survives
 kind switches. A
@@ -590,7 +590,7 @@ src/
       ManageModal.tsx      categories & activities editor + home base
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
-    tier-list/             movie/TV/book/ice-cream + custom boards (one per route)
+    tier-list/             movie/TV/book + custom boards (ice cream is one)
       TierListPage.tsx     owns the store, You/Partner toggle, item modal state
       useTierListStore.ts  data seam: lists + pool + placements + completions CRUD
       derive.ts            board building, moveItem, list keys, shared boards, pruneList

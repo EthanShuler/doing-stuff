@@ -81,15 +81,17 @@ export interface WishlistItem {
   lng: number | null
 }
 
-// --- Tier lists (movies + TV + books + ice cream + custom lists) --------------
+// --- Tier lists (movies + TV + books + custom lists) --------------------------
 
-/** The four BUILT-IN boards, each with its own route and its own wording in
- *  the tier-list copy.ts. Stays a closed union — a space-defined list is a
- *  `TierList` row, not a new kind here. */
-export type TierKind = 'movie' | 'tv' | 'book' | 'ice-cream'
+/** The three BUILT-IN boards, each with its own route and its own wording in
+ *  the tier-list copy.ts. They're built in because each has a title-search
+ *  provider (TMDB / Open Library) and a want-to list in the Lists feature;
+ *  everything else (ice cream included) is a space-defined `TierList` row.
+ *  Stays a closed union. */
+export type TierKind = 'movie' | 'tv' | 'book'
 
 /**
- * Which board a pool item belongs to: one of the four built-ins, or
+ * Which board a pool item belongs to: one of the three built-ins, or
  * `list:<tier_lists.id>` for a space-defined one. This is the app-side key
  * only — in the DB it's a `kind` column ('custom' for a custom list) plus a
  * nullable `list_id`; the tier-list derive.ts converts
@@ -98,12 +100,13 @@ export type TierKind = 'movie' | 'tv' | 'book' | 'ice-cream'
 export type ListKey = TierKind | `list:${string}`
 
 /**
- * A space-defined tier list ("Bugs", "Fruits") — one row in `tier_lists`.
- * Shared space data like the item pool: either member can create, rename, or
- * delete one, and deleting cascades its items (and everyone's rankings of
- * them). Behavior is fixed to the ice-cream template — shared pool, S–F
- * tiers, a "Not <past>" shelf, no dates in the UI — so the row only carries
- * WORDS (see customCopy in the tier-list copy.ts).
+ * A space-defined tier list ("Ice Cream", "Bugs", "Fruits") — one row in
+ * `tier_lists`. Shared space data like the item pool: either member can
+ * create, rename, or delete one, and deleting cascades its items (and
+ * everyone's rankings of them). Behavior is fixed to one template — shared
+ * pool, S–F tiers, a "Not <past>" shelf, no dates in the UI, hand-pasted
+ * images — so the row carries WORDS (see customCopy in the tier-list copy.ts)
+ * plus the one `shared` behavior flag.
  */
 export interface TierList {
   id: string
@@ -128,7 +131,7 @@ export interface TierList {
 /** The fixed tier ladder — not user-editable. */
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
 
-/** A movie, show, book, ice cream, or custom-list item in the space's SHARED
+/** A movie, show, book, or custom-list item in the space's SHARED
  *  pool — one row in `tier_items`. */
 export interface TierItem {
   id: string
@@ -139,9 +142,9 @@ export interface TierItem {
   imageUrl: string
   /** The SHARED "we finished this" date, ISO ("YYYY-MM-DD"); null when unknown
    *  (legacy rows). Movies/TV only — books are read separately, so their dates
-   *  live per person in TierCompletion and this stays null. Ice cream shows no
-   *  dates in the UI, but reuses this as its shared "tried it" marker (null =
-   *  not tried; any date = tried). */
+   *  live per person in TierCompletion and this stays null. Custom lists show
+   *  no dates in the UI, but reuse this as their shared "tried it" marker
+   *  (null = not tried; any date = tried). */
   doneOn: string | null
   /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
   tags: string[]

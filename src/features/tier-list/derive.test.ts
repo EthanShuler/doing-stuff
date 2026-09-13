@@ -200,45 +200,14 @@ describe('deriveBoard for books', () => {
   })
 })
 
-// --- deriveBoard: ice cream (shared tried state, no visible dates) --------------
-
-describe('deriveBoard for ice cream', () => {
-  it('an untried flavor (null doneOn) sits on the Not tried shelf', () => {
-    const a = item({ kind: 'ice-cream', doneOn: null })
-    const board = deriveBoard([a], [], [], 'u1', 'ice-cream')
-    expect(board.unwatched).toEqual([a])
-    expect(board.unranked).toEqual([])
-  })
-
-  it('the tried marker is shared — both viewers see it off the shelf', () => {
-    const a = item({ kind: 'ice-cream', doneOn: '2026-06-07' })
-    expect(deriveBoard([a], [], [], 'u1', 'ice-cream').unranked).toEqual([a])
-    expect(deriveBoard([a], [], [], 'u2', 'ice-cream').unranked).toEqual([a])
-  })
-
-  it('ignores read records — only the shared marker rules', () => {
-    const a = item({ kind: 'ice-cream', doneOn: null })
-    const board = deriveBoard([a], [], [completion({ itemId: a.id, userId: 'u1' })], 'u1', 'ice-cream')
-    expect(board.unwatched).toEqual([a])
-  })
-
-  it('a placement wins over a missing tried marker', () => {
-    const a = item({ kind: 'ice-cream', doneOn: null })
-    const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'S' })], [], 'u1', 'ice-cream')
-    expect(board.tiers.S).toEqual([a])
-    expect(board.unwatched).toEqual([])
-  })
-})
-
 describe('datesArePersonal', () => {
   it('is true only for books', () => {
     expect(datesArePersonal('book')).toBe(true)
     expect(datesArePersonal('movie')).toBe(false)
     expect(datesArePersonal('tv')).toBe(false)
-    expect(datesArePersonal('ice-cream')).toBe(false)
   })
 
-  it('is false for a custom list — they follow the ice-cream template', () => {
+  it('is false for a custom list — ice cream and friends share one done marker', () => {
     expect(datesArePersonal('list:l1')).toBe(false)
   })
 })
@@ -254,12 +223,10 @@ describe('list key helpers', () => {
 
   it('reports no list id for a built-in kind', () => {
     expect(listIdOf('movie')).toBeNull()
-    expect(listIdOf('ice-cream')).toBeNull()
   })
 
   it('maps a key onto the row’s kind column', () => {
     expect(kindColumn('movie')).toBe('movie')
-    expect(kindColumn('ice-cream')).toBe('ice-cream')
     expect(kindColumn('list:l1')).toBe('custom')
   })
 
@@ -269,20 +236,20 @@ describe('list key helpers', () => {
   })
 
   it('kindColumn + listIdOf round-trip through keyOf', () => {
-    for (const key of ['movie', 'tv', 'book', 'ice-cream', 'list:l1'] as const) {
+    for (const key of ['movie', 'tv', 'book', 'list:l1'] as const) {
       expect(keyOf(kindColumn(key), listIdOf(key))).toBe(key)
     }
   })
 })
 
-// --- deriveBoard: a custom list (ice-cream behavior, keyed by list id) ---------
+// --- deriveBoard: a custom list (shared done marker, keyed by list id) ---------
 
 describe('deriveBoard for a custom list', () => {
   it('filters by the list key, ignoring other boards', () => {
     const mine = item({ kind: 'list:l1', doneOn: '2026-06-09' })
     const theirs = item({ kind: 'list:l2', doneOn: '2026-06-09' })
-    const flavor = item({ kind: 'ice-cream', doneOn: '2026-06-09' })
-    const board = deriveBoard([mine, theirs, flavor], [], [], 'u1', 'list:l1')
+    const movie = item({ kind: 'movie', doneOn: '2026-06-09' })
+    const board = deriveBoard([mine, theirs, movie], [], [], 'u1', 'list:l1')
     expect(board.unranked).toEqual([mine])
   })
 
@@ -313,7 +280,7 @@ describe('deriveBoard for a custom list', () => {
 describe('isSharedBoard', () => {
   it('is false for every built-in board', () => {
     const lists = [list({ shared: true })]
-    for (const key of ['movie', 'tv', 'book', 'ice-cream'] as const) {
+    for (const key of ['movie', 'tv', 'book'] as const) {
       expect(isSharedBoard(key, lists)).toBe(false)
     }
   })

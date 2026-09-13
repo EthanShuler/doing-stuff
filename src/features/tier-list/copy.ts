@@ -5,10 +5,10 @@ import { listIdOf } from './derive'
  * Per-kind wording + iconography, so the components stay kind-agnostic.
  * Movies and TV are "watched" (one shared date on the pool item — we watch
  * together); books are "read", and read state is per person (a
- * `tier_item_completions` row); ice cream is "tried" — shared like movies/TV,
- * but with no visible date (the item's shared `done_on` is just its
- * tried/not-tried marker). `datesArePersonal()` in derive.ts is the behavior
- * switch — this file is just the words.
+ * `tier_item_completions` row); a space-defined list ("Ice Cream") is
+ * "tried" — shared like movies/TV, but with no visible date (the item's
+ * shared `done_on` is just its tried/not-tried marker). `datesArePersonal()`
+ * in derive.ts is the behavior switch — this file is just the words.
  */
 export interface KindCopy {
   /** Browser-tab / nav title for the kind's route. */
@@ -82,27 +82,14 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
       'New books land on your unranked shelf — or Unread with no date. Read dates are per person; your partner marks their own.',
     attribution: 'Book search by Open Library.',
   },
-  'ice-cream': {
-    pageTitle: 'Ice Cream',
-    usesDates: false,
-    noun: 'flavor',
-    emoji: '🍦',
-    example: 'Mint chocolate chip',
-    imageLabel: 'Photo URL',
-    creatorLabel: 'Brand or shop',
-    shelfLabel: 'Not tried',
-    past: 'tried',
-    dateLabel: 'Tried on',
-    boardHint: "New flavors land on both of your unranked shelves — drag one to Not tried if you haven't had it yet.",
-    attribution: '',
-  },
 }
 
 // --- Space-defined lists ------------------------------------------------------
-// A custom list has no entry above: its behavior is fixed to the ice-cream
-// template (shared pool, no visible dates, hand-pasted image URLs, no search
-// provider) and its WORDS come from the `tier_lists` row. So the copy is
-// templated here rather than stored.
+// A custom list has no entry above: its behavior is fixed to one template
+// (shared pool, no visible dates, hand-pasted image URLs, no search provider
+// — the shape ice cream had when it was built in) and its WORDS come from the
+// `tier_lists` row. So the copy is templated here rather than stored. Only
+// movies/TV/books stay built in, for their search providers and want-to lists.
 
 /** Capitalize a lowercase participle for a sentence start ("tried" → "Tried"). */
 const capitalize = (word: string): string => (word ? word[0].toUpperCase() + word.slice(1) : word)
@@ -115,8 +102,8 @@ export function customCopy(list: TierList): KindCopy {
   const { name, noun, past, shared } = list
   return {
     pageTitle: name,
-    // Custom lists follow ice cream: the shared done date is only a
-    // done/not-done marker, managed by dragging on and off the shelf.
+    // On a custom list the shared done date is only a done/not-done marker,
+    // managed by dragging on and off the shelf.
     usesDates: false,
     noun,
     emoji: list.emoji || LIST_EMOJI,
