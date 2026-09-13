@@ -68,7 +68,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
   )
 
   // Same trick for the tier lists: /movies, /tv, /books, /ice-cream and
-  // /lists/:id render one component, so its store survives switching boards —
+  // /tiers/:id render one component, so its store survives switching boards —
   // the board just re-derives. No kind = the custom-list route, which reads
   // the list id out of the URL.
   const tierList = (kind?: TierKind) => (
@@ -92,7 +92,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           {/* Space-defined boards. Same element type in the same slot as the
               four above, so switching between them keeps the store alive; an
               unknown id redirects from inside the page (after its load). */}
-          <Route path="/lists/:id" element={tierList()} />
+          <Route path="/tiers/:id" element={tierList()} />
           <Route
             path="/french-toast"
             element={<ComingSoon title="French toast" blurb="The definitive french toast ranking, coming soon." />}

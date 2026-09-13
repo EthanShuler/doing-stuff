@@ -17,13 +17,11 @@ export interface ItemDraft {
    *  unread shelf until it's dated or dragged into a tier). For movies/TV this
    *  is the item's shared done date; for books it's the EDITOR's own one;
    *  dateless kinds (ice cream) show no field and just pass the existing
-   *  tried marker through unchanged. Board items only — list items aren't
-   *  started yet, so the field is hidden. */
+   *  tried marker through unchanged. */
   doneOn: string
-  /** Shared filter labels ("disney", "fantasy"). Board items only. */
+  /** Shared filter labels ("disney", "fantasy"). */
   tags: string[]
-  /** Who made it — author/director/etc. (label per kind in copy.ts). Both
-   *  variants: a watchlist row carries it onto the tier item on check-off. */
+  /** Who made it — author/director/etc. (label per kind in copy.ts). */
   creator: string
 }
 
@@ -33,7 +31,6 @@ export function ItemModal({
   copy,
   draft,
   isEditing,
-  variant = 'board',
   tagSuggestions = [],
   onChange,
   saving,
@@ -50,9 +47,6 @@ export function ItemModal({
   copy: KindCopy
   draft: ItemDraft
   isEditing: boolean
-  /** 'board' adds straight to the tier pool; 'watchlist' adds a "want to watch"
-   *  item that only reaches the board once it's checked off. Just tweaks copy. */
-  variant?: 'board' | 'watchlist'
   /** Tags already used on this kind's items, offered as autocomplete options
    *  so spellings converge instead of forking ("Disney" vs "disney"). */
   tagSuggestions?: string[]
@@ -64,23 +58,14 @@ export function ItemModal({
 }) {
   const noun = copy.noun
   const canSave = Boolean(draft.title.trim())
-  const isWatchlist = variant === 'watchlist'
 
   // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
   // books (keyless, so always on). No provider covers ice cream or a
   // space-defined list — hand entry only (see TitleSearchInput).
   const searchKind: SearchKind = kind === 'movie' || kind === 'tv' || kind === 'book' ? kind : null
 
-  const heading = isWatchlist
-    ? isEditing
-      ? `Edit ${copy.listLabel.toLowerCase()} item`
-      : `Add a ${noun} to ${copy.verb}`
-    : isEditing
-      ? `Edit ${noun}`
-      : `Add a ${noun}`
-  const hint = isWatchlist ? copy.listHint : copy.boardHint
-  const saveLabel = isEditing ? 'Save changes' : isWatchlist ? `Add to ${copy.listLabel.toLowerCase()}` : `Add ${noun}`
-  const deleteLabel = isWatchlist ? `Remove from ${copy.listLabel.toLowerCase()}` : `Delete ${noun}`
+  const heading = isEditing ? `Edit ${noun}` : `Add a ${noun}`
+  const saveLabel = isEditing ? 'Save changes' : `Add ${noun}`
 
   // Live preview of the card exactly as it will render on the board. The
   // image URL is debounced so typing or pasting a link fires one request when
@@ -135,34 +120,30 @@ export function ItemModal({
             value={draft.creator}
             onChange={(e) => onChange({ creator: e.currentTarget.value })}
             placeholder="Optional"
-            mb={isWatchlist ? 6 : 18}
+            mb={18}
           />
-          {!isWatchlist && (
-            <>
-              {/* Dateless kinds (ice cream) get no field here: tried/not-tried
-                  is managed by dragging on/off the shelf, and the draft passes
-                  the existing marker through untouched. */}
-              {copy.usesDates && (
-                <TextInput
-                  label={copy.dateLabel}
-                  type="date"
-                  value={draft.doneOn}
-                  onChange={(e) => onChange({ doneOn: e.currentTarget.value })}
-                  mb={18}
-                />
-              )}
-              <TagsInput
-                label="Tags"
-                value={draft.tags}
-                onChange={(tags) => onChange({ tags })}
-                data={tagSuggestions}
-                placeholder={draft.tags.length === 0 ? 'e.g. fantasy, disney (optional)' : undefined}
-                mb={6}
-              />
-            </>
+          {/* Dateless kinds (ice cream) get no field here: tried/not-tried is
+              managed by dragging on/off the shelf, and the draft passes the
+              existing marker through untouched. */}
+          {copy.usesDates && (
+            <TextInput
+              label={copy.dateLabel}
+              type="date"
+              value={draft.doneOn}
+              onChange={(e) => onChange({ doneOn: e.currentTarget.value })}
+              mb={18}
+            />
           )}
+          <TagsInput
+            label="Tags"
+            value={draft.tags}
+            onChange={(tags) => onChange({ tags })}
+            data={tagSuggestions}
+            placeholder={draft.tags.length === 0 ? 'e.g. fantasy, disney (optional)' : undefined}
+            mb={6}
+          />
           <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>
-            {hint}
+            {copy.boardHint}
             {canSearch(searchKind) && ` ${copy.attribution}`}
           </Text>
         </Box>
@@ -180,7 +161,7 @@ export function ItemModal({
         confirmDisabled={!canSave}
         loading={saving}
         onDelete={isEditing ? onDelete : undefined}
-        deleteLabel={deleteLabel}
+        deleteLabel={`Delete ${noun}`}
       />
     </ModalShell>
   )

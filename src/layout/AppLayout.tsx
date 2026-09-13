@@ -15,7 +15,7 @@ import { Splash } from '../components/Splash'
  *  /board-games, /cats) still exist in App.tsx but are off the nav. */
 const FEATURES = [
   { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
-  { label: 'Tier Lists', path: '/movies', matches: ['/movies', '/tv', '/books', '/ice-cream', '/lists'] },
+  { label: 'Tier Lists', path: '/movies', matches: ['/movies', '/tv', '/books', '/ice-cream', '/tiers'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
   { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },

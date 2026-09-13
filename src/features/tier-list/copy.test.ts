@@ -7,7 +7,6 @@ const list = (over: Partial<TierList> = {}): TierList => ({
   name: 'Fruits',
   emoji: '🍎',
   noun: 'fruit',
-  verb: 'try',
   past: 'tried',
   createdBy: 'u1',
   createdAt: '2026-06-09T09:00:00Z',
@@ -15,22 +14,19 @@ const list = (over: Partial<TierList> = {}): TierList => ({
 })
 
 describe('customCopy', () => {
-  it('templates the shelf and list labels from the list’s words', () => {
+  it('templates the shelf and date labels from the list’s words', () => {
     const copy = customCopy(list())
     expect(copy.pageTitle).toBe('Fruits')
     expect(copy.noun).toBe('fruit')
     expect(copy.shelfLabel).toBe('Not tried')
-    expect(copy.listLabel).toBe('To-try list')
-    expect(copy.pastCap).toBe('Tried')
+    expect(copy.dateLabel).toBe('Tried on')
   })
 
   it('reads naturally with other grammar', () => {
-    const copy = customCopy(list({ name: 'Cheeses', noun: 'cheese', verb: 'eat', past: 'eaten' }))
+    const copy = customCopy(list({ name: 'Cheeses', noun: 'cheese', past: 'eaten' }))
     expect(copy.shelfLabel).toBe('Not eaten')
-    expect(copy.listLabel).toBe('To-eat list')
-    expect(copy.pastCap).toBe('Eaten')
-    expect(copy.listEmptyTitle).toBe('Nothing to eat yet')
-    expect(copy.listEmptyBlurb).toContain('a cheese you both want to eat')
+    expect(copy.dateLabel).toBe('Eaten on')
+    expect(copy.boardHint).toContain('Not eaten')
   })
 
   it('follows the ice-cream template: no dates, no search provider, no example', () => {

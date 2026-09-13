@@ -41,7 +41,7 @@ export function ListPicker({
     ...lists.map((list) => ({
       key: listKeyFor(list.id),
       label: `${list.emoji || '🏷️'} ${list.name}`,
-      path: `/lists/${list.id}`,
+      path: `/tiers/${list.id}`,
     })),
   ]
 

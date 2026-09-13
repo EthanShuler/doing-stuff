@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TierItem, TierPlacement, TierCompletion, WatchlistItem } from '../../types'
+import type { TierItem, TierPlacement, TierCompletion } from '../../types'
 import {
   TIERS,
   datesArePersonal,
@@ -10,13 +10,10 @@ import {
   keyOf,
   kindColumn,
   listIdOf,
-  listIsPersonal,
   listKeyFor,
   moveItem,
-  nextWatchlistPosition,
   normalizeTags,
   pruneList,
-  sortWatchlist,
   tierSwatch,
 } from './derive'
 import { palette } from '../../theme'
@@ -50,22 +47,6 @@ function placement(over: Partial<TierPlacement> = {}): TierPlacement {
 function completion(over: Partial<TierCompletion> = {}): TierCompletion {
   seq += 1
   return { id: `r${seq}`, itemId: 'i1', userId: 'u1', doneOn: '2026-06-20', ...over }
-}
-
-function wish(over: Partial<WatchlistItem> = {}): WatchlistItem {
-  seq += 1
-  return {
-    id: `w${seq}`,
-    kind: 'movie',
-    title: `Wish ${seq}`,
-    imageUrl: '',
-    creator: '',
-    position: seq,
-    tierItemId: null,
-    createdBy: 'u1',
-    createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
-    ...over,
-  }
 }
 
 // --- deriveBoard ---------------------------------------------------------------
@@ -246,19 +227,6 @@ describe('datesArePersonal', () => {
 
   it('is false for a custom list — they follow the ice-cream template', () => {
     expect(datesArePersonal('list:l1')).toBe(false)
-  })
-})
-
-describe('listIsPersonal', () => {
-  it('is true only for books — reading lists are per person', () => {
-    expect(listIsPersonal('book')).toBe(true)
-    expect(listIsPersonal('movie')).toBe(false)
-    expect(listIsPersonal('tv')).toBe(false)
-    expect(listIsPersonal('ice-cream')).toBe(false)
-  })
-
-  it('is false for a custom list — its to-do list is shared', () => {
-    expect(listIsPersonal('list:l1')).toBe(false)
   })
 })
 
@@ -454,72 +422,10 @@ describe('moveItem', () => {
   })
 })
 
-// --- watchlist ordering ------------------------------------------------------------
-
-describe('sortWatchlist', () => {
-  it('orders open items by position (top = next up)', () => {
-    const second = wish({ position: 2 })
-    const first = wish({ position: 1 })
-    expect(sortWatchlist([second, first]).map((w) => w.id)).toEqual([first.id, second.id])
-  })
-
-  it('fractional positions land between their neighbors', () => {
-    const a = wish({ position: 1 })
-    const b = wish({ position: 2 })
-    const between = wish({ position: 1.5 })
-    expect(sortWatchlist([a, b, between]).map((w) => w.id)).toEqual([a.id, between.id, b.id])
-  })
-
-  it('checked-off items sink below open ones, keeping their queue order', () => {
-    const doneLate = wish({ position: 3, tierItemId: 'x' })
-    const open = wish({ position: 2 })
-    const doneEarly = wish({ position: 1, tierItemId: 'y' })
-    expect(sortWatchlist([doneLate, open, doneEarly]).map((w) => w.id)).toEqual([
-      open.id,
-      doneEarly.id,
-      doneLate.id,
-    ])
-  })
-
-  it('ties (e.g. legacy rows all at 0) break by createdAt, oldest first', () => {
-    const newer = wish({ position: 0, createdAt: '2026-06-02T00:00:00Z' })
-    const older = wish({ position: 0, createdAt: '2026-06-01T00:00:00Z' })
-    expect(sortWatchlist([newer, older]).map((w) => w.id)).toEqual([older.id, newer.id])
-  })
-
-  it('never mutates the input', () => {
-    const input = [wish({ position: 2 }), wish({ position: 1 })]
-    const ids = input.map((w) => w.id)
-    sortWatchlist(input)
-    expect(input.map((w) => w.id)).toEqual(ids)
-  })
-})
-
-describe('nextWatchlistPosition', () => {
-  it('appends after the kind’s highest position', () => {
-    const items = [wish({ position: 4 }), wish({ position: 1.5 })]
-    expect(nextWatchlistPosition(items, 'movie')).toBe(5)
-  })
-
-  it('ignores other kinds', () => {
-    const items = [wish({ kind: 'tv', position: 9 }), wish({ kind: 'movie', position: 2 })]
-    expect(nextWatchlistPosition(items, 'movie')).toBe(3)
-  })
-
-  it('starts an empty list at 1', () => {
-    expect(nextWatchlistPosition([], 'movie')).toBe(1)
-  })
-
-  it('queues a custom list separately from the built-ins', () => {
-    const items = [wish({ kind: 'movie', position: 9 }), wish({ kind: 'list:l1', position: 2 })]
-    expect(nextWatchlistPosition(items, 'list:l1')).toBe(3)
-  })
-})
-
 // --- deleting a list ----------------------------------------------------------
 
 describe('pruneList', () => {
-  it('removes the list’s items, their placements and completions, and its wishes', () => {
+  it('removes the list’s items and their placements and completions', () => {
     const mine = item({ kind: 'list:l1' })
     const alsoMine = item({ kind: 'list:l1' })
     const other = item({ kind: 'movie' })
@@ -531,23 +437,21 @@ describe('pruneList', () => {
         placement({ itemId: other.id, userId: 'u1' }),
       ],
       completions: [completion({ itemId: alsoMine.id }), completion({ itemId: other.id })],
-      watchlist: [wish({ kind: 'list:l1' }), wish({ kind: 'movie' })],
     }
     const next = pruneList(state, 'l1')
     expect(next.items).toEqual([other])
     expect(next.placements.map((p) => p.itemId)).toEqual([other.id])
     expect(next.completions.map((c) => c.itemId)).toEqual([other.id])
-    expect(next.watchlist.map((w) => w.kind)).toEqual(['movie'])
   })
 
   it('leaves another list alone', () => {
     const keep = item({ kind: 'list:l2' })
-    const next = pruneList({ items: [keep], placements: [], completions: [], watchlist: [] }, 'l1')
+    const next = pruneList({ items: [keep], placements: [], completions: [] }, 'l1')
     expect(next.items).toEqual([keep])
   })
 
   it('never mutates the input', () => {
-    const state = { items: [item({ kind: 'list:l1' })], placements: [], completions: [], watchlist: [] }
+    const state = { items: [item({ kind: 'list:l1' })], placements: [], completions: [] }
     const before = state.items.length
     pruneList(state, 'l1')
     expect(state.items.length).toBe(before)

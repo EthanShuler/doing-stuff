@@ -47,15 +47,15 @@ test('/ice-cream renders the ice cream board', async ({ page }) => {
   await expect(page.getByText('Mint chocolate chip')).toBeVisible()
 })
 
-test('/lists/:id renders a space-defined board', async ({ page }) => {
+test('/tiers/:id renders a space-defined board', async ({ page }) => {
   // Seed list l1 is "Fruits" (🍎 / fruit / try / tried).
-  await page.goto('/lists/l1')
+  await page.goto('/tiers/l1')
   await expect(page.getByText('Mango')).toBeVisible()
   await expect(page.getByRole('button', { name: '+ Add fruit' })).toBeVisible()
 })
 
 test('an unknown list id redirects to /movies', async ({ page }) => {
-  await page.goto('/lists/nope')
+  await page.goto('/tiers/nope')
   await expect(page).toHaveURL('/movies')
   await expect(page.getByText('Spirited Away')).toBeVisible()
 })

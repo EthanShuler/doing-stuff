@@ -89,10 +89,10 @@ export interface WishlistItem {
 export type TierKind = 'movie' | 'tv' | 'book' | 'ice-cream'
 
 /**
- * Which board a pool item or watchlist row belongs to: one of the four
- * built-ins, or `list:<tier_lists.id>` for a space-defined one. This is the
- * app-side key only — in the DB it's a `kind` column ('custom' for a custom
- * list) plus a nullable `list_id`; the tier-list derive.ts converts
+ * Which board a pool item belongs to: one of the four built-ins, or
+ * `list:<tier_lists.id>` for a space-defined one. This is the app-side key
+ * only — in the DB it's a `kind` column ('custom' for a custom list) plus a
+ * nullable `list_id`; the tier-list derive.ts converts
  * (`keyOf` / `kindColumn` / `listIdOf`).
  */
 export type ListKey = TierKind | `list:${string}`
@@ -101,10 +101,9 @@ export type ListKey = TierKind | `list:${string}`
  * A space-defined tier list ("Bugs", "Fruits") — one row in `tier_lists`.
  * Shared space data like the item pool: either member can create, rename, or
  * delete one, and deleting cascades its items (and everyone's rankings of
- * them) plus its to-try list. Behavior is fixed to the ice-cream template —
- * shared pool, S–F tiers, a "Not <past>" shelf, a shared to-<verb> list, no
- * dates in the UI — so the row only carries WORDS (see customCopy in the
- * tier-list copy.ts).
+ * them). Behavior is fixed to the ice-cream template — shared pool, S–F
+ * tiers, a "Not <past>" shelf, no dates in the UI — so the row only carries
+ * WORDS (see customCopy in the tier-list copy.ts).
  */
 export interface TierList {
   id: string
@@ -114,8 +113,6 @@ export interface TierList {
   emoji: string
   /** Lowercase singular noun used inline: "Add a fruit". */
   noun: string
-  /** Infinitive: "to-try list", "Add a fruit to try". */
-  verb: string
   /** Past participle, lowercase: the "Not tried" shelf. */
   past: string
   /** auth.users id of the member who created it (null for legacy rows). */
@@ -181,34 +178,6 @@ export interface TierPlacement {
   tier: Tier
   /** Fractional ordering within the tier (midpoint insertion on drop). */
   position: number
-}
-
-/**
- * A "want to watch" (or, for books, "want to read") item in the space's SHARED
- * watchlist — one row in `watchlist_items`. Checking it off creates a
- * `tier_items` row in the pool and links to it via `tierItemId` (null = still
- * open). The whole list is shared, so any member can add / edit / check off.
- */
-export interface WatchlistItem {
-  id: string
-  /** Which list it's on (a built-in kind, or `list:<id>` — see ListKey). */
-  kind: ListKey
-  title: string
-  /** Optional poster/cover URL; carried onto the tier card when checked off. '' = none. */
-  imageUrl: string
-  /** Who made it — author/director/etc. (per-kind label in copy.ts). Carried
-   *  onto the tier item when checked off, like the image. '' = unknown. */
-  creator: string
-  /** Queue order within the kind's list — top (lowest) = watch next.
-   *  Fractional midpoint insertion on drag reorder; new items append at the
-   *  end (max + 1). */
-  position: number
-  /** The tier item this produced when checked off; null while still "want to watch". */
-  tierItemId: string | null
-  /** auth.users id of the member who added it (null for legacy rows). */
-  createdBy: string | null
-  /** ISO timestamp; tiebreak ordering for same-position rows. */
-  createdAt: string
 }
 
 // --- Spoons (the souvenir spoon collection) ----------------------------------
