@@ -81,7 +81,9 @@ export function TierBoard({
   cardEmoji: string
   shelfHint?: string
   unwatchedHint?: string
-  unwatchedLabel?: string
+  /** null on a board with no second shelf (a custom list) — BoardView then
+   *  renders only the unranked one, so no drag can reach 'unwatched'. */
+  unwatchedLabel: string | null
   openShelves: ShelfOpenState
   onToggleShelf: (shelf: ShelfId) => void
 }) {

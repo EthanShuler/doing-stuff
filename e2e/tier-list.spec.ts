@@ -9,11 +9,10 @@ import { boardShelf, openShelf, pickList, pickSegment, tierRow } from './helpers
 //   Everything Everywhere is dated with no Avery placement (→ her Unranked).
 // - Books: read state is per person — Project Hail Mary is ranked A by Avery
 //   (she read it) but Unread for Jordan.
-// - Ice cream is a CUSTOM list (seed l0, /tiers/l0): no dates in the UI — the
-//   item’s shared doneOn is just the tried marker.
-//   Rum raisin is untried (→ Not tried for both); Strawberry cheesecake is
-//   tried but unranked by Avery.
-// - Both shelves under the tiers start COLLAPSED (heading + count only), so a
+// - Ice cream is a CUSTOM list (seed l0, /tiers/l0): no dates in the UI and no
+//   second shelf — Rum raisin and Strawberry cheesecake are both simply
+//   unranked for Avery.
+// - The shelves under the tiers start COLLAPSED (heading + count only), so a
 //   test that reads a shelf's cards expands it first with openShelf().
 
 test('movie board derives tiers and shelves for the viewer', async ({ page }) => {
@@ -89,18 +88,19 @@ test('book read state is per person (Unread shelf differs by viewer)', async ({ 
   await expect(boardShelf(page, 'unwatched').getByText('Project Hail Mary')).toBeVisible()
 })
 
-test('ice cream board splits tried/not-tried with no dates shown', async ({ page }) => {
+test('ice cream board has one shelf and no dates', async ({ page }) => {
   await page.goto('/tiers/l0')
   await expect(tierRow(page, 'S').getByText('Mint chocolate chip')).toBeVisible()
-  await openShelf(page, 'unranked')
-  await openShelf(page, 'unwatched')
-  await expect(boardShelf(page, 'unranked').getByText('Strawberry cheesecake')).toBeVisible()
-  await expect(boardShelf(page, 'unwatched').getByText('Not tried')).toBeVisible()
-  await expect(boardShelf(page, 'unwatched').getByText('Rum raisin')).toBeVisible()
+  // A custom list has no second shelf at all.
+  await expect(boardShelf(page, 'unwatched')).toHaveCount(0)
 
-  // The tried marker is shared: Rum raisin is Not tried for Jordan too.
+  // Everything Avery hasn't ranked sits in Unranked, dated or not.
+  await openShelf(page, 'unranked')
+  await expect(boardShelf(page, 'unranked').getByText('Strawberry cheesecake')).toBeVisible()
+  await expect(boardShelf(page, 'unranked').getByText('Rum raisin')).toBeVisible()
+
   await pickSegment(page, 'Jordan')
-  await expect(boardShelf(page, 'unwatched').getByText('Rum raisin')).toBeVisible()
+  await expect(boardShelf(page, 'unwatched')).toHaveCount(0)
   await expect(tierRow(page, 'A').getByText('Mint chocolate chip')).toBeVisible()
 })
 
@@ -153,8 +153,8 @@ test('tag pills cycle include → exclude → off', async ({ page }) => {
 })
 
 // --- custom lists ------------------------------------------------------------
-// Seed list l1 is "Fruits": Mango tried + ranked S by Avery, Durian untried
-// (→ Not tried), and Honeycrisp apple tried but unranked.
+// Seed list l1 is "Fruits": Mango ranked S by Avery; Durian and Honeycrisp
+// apple both unranked (a custom list has no second shelf).
 
 test('the picker reaches a space-defined board without leaving the page', async ({ page }) => {
   await page.goto('/movies')
@@ -163,19 +163,16 @@ test('the picker reaches a space-defined board without leaving the page', async 
 
   await expect(tierRow(page, 'S').getByText('Mango')).toBeVisible()
   await openShelf(page, 'unranked')
-  await openShelf(page, 'unwatched')
   await expect(boardShelf(page, 'unranked').getByText('Honeycrisp apple')).toBeVisible()
-  // A custom list has a "Not <past>" shelf.
-  await expect(boardShelf(page, 'unwatched').getByText('Not tried')).toBeVisible()
-  await expect(boardShelf(page, 'unwatched').getByText('Durian')).toBeVisible()
+  await expect(boardShelf(page, 'unranked').getByText('Durian')).toBeVisible()
+  await expect(boardShelf(page, 'unwatched')).toHaveCount(0)
 })
 
 /** The You/Partner toggle's partner tab (Mantine's SegmentedControl label). */
 const partnerTab = (page: Page) => page.locator('.mantine-SegmentedControl-label').filter({ hasText: /^Jordan$/ })
 
 // Seed list l2 is "Board games", flagged SHARED: one board for the space
-// (null-owner placements) — Catan S, Wingspan unranked, Twilight Imperium
-// Not played.
+// (null-owner placements) — Catan S, Wingspan and Twilight Imperium unranked.
 test('a shared list shows one board for both members, with no You/Partner toggle', async ({ page }) => {
   await page.goto('/movies')
   await expect(partnerTab(page)).toBeVisible()
@@ -189,10 +186,8 @@ test('a shared list shows one board for both members, with no You/Partner toggle
   // The shared ranking, not anyone's personal one.
   await expect(tierRow(page, 'S').getByText('Catan')).toBeVisible()
   await openShelf(page, 'unranked')
-  await openShelf(page, 'unwatched')
   await expect(boardShelf(page, 'unranked').getByText('Wingspan')).toBeVisible()
-  await expect(boardShelf(page, 'unwatched').getByText('Not played')).toBeVisible()
-  await expect(boardShelf(page, 'unwatched').getByText('Twilight Imperium')).toBeVisible()
+  await expect(boardShelf(page, 'unranked').getByText('Twilight Imperium')).toBeVisible()
 
   // The flag is editable, and the add hint speaks of one shelf.
   await page.getByRole('button', { name: 'Edit list' }).click()

@@ -7,6 +7,7 @@ import {
   distinctTags,
   filterByTags,
   findContainer,
+  hasUndatedShelf,
   isSharedBoard,
   keyOf,
   kindColumn,
@@ -52,7 +53,7 @@ function completion(over: Partial<TierCompletion> = {}): TierCompletion {
 }
 
 function list(over: Partial<TierList> = {}): TierList {
-  return { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z', ...over }
+  return { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z', ...over }
 }
 
 // --- deriveBoard ---------------------------------------------------------------
@@ -242,7 +243,7 @@ describe('list key helpers', () => {
   })
 })
 
-// --- deriveBoard: a custom list (shared done marker, keyed by list id) ---------
+// --- deriveBoard: a custom list (no dates at all, keyed by list id) ------------
 
 describe('deriveBoard for a custom list', () => {
   it('filters by the list key, ignoring other boards', () => {
@@ -253,7 +254,7 @@ describe('deriveBoard for a custom list', () => {
     expect(board.unranked).toEqual([mine])
   })
 
-  it('splits on the SHARED done date and ignores completions', () => {
+  it('has no second shelf: every unplaced item is unranked, dated or not', () => {
     const done = item({ kind: 'list:l1', doneOn: '2026-06-09' })
     const notYet = item({ kind: 'list:l1', doneOn: null })
     const board = deriveBoard(
@@ -263,19 +264,27 @@ describe('deriveBoard for a custom list', () => {
       'u1',
       'list:l1',
     )
-    expect(board.unranked).toEqual([done])
-    expect(board.unwatched).toEqual([notYet])
+    expect(board.unranked.map((i) => i.id).sort()).toEqual([done.id, notYet.id].sort())
+    expect(board.unwatched).toEqual([])
   })
 
-  it('a placement wins over a missing done date', () => {
+  it('still ranks a placed item, dateless or not', () => {
     const a = item({ kind: 'list:l1', doneOn: null })
     const board = deriveBoard([a], [placement({ itemId: a.id, tier: 'A' })], [], 'u1', 'list:l1')
     expect(board.tiers.A).toEqual([a])
+    expect(board.unranked).toEqual([])
     expect(board.unwatched).toEqual([])
   })
 })
 
 // --- shared boards -----------------------------------------------------------------
+
+describe('hasUndatedShelf', () => {
+  it('is true for the built-in kinds and false for a custom list', () => {
+    for (const key of ['movie', 'tv', 'book'] as const) expect(hasUndatedShelf(key)).toBe(true)
+    expect(hasUndatedShelf('list:l1')).toBe(false)
+  })
+})
 
 describe('isSharedBoard', () => {
   it('is false for every built-in board', () => {
@@ -336,10 +345,11 @@ describe('deriveBoard for a shared list', () => {
     expect(board.unranked).toEqual([a])
   })
 
-  it('still splits the shelves on the shared done date', () => {
+  it('has no second shelf either — unplaced is simply unranked', () => {
     const notYet = item({ kind: 'list:l2', doneOn: null })
     const board = deriveBoard([notYet], [], [], 'u1', 'list:l2', true)
-    expect(board.unwatched).toEqual([notYet])
+    expect(board.unranked).toEqual([notYet])
+    expect(board.unwatched).toEqual([])
   })
 })
 

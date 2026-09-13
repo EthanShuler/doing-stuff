@@ -46,10 +46,11 @@ export type ShelfOpenState = Record<ShelfId, boolean>
 export const SHELVES_COLLAPSED: ShelfOpenState = { unranked: false, unwatched: false }
 
 /**
- * The board itself: six tier rows + the unranked and unwatched shelves. Purely
- * presentational — TierBoard injects sortable cards and droppable row areas for
- * your own board; the partner view renders it with plain cards and no drag
- * wiring at all.
+ * The board itself: six tier rows + the unranked shelf, plus the unwatched one
+ * on the boards that track a date (a null unwatchedLabel = no second shelf, as
+ * on a custom list). Purely presentational — TierBoard injects sortable cards
+ * and droppable row areas for your own board; the partner view renders it with
+ * plain cards and no drag wiring at all.
  */
 export function BoardView({
   board,
@@ -57,7 +58,7 @@ export function BoardView({
   RowArea = PlainRowArea,
   shelfHint,
   unwatchedHint,
-  unwatchedLabel = 'Unwatched',
+  unwatchedLabel,
   openShelves,
   onToggleShelf,
 }: {
@@ -68,13 +69,25 @@ export function BoardView({
   shelfHint?: string
   /** Shown in the unwatched shelf when it's empty. */
   unwatchedHint?: string
-  /** The second shelf's heading — 'Unread' on the books board. */
-  unwatchedLabel?: string
+  /** The second shelf's heading — 'Unread' on the books board — or null on a
+   *  board that has no second shelf (a custom list: an item is either ranked
+   *  or unranked), where it isn't rendered at all. */
+  unwatchedLabel: string | null
   /** Which shelves are expanded — the page owns this so it survives the
    *  You/Partner and filter switches and resets on a board switch. */
   openShelves: ShelfOpenState
   onToggleShelf: (shelf: ShelfId) => void
 }) {
+  // The shelves: unranked (not yet placed by this viewer) and — only where the
+  // board tracks a date — unwatched/unread (no date for this viewer: shared
+  // for movies/TV, the viewer's own read record for books).
+  const shelves: { container: ShelfId; label: string; items: TierItem[]; hint?: string }[] = [
+    { container: 'unranked', label: 'Unranked', items: board.unranked, hint: shelfHint },
+  ]
+  if (unwatchedLabel !== null) {
+    shelves.push({ container: 'unwatched', label: unwatchedLabel, items: board.unwatched, hint: unwatchedHint })
+  }
+
   return (
     <Box mt={20}>
       <Box style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 14, overflow: 'hidden', background: colors.surface }}>
@@ -114,15 +127,7 @@ export function BoardView({
         })}
       </Box>
 
-      {/* The shelves: unranked (dated, not yet placed by this viewer) and
-          unwatched/unread (no date for this viewer — shared for movies/TV,
-          the viewer's own read record for books). */}
-      {(
-        [
-          { container: 'unranked', label: 'Unranked', items: board.unranked, hint: shelfHint },
-          { container: 'unwatched', label: unwatchedLabel, items: board.unwatched, hint: unwatchedHint },
-        ] as const
-      ).map(({ container, label, items, hint }) => {
+      {shelves.map(({ container, label, items, hint }) => {
         const open = openShelves[container]
         return (
           <Box
@@ -134,7 +139,7 @@ export function BoardView({
           >
             {/* The heading sits INSIDE the card area so a collapsed shelf is
                 still a drop target: a card can be unranked, or sent back to
-                Not tried, without expanding the shelf first. */}
+                Unwatched, without expanding the shelf first. */}
             <RowArea container={container} items={items} compact={!open}>
               <UnstyledButton
                 data-shelf-toggle

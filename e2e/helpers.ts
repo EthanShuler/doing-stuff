@@ -40,7 +40,8 @@ export function tierRow(page: Page, tier: string): Locator {
   return page.locator(`[data-board-row="${tier}"]`)
 }
 
-/** The board's 'unranked' or 'unwatched' (Unwatched/Unread) shelf. */
+/** The board's 'unranked' or 'unwatched' (Unwatched/Unread) shelf. A custom
+ *  list's board has no 'unwatched' shelf at all. */
 export function boardShelf(page: Page, shelf: 'unranked' | 'unwatched'): Locator {
   return page.locator(`[data-board-shelf="${shelf}"]`)
 }

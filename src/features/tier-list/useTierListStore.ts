@@ -48,10 +48,10 @@ function seed(): Snapshot {
     lists: [
       // Ice cream is a space-defined list like any other (it used to be a
       // built-in kind — the 2026-09-13 migration converted it).
-      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
-      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', past: 'tried', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', shared: false, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
+      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
       // A SHARED list too: one board both members rank (null-owner placements).
-      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', past: 'played', shared: true, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
+      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', shared: true, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
@@ -72,26 +72,26 @@ function seed(): Snapshot {
       { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
       { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
       { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
-      // Ice cream (custom list l0): dates never show — doneOn is just the shared tried
-      // marker (null = the Not tried shelf).
+      // Ice cream (custom list l0): a custom board tracks no date, so doneOn is
+      // ignored there — an item is ranked, or it's on the unranked shelf.
       { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
       { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
       { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
       { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
-      // The custom "Fruits" list — same shape as Ice Cream (shared tried
-      // marker, no dates in the UI), keyed by `list:<id>` instead of a kind.
+      // The custom "Fruits" list — same shape as Ice Cream (no dates, one
+      // shelf), keyed by `list:<id>` instead of a kind.
       { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
       { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
       { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
-      // The shared Board games list: Catan ranked, Wingspan played but
-      // unranked, Twilight Imperium not yet played.
+      // The shared Board games list: Catan ranked; Wingspan and Twilight
+      // Imperium unranked.
       { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
       { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
       { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
-    // a few items stay unranked — and some undated → unwatched — to exercise
-    // both shelves.
+    // a few built-in items stay unranked — and some undated → unwatched — to
+    // exercise both shelves.
     placements: [
       { id: 'p1', itemId: 'm1', userId: 'u1', tier: 'S', position: 1 },
       { id: 'p2', itemId: 'm4', userId: 'u1', tier: 'S', position: 2 },
@@ -135,7 +135,6 @@ type TierListRow = {
   name: string
   emoji: string | null
   noun: string
-  past: string
   shared: boolean
   created_by: string | null
   created_at: string
@@ -172,7 +171,6 @@ const toTierList = (r: TierListRow): TierList => ({
   name: r.name,
   emoji: r.emoji ?? '',
   noun: r.noun,
-  past: r.past,
   shared: r.shared,
   createdBy: r.created_by,
   createdAt: r.created_at,
@@ -203,7 +201,7 @@ const toTierCompletion = (r: TierCompletionRow): TierCompletion => ({
   doneOn: r.done_on,
 })
 
-const TIER_LIST_COLUMNS = 'id,name,emoji,noun,past,shared,created_by,created_at'
+const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,created_by,created_at'
 const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
@@ -264,8 +262,8 @@ export interface TierListStore {
   /** Rewrite one tier's ordering at integer positions (float-precision rescue). */
   placeTier: (tier: Tier, orderedItemIds: string[], shared?: boolean) => Promise<void>
   /** Set or clear the pool item's SHARED done date (drag on/off the unwatched
-   *  shelf). Movies/TV/custom lists. Inline flow — records the error and resyncs
-   *  instead of throwing. */
+   *  shelf). Movies/TV only — a custom list has no date and no second shelf.
+   *  Inline flow — records the error and resyncs instead of throwing. */
   setSharedDoneOn: (itemId: string, doneOn: string | null) => Promise<void>
   /** Set or clear YOUR OWN completion of an item — a book's read record (drag
    *  on/off the Unread shelf, or the date field in the edit modal). null
@@ -284,13 +282,11 @@ export interface TierListStore {
   deleteList: (id: string) => Promise<void>
 }
 
-/** Normalize a list draft for saving: trimmed words, one emoji, a sane
- *  fallback for the participle. */
+/** Normalize a list draft for saving: trimmed words, one emoji. */
 const cleanListDraft = (draft: ListDraft) => ({
   name: draft.name.trim(),
   emoji: firstGrapheme(draft.emoji),
   noun: draft.noun.trim().toLowerCase(),
-  past: draft.past.trim() || 'tried',
   shared: draft.shared,
 })
 

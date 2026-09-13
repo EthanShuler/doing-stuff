@@ -60,9 +60,9 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
 - **Custom list** (`tier_lists`) — a board the space defines from the UI
   ("Ice Cream", "Bugs", "Fruits"), shared data with the uniform RLS: either
   member can create, re-word, or delete one. Behavior is **fixed to one
-  template** (shared pool, S–F tiers, a "Not <past>" shelf, hand-pasted
-  image URLs, no search provider, no visible dates), so the row carries
-  WORDS — `name`, `emoji`, singular `noun`, `past` — which `customCopy()` in
+  template** (shared pool, S–F tiers, one unranked shelf, hand-pasted
+  image URLs, no search provider, no dates at all), so the row carries
+  WORDS — `name`, `emoji`, singular `noun` — which `customCopy()` in
   the tier-list `copy.ts` templates into a full `KindCopy` — plus ONE
   behavior flag, **`shared`** (the "Shared board" checkbox in `ListModal`):
   a shared list has **one board the space ranks together** instead of a
@@ -91,10 +91,10 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   the SHARED "we finished it" date; defaults to today on a board add or a
   Lists check-off.
   Movies/TV only — books leave it null and use per-person completions instead,
-  and a custom list never shows a date: `done_on` is just its shared
-  tried/not-tried marker, managed by dragging on/off the Not tried shelf
-  (`usesDates: false` in the tier-list `copy.ts` hides the modal's date
-  field) — and free-text
+  and a **custom list ignores it entirely**: it tracks no date, so its board
+  has no second shelf and its item modal no date field (`dates: null` in the
+  tier-list `copy.ts`, mirrored by `hasUndatedShelf()` in its `derive.ts`)
+  — and free-text
   **`tags`** (`text[]`, e.g. "disney", "fantasy") shared like the item; the
   board page filters by them with multi-select pills (OR semantics, matched
   case-insensitively). A filtered board is **read-only** — hidden cards make
@@ -108,11 +108,12 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
   to integers if float precision ever runs out). "Unranked" is the absence of a
-  placement row; an unplaced item with **no date for the viewer** lands on a
-  second dashed **Unwatched** (books: **Unread**, custom lists: **Not tried**)
-  shelf instead (a placement
-  wins over a missing date). Dragging out of that shelf stamps today's date;
-  dropping onto it unranks the card and clears the date. Both shelves are
+  placement row. On the three **built-in** boards an unplaced item with **no
+  date for the viewer** lands on a second dashed **Unwatched** (books:
+  **Unread**) shelf instead (a placement wins over a missing date); dragging
+  out of that shelf stamps today's date, dropping onto it unranks the card and
+  clears the date. A **custom list has only the unranked shelf** — it tracks
+  no date, so there's nothing to split on. The shelves are
   **collapsible and start collapsed** (heading + count; the page owns the
   open state, so it survives the You/Partner and filter switches and resets
   on a board switch). The heading sits inside the droppable area, so a

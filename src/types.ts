@@ -104,7 +104,7 @@ export type ListKey = TierKind | `list:${string}`
  * `tier_lists`. Shared space data like the item pool: either member can
  * create, rename, or delete one, and deleting cascades its items (and
  * everyone's rankings of them). Behavior is fixed to one template — shared
- * pool, S–F tiers, a "Not <past>" shelf, no dates in the UI, hand-pasted
+ * pool, S–F tiers, one Unranked shelf, no dates in the UI, hand-pasted
  * images — so the row carries WORDS (see customCopy in the tier-list copy.ts)
  * plus the one `shared` behavior flag.
  */
@@ -116,8 +116,6 @@ export interface TierList {
   emoji: string
   /** Lowercase singular noun used inline: "Add a fruit". */
   noun: string
-  /** Past participle, lowercase: the "Not tried" shelf. */
-  past: string
   /** True = ONE board the whole space ranks together (placements carry a
    *  null userId and either member may write them); false = the usual board
    *  per person. */
@@ -142,9 +140,9 @@ export interface TierItem {
   imageUrl: string
   /** The SHARED "we finished this" date, ISO ("YYYY-MM-DD"); null when unknown
    *  (legacy rows). Movies/TV only — books are read separately, so their dates
-   *  live per person in TierCompletion and this stays null. Custom lists show
-   *  no dates in the UI, but reuse this as their shared "tried it" marker
-   *  (null = not tried; any date = tried). */
+   *  live per person in TierCompletion and this stays null. Custom lists
+   *  ignore it entirely: they show no dates and have no second shelf, so an
+   *  item there is either ranked or unranked. */
   doneOn: string | null
   /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
   tags: string[]

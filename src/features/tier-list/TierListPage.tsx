@@ -28,7 +28,8 @@ import { ListModal, draftFromList, emptyListDraft } from './ListModal'
 import type { ListDraft } from './ListModal'
 
 // An add is "just finished this" → default the date to today (the shared
-// watched date, or your own read date for books).
+// watched date, or your own read date for books). A dateless board (a custom
+// list) drops it on save.
 const emptyDraft = (): ItemDraft => ({
   title: '',
   imageUrl: '',
@@ -68,6 +69,9 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const key: ListKey = kind ?? listKeyFor(routeListId ?? '')
   const copy = copyFor(key, store.lists)
   const noun = copy.noun
+  // The board's date words, or null where it tracks no date (a custom list) —
+  // then there's no date field and no second shelf, just Unranked.
+  const dates = copy.dates
   // Books track "have I read it" per person; everything else shares one date.
   const personal = datesArePersonal(key)
   // A shared custom list has ONE board both members drag on (null-owner
@@ -81,7 +85,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const partnerName = displayNameFor(partner) || 'Partner'
   const showingPartner = viewer === 'partner' && partner !== null && !shared
 
-  // The two shelves under the tiers start collapsed (a long unranked shelf
+  // The shelves under the tiers start collapsed (a long unranked shelf
   // otherwise pushes the tiers off screen). Owned here rather than in
   // BoardView so expanding one survives the You/Partner and filter switches
   // — which swap board components — and resets on a board switch.
@@ -157,7 +161,9 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     runSave(async () => {
       if (!draft.title.trim()) return
       try {
-        const dateOn = draft.doneOn || null
+        // A custom list tracks no date — never write one, even though the
+        // draft carries today's by default.
+        const dateOn = dates ? draft.doneOn || null : null
         if (editingId) await store.updateItem(editingId, key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
         else await store.addItem(key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
         closeModal()
@@ -330,8 +336,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                   board={board}
                   renderCard={(item) => <CardVisual key={item.id} item={item} emoji={copy.emoji} />}
                   shelfHint={`${partnerName} hasn't ranked everything yet.`}
-                  unwatchedHint={`Nothing waiting to be ${copy.past}.`}
-                  unwatchedLabel={copy.shelfLabel}
+                  unwatchedHint={dates ? `Nothing waiting to be ${dates.past}.` : undefined}
+                  unwatchedLabel={dates?.shelfLabel ?? null}
                   openShelves={openShelves}
                   onToggleShelf={toggleShelf}
                 />
@@ -349,8 +355,10 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                     <CardVisual key={item.id} item={item} emoji={copy.emoji} onClick={() => openEdit(item)} />
                   )}
                   shelfHint={`No unranked ${noun}s match this filter.`}
-                  unwatchedHint={`No ${copy.shelfLabel.toLowerCase()} ${noun}s match this filter.`}
-                  unwatchedLabel={copy.shelfLabel}
+                  unwatchedHint={
+                    dates ? `No ${dates.shelfLabel.toLowerCase()} ${noun}s match this filter.` : undefined
+                  }
+                  unwatchedLabel={dates?.shelfLabel ?? null}
                   openShelves={openShelves}
                   onToggleShelf={toggleShelf}
                 />
@@ -388,8 +396,10 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                     ? `No ${noun}s yet — add one to get started.`
                     : 'Everything is ranked. Nice.'
                 }
-                unwatchedHint={`Drag a ${noun} here if you haven't actually ${copy.past} it yet.`}
-                unwatchedLabel={copy.shelfLabel}
+                unwatchedHint={
+                  dates ? `Drag a ${noun} here if you haven't actually ${dates.past} it yet.` : undefined
+                }
+                unwatchedLabel={dates?.shelfLabel ?? null}
                 openShelves={openShelves}
                 onToggleShelf={toggleShelf}
               />
