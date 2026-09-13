@@ -6,14 +6,17 @@ Guidance for working in this repo. Read this before making changes.
 
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand link + feature nav +
-sign-out). The nav is **one item per feature, not per route** — seven of them,
-collapsing into the burger drawer below Mantine's `md` breakpoint; the four
+sign-out). The nav is **one item per feature, not per route** — eight of them,
+collapsing into the burger drawer below Mantine's `md` breakpoint; the five
 tier-list routes share a single "Tier Lists" item and are chosen in-page with
-the `ListPicker` pill row. The three unbuilt placeholder routes are off the nav
+the `ListPicker` pill row, and the Lists routes likewise share one "Lists"
+item. The three unbuilt placeholder routes are off the nav
 but still resolve. Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
-`/ice-cream`, and `/lists/:id` (a space-defined board) are the **Tier Lists**
-feature; `/spoons` is the **Spoons**
+`/ice-cream`, and `/tiers/:id` (a space-defined board) are the **Tier Lists**
+feature; `/lists/movies`, `/lists/tv`, `/lists/books`, and `/lists/:id` (a
+free-form list) are the **Lists** feature (`/lists` redirects to
+`/lists/movies`); `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
 the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
 `/little-guys` is the **Little Guys** feature; `/french-toast` is a placeholder
@@ -46,8 +49,10 @@ wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`, `/lists/:id`) —
-drag-n-drop S/A/B/C/D/F boards. Five routes, ONE header nav item: which board
+**Tier Lists** (`/movies`, `/tv`, `/books`, `/ice-cream`, `/tiers/:id`) —
+drag-n-drop S/A/B/C/D/F boards — **tiers only**; the want-to queues are the
+separate Lists feature below, and each movie/TV/book board links to its list
+from the control bar. Five routes, ONE header nav item: which board
 you're on is chosen in-page by the `ListPicker` pill row (four built-ins, then
 the space's own lists, then "+ New list" and — on a custom board — a faint
 "Edit list"). The domain model splits pool from opinion:
@@ -55,27 +60,25 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
 - **Custom list** (`tier_lists`) — a board the space defines from the UI
   ("Bugs", "Fruits"), shared data with the uniform RLS: either member can
   create, re-word, or delete one. Behavior is **fixed to the ice-cream
-  template** (shared pool, S–F tiers, a "Not <past>" shelf, a shared
-  to-<verb> list, hand-pasted image URLs, no search provider, no visible
-  dates), so the row carries only WORDS — `name`, `emoji`, singular `noun`,
-  `verb`, `past` — which `customCopy()` in the tier-list `copy.ts` templates
-  into a full `KindCopy`. Its items and to-do rows carry `kind = 'custom'`
-  plus a `list_id` FK, so **deleting a list is one statement** and Postgres
-  cascades the items (and every member's placements/completions of them) and
-  the list's to-do rows; the store mirrors that with `pruneList()`.
+  template** (shared pool, S–F tiers, a "Not <past>" shelf, hand-pasted
+  image URLs, no search provider, no visible dates), so the row carries only
+  WORDS — `name`, `emoji`, singular `noun`, `past` — which `customCopy()` in
+  the tier-list `copy.ts` templates into a full `KindCopy`. Its items carry
+  `kind = 'custom'` plus a `list_id` FK, so **deleting a list is one
+  statement** and Postgres cascades the items (and every member's
+  placements/completions of them); the store mirrors that with `pruneList()`.
   App-side a board is one **`ListKey`**: a `TierKind` or `` `list:${id}` ``
   (`TierKind` itself stays a closed 4-member union). `copyFor(key, lists)`
   resolves either into wording — and never throws for a list row that's gone,
   so a partner's tab survives the beat between a realtime DELETE and the
-  `<Navigate>` back to `/movies`. Reading lists stay a book-only concept, so
-  the per-person watchlist RLS needed no change.
+  `<Navigate>` back to `/movies`.
 - **Tier item** (`tier_items`) — a movie, show, book, ice cream flavor, or
   custom-list item in the
   space's **shared pool** (a `kind 'movie'|'tv'|'book'|'ice-cream'|'custom'`
   column plus a nullable `list_id`, a
   title, a hand-pasted poster/cover `image_url`, a nullable `done_on` date —
-  the SHARED "we finished it" date; defaults to today on a board add or
-  watchlist check-off.
+  the SHARED "we finished it" date; defaults to today on a board add or a
+  Lists check-off.
   Movies/TV only — books leave it null and use per-person completions instead,
   and ice cream never shows a date: `done_on` is just its shared
   tried/not-tried marker, managed by dragging on/off the Not tried shelf
@@ -113,24 +116,9 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   for books, shelf drags and the modal's date field write the viewer's own
   completion row and never touch the item's shared `done_on`.
   Same split RLS as placements (read everyone's, write only your own).
-- **Watchlist item** (`watchlist_items`) — a "want to watch/read/try" entry
-  per kind (UI label: Watchlist, Reading list for books, or To-try list for
-  ice cream). Movie/TV/ice-cream lists are shared; the book reading list is
-  **per person** — owned via `created_by`, the UI shows only the viewer's rows
-  (`listIsPersonal()` in the tier-list `derive.ts` is the switch), and RLS
-  lets only the owner write a book row. Rows carry their own `creator`
-  (shown under the row title). The open rows are a **priority queue**: a
-  fractional `position` (same midpoint-insertion scheme as placements) orders
-  them, drag-to-reorder in `Watchlist.tsx`, top = watch/read/try next; new
-  rows append at max + 1, and checked-off rows sink below the queue (keeping
-  their slot, so unchecking restores it). Checking one off
-  creates the tier item — dated today: the shared `done_on` for movies/TV
-  and ice cream, the *checker's own completion row* for books — carrying the
-  image and creator onto it, and links via `tier_item_id`
-  (`on delete set null` reopens the wish, mirroring wishlist → entry).
 
 All five routes render the same `TierListPage` (a `kind` prop for a built-in,
-the URL's list id for `/lists/:id`), so the store —
+the URL's list id for `/tiers/:id`), so the store —
 holding every kind plus all users' placements and completions — survives
 kind switches. A
 You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
@@ -138,6 +126,55 @@ You/Partner toggle swaps whose board is derived; yours is a dnd-kit board
 (`BoardView`). Drops are optimistic: on write failure the store records the
 error and refetches, so the card snaps back. Per-kind wording (watch/read,
 shelf labels, emoji, hints) lives in the tier-list `copy.ts`.
+
+**Lists** (`/lists/movies`, `/lists/tv`, `/lists/books`, `/lists/:id`) — the
+want-to queues, one list on screen at a time, built to show most of a list
+without scrolling. Four routes render one `ListsPage` (a `kind` prop for the
+three built-ins, the URL's id for a free-form list), so the store survives
+switching lists; a `PickerRow` pill row above the control bar picks which
+(🎬 Movies · 📺 TV · 📖 Books · each free-form list · "+ New list" · a faint
+"Edit list" on a free-form list). The domain model:
+
+- **Free-form list** (`lists`) — a list the space defines from the UI
+  ("Groceries", "Restaurants to try"): just `name` + `emoji`, shared data
+  with the uniform RLS. Deleting one cascades its rows in the DB; the store
+  mirrors that with `pruneListDef()`. The movie/TV/book lists are built in
+  and have no row here.
+- **List item** (`list_items`) — one row on one list: `kind
+  'movie'|'tv'|'book'|'custom'` plus a nullable `list_id` (→ `lists`), a
+  `title`, an optional `image_url` and `creator` (Director / Creator / Author;
+  on a free-form list the same column is the optional **Note**), a fractional
+  `position` (midpoint insertion via `src/lib/order.ts`, drag-to-reorder, top
+  = next up, new rows append at max + 1), and TWO done markers: `tier_item_id`
+  for media rows and `done_on` for free-form rows — `isDone()` in the lists
+  `derive.ts` is `tierItemId !== null || doneOn !== null`. Movie/TV lists are
+  shared; the **book reading list is per person** — owned via `created_by`,
+  the page shows only the viewer's rows (`listIsPersonal()`), and RLS lets only
+  the owner write a book row. App-side a list is one **`ListRef`**: `'movie' |
+  'tv' | 'book'` or `` `custom:${id}` `` (deliberately not the tier-list
+  `ListKey` — a `custom:` ref points at a `lists` row, not a tier board);
+  `copyFor(ref, lists)` in the lists `copy.ts` resolves it into a `ListCopy`
+  and never throws for a gone list.
+- **Check-off** — a movie/TV/book row creates the tier item exactly as a board
+  add would (shared `done_on = today` for movies/TV; for books `done_on: null`
+  plus the checker's own `tier_item_completions` row — `datesArePersonal()`
+  from the tier-list `derive.ts` is the switch), carries the image and creator
+  onto it, then links via `tier_item_id`, so it lands on the board's Unranked
+  shelf. The Lists store writes `tier_items` directly; the tier page's own
+  realtime channel picks it up. Unchecking clears the link (the tier item
+  stays on the board). Deleting the tier item reopens the row via the FK
+  `on delete set null`, which reaches an open Lists tab as a realtime UPDATE
+  on `list_items` — no cross-table read. A free-form row just gets
+  `done_on = today`. Seed mode can't show the card on the tier seed (separate
+  in-memory stores).
+
+UI: inline **quick-add** at the top of the list (Enter adds a title-only row;
+picking a TMDB / Open Library suggestion from the shared `TitleSearchInput`
+adds it with poster + creator), dense ~38px rows in one bordered panel
+(checkbox · 22×32 thumb · title · faint creator · ×), a collapsed **Done · n**
+section below the open queue (strikethrough rows, uncheck, no dates), edits in
+`ListItemModal`, list create/rename/delete in `ListDefModal`. Deliberately no
+realtime-derived dates and no You/Partner toggle.
 
 **Spoons** (`/spoons`) — Squabby's souvenir spoon collection. A **spoon**
 (`spoons` table, shared space data, uniform RLS) has a name, an optional
@@ -439,21 +476,21 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
-  `tier_item_completions`, `watchlist_items`, `spoons`, `park_visits`, `recipes`,
-  `music_practice_days`, `little_guys`.
+  `tier_item_completions`, `lists`, `list_items`, `spoons`, `park_visits`,
+  `recipes`, `music_practice_days`, `little_guys`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
   **`tier_placements` / `tier_item_completions` / `music_practice_days`** (members
   read all, but insert/update/delete require `user_id = auth.uid()` — rankings,
-  book read state, and daily practice are personal), and **`watchlist_items`**
+  book read state, and daily practice are personal), and **`list_items`**
   (members read all; writes to BOOK rows additionally require
-  `created_by = auth.uid()` — reading lists are personal, other kinds' lists
-  stay shared). Follow that pattern for any future per-person opinion data.
-  **`tier_lists` is uniform/shared** — a custom list belongs to the space, and
-  its rows are `kind 'custom'`, never `'book'`, so they stay outside that
-  per-person carve-out.
+  `created_by = auth.uid()` — reading lists are personal, other lists stay
+  shared). Follow that pattern for any future per-person opinion data.
+  **`tier_lists` and `lists` are uniform/shared** — a custom board or a
+  free-form list belongs to the space, and their rows are `kind 'custom'`,
+  never `'book'`, so they stay outside that per-person carve-out.
 - **`profiles` mirrors `auth.users`** (which the browser can't read). An
   `on_auth_user_created` trigger inserts one row per user (`id`, `email`,
   `display_name`); RLS lets you read your own profile plus any co-member's (via
@@ -477,7 +514,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 ```
 src/
   App.tsx                  gate (auth → space) → BrowserRouter → AppLayout → routes
-                           (the 7 feature pages are React.lazy at module scope)
+                           (the 8 feature pages are React.lazy at module scope)
   types.ts                 domain types (mirror DB columns)
   theme.ts                 earthy palette, fonts, shared colors, swatchFor()
   mantineTheme.ts          Mantine theme override mirroring theme.ts
@@ -491,9 +528,10 @@ src/
     image.ts               client-side photo downscale (≤1200px JPEG) for uploads
     imageUrl.ts            posterSrc() render-time TMDB/Open Library size rewrite
     photos.ts              shared Storage bucket photo upload / best-effort delete
+    order.ts               positionBetween() / renormalizedPositions() fractional ordering
     profile.ts             displayNameFor() — profile → short display label
-    tmdb.ts                TMDB title search (movie/TV posters) for ItemModal
-    openLibrary.ts         Open Library book search (covers) for ItemModal — keyless
+    tmdb.ts                TMDB title search (movie/TV posters) for TitleSearchInput
+    openLibrary.ts         Open Library book search (covers) for TitleSearchInput — keyless
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
     database.types.ts      typed schema (regenerate with supabase gen types)
   data/                    shared (cross-feature) hooks
@@ -509,13 +547,16 @@ src/
     EmptyCard.tsx          dashed empty-state card
     FloatingBanner.tsx     fixed dismissible error/notice banner
     MapCanvas.tsx          shared Leaflet frame: tiles, Recenter, FitToPins, icon cache
+    MediaImage.tsx         poster/cover <img> with emoji fallback (tier cards, list rows)
     ModalFooter.tsx        modal action row: Delete link / Cancel / primary
     ModalShell.tsx         shared Mantine modal chrome (title, size, confirm-aware)
     PageFrame.tsx          PAGE_MAX_WIDTH + each page's padded, centered column
     PhotoCard.tsx          PhotoCardGrid + PhotoCard (spoons / guys / recipes)
+    PickerRow.tsx          in-page pill row picking a board/list (tier lists, lists)
     Pill.tsx               category filter pill
     Splash.tsx             centered loading/fatal message
     Stars.tsx              read-only rating display
+    TitleSearchInput.tsx   title field with debounced TMDB / Open Library suggestions
   features/
     doing-stuff/           the activity tracker (landing feature)
       DoingStuffPage.tsx   owns the store, modal state, derive wiring, control bar
@@ -538,13 +579,22 @@ src/
       derive.test.ts       vitest coverage for derive.ts
       copy.ts              per-kind wording + customCopy/copyFor for custom lists
       copy.test.ts         vitest coverage for copy.ts
-      ListPicker.tsx       in-page pill row selecting which board you're on
+      ListPicker.tsx       thin PickerRow wrapper: built-in boards + custom boards
       ListModal.tsx        create / re-word / delete a space-defined list
       TierBoard.tsx        dnd-kit wiring: sensors, collision, drag handlers
       BoardView.tsx        pure board layout (tier rows + unranked/unread shelves)
       TierCard.tsx         CardVisual (poster + fallback) + SortableCard
-      ItemModal.tsx        add/edit pool item, TMDB/Open Library suggestions
-      Watchlist.tsx        shared watch/reading list (check off → pool item)
+      ItemModal.tsx        add/edit pool item (title via TitleSearchInput)
+    lists/                 the want-to queues: movie/TV/book + free-form lists
+      ListsPage.tsx        owns the store, picker, counts, modal state, missing-list redirect
+      useListStore.ts      data seam: lists + list_items CRUD, check-off → tier_items
+      derive.ts            pure refs, isDone, sortListItems, nextPosition, pruneListDef
+      derive.test.ts       vitest coverage for derive.ts
+      copy.ts              per-list wording: LIST_COPY + customListCopy/copyFor
+      copy.test.ts         vitest coverage for copy.ts
+      ListRows.tsx         quick-add + dense dnd-kit rows + collapsed Done section
+      ListItemModal.tsx    edit a row (title search, image, creator/note, remove)
+      ListDefModal.tsx     create / rename / delete a free-form list
     spoons/                the souvenir spoon collection (list + map)
       SpoonsPage.tsx       owns the store, Collection/Map toggle, modal state
       useSpoonStore.ts     data seam: spoons CRUD + geocode (or seed fallback)
@@ -593,8 +643,8 @@ src/
 e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
-                           tier-list, spoons, little-guys, parks, recipes,
-                           music-practice, mobile, mobile-overflow)
+                           tier-list, lists, spoons, little-guys, parks,
+                           recipes, music-practice, mobile, mobile-overflow)
                            — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants (the source of truth)
@@ -625,7 +675,8 @@ and `src/lib/`.
   provider owns the Escape key so a later-mounted modal can't swallow the same
   press). Never `window.confirm`. Keep this for anything that destroys logged
   or shared data — entries, repeats, categories, activities, wishes, tier
-  items, watchlist rows, spoons, little guys, recipes, park visits.
+  items, list rows and free-form lists, spoons, little guys, recipes, park
+  visits.
 - **Every feature page wears the same shell.** `PageFrame` (padding + the
   centered `PAGE_MAX_WIDTH` column) wraps the page; `ControlBar` is its top row
   (`left` = toggles/filters/counts, `right` = the primary action) above the
