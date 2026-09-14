@@ -7,7 +7,8 @@ import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
 export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
 
 /** A droppable container on the board: a tier row, the unranked shelf, or the
- *  unwatched (for books: unread) shelf. */
+ *  unwatched (for books: unread) shelf — which a custom list's board doesn't
+ *  have at all (see hasUndatedShelf). */
 export type ContainerId = Tier | 'unranked' | 'unwatched'
 
 /** Just the two shelves — the collapsible containers under the tier rows. */
@@ -41,11 +42,18 @@ export const keyOf = (kind: string, listId: string | null): ListKey =>
  * shared item. Movies and TV are watched together, so `TierItem.doneOn` (the
  * shared date) is the truth; books are read separately, so each member's date
  * is their own TierCompletion row and the shared one is ignored. A custom
- * list ("Ice Cream") is tried together — shared like movies/TV — but shows no
- * dates in the UI: `doneOn` is just its tried/not-tried marker (see
- * `usesDates` in copy.ts).
+ * list ("Ice Cream") has no date of either sort — see hasUndatedShelf below.
  */
 export const datesArePersonal = (key: ListKey): boolean => key === 'book'
+
+/**
+ * Whether a board has the second, undated shelf beneath the tiers (Unwatched,
+ * or Unread for books) — the three built-in kinds do. A custom list ("Ice
+ * Cream") tracks no "done with it" date in the UI, so an item there is either
+ * ranked or Unranked and its shared `doneOn` is ignored entirely.
+ * `copy.dates === null` is the wording side of this same switch.
+ */
+export const hasUndatedShelf = (key: ListKey): boolean => listIdOf(key) === null
 
 // --- Shared boards -------------------------------------------------------------
 // A custom list can be `shared`: ONE board the space ranks together instead of
@@ -119,6 +127,8 @@ export interface Board {
  * Build one person's board for one kind. Items the viewer hasn't placed land
  * on a shelf — the unwatched/unread shelf when they have no date, otherwise
  * the unranked shelf (both oldest first, so new additions appear at the end).
+ * A board with no undated shelf (a custom list) skips that split: everything
+ * the viewer hasn't placed is unranked.
  * "Have a date" is per kind: movies/TV read the item's shared `doneOn`; books
  * look for the VIEWER's own completion row, so the same book can be ranked on
  * one board and unread on the other. A placement always wins: a ranked item
@@ -145,6 +155,7 @@ export function deriveBoard(
     }
   }
   const personal = datesArePersonal(key)
+  const undatedShelf = hasUndatedShelf(key)
   const completedItems = new Set<string>()
   if (personal) {
     for (const r of completions) {
@@ -163,7 +174,7 @@ export function deriveBoard(
     const placement = placementByItem.get(item.id)
     const dated = personal ? completedItems.has(item.id) : item.doneOn !== null
     if (placement) tiers[placement.tier].push({ item, placement })
-    else if (!dated) unwatched.push(item)
+    else if (undatedShelf && !dated) unwatched.push(item)
     else unranked.push(item)
   }
 

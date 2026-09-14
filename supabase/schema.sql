@@ -175,7 +175,7 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 -- ---------------------------------------------------------------------------
 
 -- A space-defined tier list. Behavior is fixed to one template (shared pool,
--- S–F tiers, a "Not <past>" shelf, no visible dates), so the row carries
+-- S–F tiers, one unranked shelf, no dates), so the row carries
 -- WORDS — the app templates all its copy from them (customCopy in the
 -- tier-list copy.ts) — plus the `shared` flag. Ice cream was a built-in kind
 -- until 2026-09-13; migrations/20260913_ice_cream_custom_list.sql turned it
@@ -189,10 +189,9 @@ create table if not exists public.tier_lists (
   emoji       text not null default '',
   -- Singular noun, lowercase: "fruit" → "Add a fruit".
   noun        text not null,
-  -- Past participle: "tried" → the "Not tried" shelf.
   -- (`verb` lived here until 2026-09-12, when boards lost their to-<verb>
-  --  list to the Lists feature; the migration drops it.)
-  past        text not null default 'tried',
+  --  list to the Lists feature, and `past` until 2026-09-13, when custom
+  --  boards lost their "Not <past>" shelf; both migrations drop the column.)
   -- True = one board both members rank together (null-owner placements);
   -- false = the usual board per person. Flipping it never moves rankings —
   -- the other mode's rows stay put and show again if it's flipped back.
@@ -223,8 +222,8 @@ create table if not exists public.tier_items (
   -- the client defaults it to today on add / a Lists check-off. Movies/TV
   -- only — books are read separately, so their dates are per person in
   -- `tier_item_completions.done_on` (same column name on purpose) and this
-  -- stays null. Custom lists show no dates in the UI but reuse this as their
-  -- shared tried/not-tried marker. Renamed from `watched_on` on 2026-09-11 —
+  -- stays null. Custom lists track no date at all and ignore this column
+  -- (their boards have one unranked shelf). Renamed from `watched_on` on 2026-09-11 —
   -- see the migration note at the end of this section.
   done_on     date,
   -- Free-text labels ("disney", "fantasy", "childhood reads") for filtering

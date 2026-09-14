@@ -16,8 +16,7 @@ export interface ItemDraft {
   /** ISO date it was finished; '' = not yet (the item sits on the unwatched/
    *  unread shelf until it's dated or dragged into a tier). For movies/TV this
    *  is the item's shared done date; for books it's the EDITOR's own one;
-   *  dateless boards (custom lists) show no field and just pass the existing
-   *  tried marker through unchanged. */
+   *  dateless boards (custom lists) show no field and track no date at all. */
   doneOn: string
   /** Shared filter labels ("disney", "fantasy"). */
   tags: string[]
@@ -122,12 +121,11 @@ export function ItemModal({
             placeholder="Optional"
             mb={18}
           />
-          {/* Dateless boards (custom lists) get no field here: tried/not-tried is
-              managed by dragging on/off the shelf, and the draft passes the
-              existing marker through untouched. */}
-          {copy.usesDates && (
+          {/* Dateless boards (custom lists) get no field here — an item there
+              is simply ranked or unranked. */}
+          {copy.dates && (
             <TextInput
-              label={copy.dateLabel}
+              label={copy.dates.fieldLabel}
               type="date"
               value={draft.doneOn}
               onChange={(e) => onChange({ doneOn: e.currentTarget.value })}
