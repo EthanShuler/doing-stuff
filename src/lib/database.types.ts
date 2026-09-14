@@ -1,585 +1,990 @@
-// Hand-authored to match supabase/schema.sql. Once the Supabase CLI is set up
-// you can regenerate this with:
+// Generated from the live database with the Supabase MCP server (2026-09-13).
+// Do not hand-edit — regenerate after any schema change with:
 //   npx supabase gen types typescript --project-id <ref> > src/lib/database.types.ts
 
-export interface Database {
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
-      spaces: {
+      activities: {
         Row: {
+          category_id: string
+          created_at: string
+          emoji: string
           id: string
           name: string
-          created_at: string
-          home_address: string | null
-          home_lat: number | null
-          home_lng: number | null
+          space_id: string
         }
         Insert: {
+          category_id: string
+          created_at?: string
+          emoji?: string
           id?: string
           name: string
-          created_at?: string
-          home_address?: string | null
-          home_lat?: number | null
-          home_lng?: number | null
+          space_id: string
         }
         Update: {
+          category_id?: string
+          created_at?: string
+          emoji?: string
           id?: string
           name?: string
-          created_at?: string
-          home_address?: string | null
-          home_lat?: number | null
-          home_lng?: number | null
+          space_id?: string
         }
-        Relationships: []
-      }
-      space_members: {
-        Row: { space_id: string; user_id: string; created_at: string }
-        Insert: { space_id: string; user_id: string; created_at?: string }
-        Update: { space_id?: string; user_id?: string; created_at?: string }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "activities_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
-        Row: { id: string; space_id: string; name: string; color_index: number; created_at: string }
-        Insert: { id?: string; space_id: string; name: string; color_index?: number; created_at?: string }
-        Update: { id?: string; space_id?: string; name?: string; color_index?: number; created_at?: string }
-        Relationships: []
-      }
-      activities: {
-        Row: { id: string; space_id: string; category_id: string; name: string; emoji: string; created_at: string }
-        Insert: { id?: string; space_id: string; category_id: string; name: string; emoji?: string; created_at?: string }
-        Update: { id?: string; space_id?: string; category_id?: string; name?: string; emoji?: string; created_at?: string }
-        Relationships: []
+        Row: {
+          color_index: number
+          created_at: string
+          id: string
+          name: string
+          space_id: string
+        }
+        Insert: {
+          color_index?: number
+          created_at?: string
+          id?: string
+          name: string
+          space_id: string
+        }
+        Update: {
+          color_index?: number
+          created_at?: string
+          id?: string
+          name?: string
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       entries: {
         Row: {
-          id: string
-          space_id: string
           activity_id: string
-          title: string
-          entry_date: string
-          description: string
-          rating: number
-          created_by: string | null
-          created_at: string
           address: string
-          lat: number | null
-          lng: number | null
-          hide_from_map: boolean
-        }
-        Insert: {
-          id?: string
-          space_id: string
-          activity_id: string
-          title?: string
+          created_at: string
+          created_by: string | null
+          description: string
           entry_date: string
-          description?: string
-          rating: number
-          created_by?: string | null
-          created_at?: string
-          address?: string
-          lat?: number | null
-          lng?: number | null
-          hide_from_map?: boolean
-        }
-        Update: {
-          id?: string
-          space_id?: string
-          activity_id?: string
-          title?: string
-          entry_date?: string
-          description?: string
-          rating?: number
-          created_by?: string | null
-          created_at?: string
-          address?: string
-          lat?: number | null
-          lng?: number | null
-          hide_from_map?: boolean
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: { id: string; email: string | null; display_name: string | null; created_at: string }
-        Insert: { id: string; email?: string | null; display_name?: string | null; created_at?: string }
-        Update: { id?: string; email?: string | null; display_name?: string | null; created_at?: string }
-        Relationships: []
-      }
-      wishlist_items: {
-        Row: {
+          hide_from_map: boolean
           id: string
-          space_id: string
-          text: string
-          entry_id: string | null
-          created_by: string | null
-          created_at: string
-          address: string | null
           lat: number | null
           lng: number | null
+          rating: number
+          space_id: string
+          title: string
         }
         Insert: {
-          id?: string
-          space_id: string
-          text?: string
-          entry_id?: string | null
-          created_by?: string | null
+          activity_id: string
+          address?: string
           created_at?: string
-          address?: string | null
+          created_by?: string | null
+          description?: string
+          entry_date: string
+          hide_from_map?: boolean
+          id?: string
           lat?: number | null
           lng?: number | null
-        }
-        Update: {
-          id?: string
-          space_id?: string
-          text?: string
-          entry_id?: string | null
-          created_by?: string | null
-          created_at?: string
-          address?: string | null
-          lat?: number | null
-          lng?: number | null
-        }
-        Relationships: []
-      }
-      tier_lists: {
-        Row: {
-          id: string
+          rating: number
           space_id: string
-          name: string
-          emoji: string
-          noun: string
-          past: string
-          shared: boolean
-          created_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          space_id: string
-          name: string
-          emoji?: string
-          noun: string
-          past?: string
-          shared?: boolean
-          created_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          space_id?: string
-          name?: string
-          emoji?: string
-          noun?: string
-          past?: string
-          shared?: boolean
-          created_by?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      tier_items: {
-        Row: {
-          id: string
-          space_id: string
-          kind: string
-          list_id: string | null
-          title: string
-          image_url: string
-          done_on: string | null
-          tags: string[]
-          creator: string
-          created_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          space_id: string
-          kind: string
-          list_id?: string | null
-          title: string
-          image_url?: string
-          done_on?: string | null
-          tags?: string[]
-          creator?: string
-          created_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          space_id?: string
-          kind?: string
-          list_id?: string | null
           title?: string
-          image_url?: string
-          done_on?: string | null
-          tags?: string[]
-          creator?: string
+        }
+        Update: {
+          activity_id?: string
+          address?: string
+          created_at?: string
           created_by?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      tier_placements: {
-        Row: {
-          id: string
-          space_id: string
-          item_id: string
-          user_id: string | null
-          tier: string
-          position: number
-          created_at: string
-        }
-        Insert: {
+          description?: string
+          entry_date?: string
+          hide_from_map?: boolean
           id?: string
-          space_id: string
-          item_id: string
-          user_id?: string | null
-          tier: string
-          position: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
+          lat?: number | null
+          lng?: number | null
+          rating?: number
           space_id?: string
-          item_id?: string
-          user_id?: string | null
-          tier?: string
-          position?: number
-          created_at?: string
+          title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "entries_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entries_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      tier_item_completions: {
+      entry_repeats: {
         Row: {
-          id: string
-          space_id: string
-          item_id: string
-          user_id: string
-          done_on: string
           created_at: string
-        }
-        Insert: {
-          id?: string
-          space_id: string
-          item_id: string
-          user_id?: string
-          done_on: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          space_id?: string
-          item_id?: string
-          user_id?: string
-          done_on?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      lists: {
-        Row: {
-          id: string
-          space_id: string
-          name: string
-          emoji: string
           created_by: string | null
-          created_at: string
+          entry_id: string
+          id: string
+          repeat_date: string
+          space_id: string
         }
         Insert: {
-          id?: string
-          space_id: string
-          name: string
-          emoji?: string
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          entry_id: string
+          id?: string
+          repeat_date: string
+          space_id: string
         }
         Update: {
-          id?: string
-          space_id?: string
-          name?: string
-          emoji?: string
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          entry_id?: string
+          id?: string
+          repeat_date?: string
+          space_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "entry_repeats_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entry_repeats_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       list_items: {
         Row: {
+          created_at: string
+          created_by: string | null
+          creator: string
+          done_on: string | null
           id: string
-          space_id: string
+          image_url: string
           kind: string
           list_id: string | null
-          title: string
-          image_url: string
-          creator: string
           position: number
+          space_id: string
           tier_item_id: string | null
-          done_on: string | null
-          created_by: string | null
-          created_at: string
+          title: string
         }
         Insert: {
+          created_at?: string
+          created_by?: string | null
+          creator?: string
+          done_on?: string | null
           id?: string
-          space_id: string
+          image_url?: string
           kind: string
           list_id?: string | null
-          title: string
-          image_url?: string
-          creator?: string
           position?: number
+          space_id: string
           tier_item_id?: string | null
-          done_on?: string | null
-          created_by?: string | null
-          created_at?: string
+          title: string
         }
         Update: {
+          created_at?: string
+          created_by?: string | null
+          creator?: string
+          done_on?: string | null
           id?: string
-          space_id?: string
+          image_url?: string
           kind?: string
           list_id?: string | null
-          title?: string
-          image_url?: string
-          creator?: string
           position?: number
+          space_id?: string
           tier_item_id?: string | null
-          done_on?: string | null
-          created_by?: string | null
-          created_at?: string
+          title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "list_items_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "list_items_tier_item_id_fkey"
+            columns: ["tier_item_id"]
+            isOneToOne: false
+            referencedRelation: "tier_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      spoons: {
+      lists: {
         Row: {
-          id: string
-          space_id: string
-          name: string
-          image_url: string
-          place: string
-          lat: number | null
-          lng: number | null
-          acquired_on: string | null
-          notes: string
-          created_by: string | null
           created_at: string
+          created_by: string | null
+          emoji: string
+          id: string
+          name: string
+          space_id: string
         }
         Insert: {
-          id?: string
-          space_id: string
-          name: string
-          image_url?: string
-          place?: string
-          lat?: number | null
-          lng?: number | null
-          acquired_on?: string | null
-          notes?: string
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          emoji?: string
+          id?: string
+          name: string
+          space_id: string
         }
         Update: {
-          id?: string
-          space_id?: string
-          name?: string
-          image_url?: string
-          place?: string
-          lat?: number | null
-          lng?: number | null
-          acquired_on?: string | null
-          notes?: string
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          emoji?: string
+          id?: string
+          name?: string
+          space_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lists_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      little_guys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          image_url: string
+          name: string
+          owner_id: string | null
+          personality: string
+          source: string
+          space_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          image_url?: string
+          name: string
+          owner_id?: string | null
+          personality?: string
+          source?: string
+          space_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+          owner_id?: string | null
+          personality?: string
+          source?: string
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "little_guys_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      music_practice_days: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          practice_date: string
+          space_id: string
+          tempo: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position: number
+          practice_date: string
+          space_id: string
+          tempo?: number | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          practice_date?: string
+          space_id?: string
+          tempo?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "music_practice_days_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       park_visits: {
         Row: {
-          id: string
-          space_id: string
-          park_code: string
-          visited_on: string | null
-          notes: string
           attendee_ids: string[]
-          separate: boolean
-          created_by: string | null
           created_at: string
+          created_by: string | null
+          id: string
+          notes: string
+          park_code: string
+          separate: boolean
+          space_id: string
+          visited_on: string | null
         }
         Insert: {
-          id?: string
-          space_id: string
-          park_code: string
-          visited_on?: string | null
-          notes?: string
           attendee_ids?: string[]
-          separate?: boolean
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string
+          park_code: string
+          separate?: boolean
+          space_id: string
+          visited_on?: string | null
         }
         Update: {
-          id?: string
-          space_id?: string
-          park_code?: string
-          visited_on?: string | null
-          notes?: string
           attendee_ids?: string[]
-          separate?: boolean
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string
+          park_code?: string
+          separate?: boolean
+          space_id?: string
+          visited_on?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "park_visits_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
         }
         Relationships: []
       }
       recipes: {
         Row: {
+          created_at: string
+          created_by: string | null
           id: string
-          space_id: string
-          title: string
           image_url: string
           ingredients: string
-          steps: string
+          notes: string
+          servings: string
           source: string
           source_url: string
+          space_id: string
+          steps: string
           tags: string[]
-          servings: string
-          total_time: string
-          notes: string
-          created_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          space_id: string
           title: string
-          image_url?: string
-          ingredients?: string
-          steps?: string
-          source?: string
-          source_url?: string
-          tags?: string[]
-          servings?: string
-          total_time?: string
-          notes?: string
-          created_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          space_id?: string
-          title?: string
-          image_url?: string
-          ingredients?: string
-          steps?: string
-          source?: string
-          source_url?: string
-          tags?: string[]
-          servings?: string
-          total_time?: string
-          notes?: string
-          created_by?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      little_guys: {
-        Row: {
-          id: string
-          space_id: string
-          name: string
-          image_url: string
-          source: string
-          owner_id: string | null
-          personality: string
-          description: string
-          created_by: string | null
-          created_at: string
+          total_time: string
         }
         Insert: {
-          id?: string
-          space_id: string
-          name: string
-          image_url?: string
-          source?: string
-          owner_id?: string | null
-          personality?: string
-          description?: string
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string
+          ingredients?: string
+          notes?: string
+          servings?: string
+          source?: string
+          source_url?: string
+          space_id: string
+          steps?: string
+          tags?: string[]
+          title: string
+          total_time?: string
         }
         Update: {
-          id?: string
-          space_id?: string
-          name?: string
-          image_url?: string
-          source?: string
-          owner_id?: string | null
-          personality?: string
-          description?: string
-          created_by?: string | null
           created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string
+          ingredients?: string
+          notes?: string
+          servings?: string
+          source?: string
+          source_url?: string
+          space_id?: string
+          steps?: string
+          tags?: string[]
+          title?: string
+          total_time?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recipes_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      music_practice_days: {
+      space_members: {
         Row: {
-          id: string
+          created_at: string
           space_id: string
           user_id: string
-          practice_date: string
-          position: number
-          tempo: number | null
-          created_at: string
         }
         Insert: {
-          id?: string
-          space_id: string
-          user_id?: string
-          practice_date: string
-          position: number
-          tempo?: number | null
           created_at?: string
+          space_id: string
+          user_id: string
         }
         Update: {
-          id?: string
+          created_at?: string
           space_id?: string
           user_id?: string
-          practice_date?: string
-          position?: number
-          tempo?: number | null
-          created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "space_members_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      entry_repeats: {
+      spaces: {
         Row: {
-          id: string
-          space_id: string
-          entry_id: string
-          repeat_date: string
-          created_by: string | null
           created_at: string
+          home_address: string | null
+          home_lat: number | null
+          home_lng: number | null
+          id: string
+          name: string
         }
         Insert: {
-          id?: string
-          space_id: string
-          entry_id: string
-          repeat_date: string
-          created_by?: string | null
           created_at?: string
+          home_address?: string | null
+          home_lat?: number | null
+          home_lng?: number | null
+          id?: string
+          name: string
         }
         Update: {
-          id?: string
-          space_id?: string
-          entry_id?: string
-          repeat_date?: string
-          created_by?: string | null
           created_at?: string
+          home_address?: string | null
+          home_lat?: number | null
+          home_lng?: number | null
+          id?: string
+          name?: string
         }
         Relationships: []
       }
-    }
-    Views: Record<string, never>
-    Functions: {
-      is_space_member: {
-        Args: { target_space: string }
-        Returns: boolean
+      spoons: {
+        Row: {
+          acquired_on: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          image_url: string
+          lat: number | null
+          lng: number | null
+          name: string
+          notes: string
+          place: string
+          space_id: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          notes?: string
+          place?: string
+          space_id: string
+        }
+        Update: {
+          acquired_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          notes?: string
+          place?: string
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spoons_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tier_item_completions: {
+        Row: {
+          created_at: string
+          done_on: string
+          id: string
+          item_id: string
+          space_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          done_on: string
+          id?: string
+          item_id: string
+          space_id: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          done_on?: string
+          id?: string
+          item_id?: string
+          space_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_item_reads_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "tier_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tier_item_reads_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tier_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          creator: string
+          done_on: string | null
+          id: string
+          image_url: string
+          kind: string
+          list_id: string | null
+          space_id: string
+          tags: string[]
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          creator?: string
+          done_on?: string | null
+          id?: string
+          image_url?: string
+          kind: string
+          list_id?: string | null
+          space_id: string
+          tags?: string[]
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          creator?: string
+          done_on?: string | null
+          id?: string
+          image_url?: string
+          kind?: string
+          list_id?: string | null
+          space_id?: string
+          tags?: string[]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "tier_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tier_items_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tier_lists: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          emoji: string
+          id: string
+          name: string
+          noun: string
+          shared: boolean
+          space_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string
+          id?: string
+          name: string
+          noun: string
+          shared?: boolean
+          space_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string
+          id?: string
+          name?: string
+          noun?: string
+          shared?: boolean
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_lists_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tier_placements: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          position: number
+          space_id: string
+          tier: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          position: number
+          space_id: string
+          tier: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          position?: number
+          space_id?: string
+          tier?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_placements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "tier_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tier_placements_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wishlist_items: {
+        Row: {
+          address: string | null
+          created_at: string
+          created_by: string | null
+          entry_id: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          space_id: string
+          text: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          created_by?: string | null
+          entry_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          space_id: string
+          text?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          created_by?: string | null
+          entry_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          space_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wishlist_items_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_items_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
-    Enums: Record<string, never>
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      is_shared_board_item: { Args: { target_item: string }; Returns: boolean }
+      is_space_member: { Args: { target_space: string }; Returns: boolean }
+      keepalive: { Args: never; Returns: string }
+      shares_space_with: { Args: { other: string }; Returns: boolean }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
