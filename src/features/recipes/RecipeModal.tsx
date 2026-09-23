@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, FileButton, Group, TagsInput, Textarea, TextInput, UnstyledButton } from '@mantine/core'
+import { Box, Button, FileButton, Flex, Group, TagsInput, Textarea, TextInput, UnstyledButton } from '@mantine/core'
 import { colors, fonts, radii, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
@@ -61,7 +61,9 @@ export function RecipeModal({
 
   return (
     <ModalShell opened={opened} onClose={onClose} size="xl" title={isEditing ? 'Edit recipe' : 'Add a recipe'}>
-      <Group gap={20} align="flex-start" wrap="nowrap">
+      {/* Fields beside the photo column; below xs (phones) the photo stacks
+          on top instead, so the fields keep the full modal width. */}
+      <Flex gap={20} direction={{ base: 'column-reverse', xs: 'row' }} align={{ base: 'stretch', xs: 'flex-start' }}>
         <Box flex={1}>
           <TextInput
             label="Title"
@@ -123,7 +125,7 @@ export function RecipeModal({
             </UnstyledButton>
           )}
         </Box>
-      </Group>
+      </Flex>
 
       <Textarea
         label="Ingredients"

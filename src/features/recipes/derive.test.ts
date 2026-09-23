@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../../types'
-import { distinctRecipeTags, filterRecipes, ingredientLines, servingsTimeLine, sortRecipes, stepBlocks } from './derive'
+import { distinctRecipeTags, filterRecipes, ingredientLines, servingsTimeLine, sortRecipes, sourceHref, stepBlocks } from './derive'
 
 const recipe = (overrides: Partial<Recipe>): Recipe => ({
   id: 'r1',
@@ -124,5 +124,19 @@ describe('servingsTimeLine', () => {
     expect(servingsTimeLine({ servings: '4', totalTime: '' })).toBe('Serves 4')
     expect(servingsTimeLine({ servings: '', totalTime: '45 min' })).toBe('45 min')
     expect(servingsTimeLine({ servings: ' ', totalTime: '' })).toBe('')
+  })
+})
+
+describe('sourceHref', () => {
+  it('keeps a URL that already has a scheme', () => {
+    expect(sourceHref('https://smittenkitchen.com/x')).toBe('https://smittenkitchen.com/x')
+    expect(sourceHref('http://example.com')).toBe('http://example.com')
+  })
+  it('adds https:// to a bare domain', () => {
+    expect(sourceHref('  smittenkitchen.com/2010/04/shakshuka/ ')).toBe('https://smittenkitchen.com/2010/04/shakshuka/')
+    expect(sourceHref('//cdn.example.com/a')).toBe('https://cdn.example.com/a')
+  })
+  it('is empty for a blank URL', () => {
+    expect(sourceHref('   ')).toBe('')
   })
 })

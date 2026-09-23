@@ -4,7 +4,7 @@ import type { Profile, Recipe } from '../../types'
 import { colors, fieldLabelStyle, fonts, text } from '../../theme'
 import { formatDateWithYear, localDateOf } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
-import { ingredientLines, servingsTimeLine, stepBlocks } from './derive'
+import { ingredientLines, servingsTimeLine, sourceHref, stepBlocks } from './derive'
 import { RecipePhoto } from './RecipeGrid'
 
 /**
@@ -68,7 +68,7 @@ export function RecipeDetail({
           {meta}
           {meta && recipe.source ? ' · ' : ''}
           {recipe.sourceUrl ? (
-            <Anchor href={recipe.sourceUrl} target="_blank" rel="noreferrer" c={colors.inkFaded} underline="always">
+            <Anchor href={sourceHref(recipe.sourceUrl)} target="_blank" rel="noreferrer" c={colors.inkFaded} underline="always">
               {recipe.source || recipe.sourceUrl}
             </Anchor>
           ) : (

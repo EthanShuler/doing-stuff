@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, FileButton, Group, Select, Textarea, TextInput, UnstyledButton } from '@mantine/core'
+import { Box, Button, FileButton, Flex, Select, Textarea, TextInput, UnstyledButton } from '@mantine/core'
 import { colors, fonts, radii, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
@@ -70,7 +70,9 @@ export function LittleGuyModal({
 
   return (
     <ModalShell opened={opened} onClose={onClose} size="lg" title={isEditing ? 'Edit little guy' : 'Add a little guy'}>
-      <Group gap={20} align="flex-start" wrap="nowrap">
+      {/* Fields beside the photo column; below xs (phones) the photo stacks
+          on top instead, so the fields keep the full modal width. */}
+      <Flex gap={20} direction={{ base: 'column-reverse', xs: 'row' }} align={{ base: 'stretch', xs: 'flex-start' }}>
         <Box flex={1}>
           <TextInput
             label="Name"
@@ -131,7 +133,7 @@ export function LittleGuyModal({
             </UnstyledButton>
           )}
         </Box>
-      </Group>
+      </Flex>
 
       <Textarea
         label="Description"

@@ -69,3 +69,12 @@ export function servingsTimeLine(recipe: Pick<Recipe, 'servings' | 'totalTime'>)
   if (recipe.totalTime.trim()) parts.push(recipe.totalTime.trim())
   return parts.join(' · ')
 }
+
+/** The source link's href. People paste bare "smittenkitchen.com/…" URLs, which
+ *  an <a> treats as a path on this site — so anything without a scheme gets
+ *  https://. Applied at render, so rows saved before this still link right. */
+export function sourceHref(url: string): string {
+  const trimmed = url.trim()
+  if (!trimmed) return ''
+  return /^[a-z][a-z\d+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/+/, '')}`
+}
