@@ -4,6 +4,14 @@ import { Box } from '@mantine/core'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+
+// CARTO basemaps now want a (free, public) key on every tile request, passed
+// as `?key=`; without one they still load but with an "API key required"
+// watermark. VITE_CARTO_API_KEY ships to the browser like the TMDB key.
+const CARTO_KEY = import.meta.env.VITE_CARTO_API_KEY as string | undefined
+const TILE_URL = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${
+  CARTO_KEY ? `?key=${encodeURIComponent(CARTO_KEY)}` : ''
+}`
 import { colors } from '../theme'
 
 // Shared Leaflet primitives for every feature map (doing-stuff, spoons, parks):
@@ -47,7 +55,7 @@ export function MapCanvas({
       <MapContainer center={center} zoom={zoom} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          url={TILE_URL}
           subdomains="abcd"
         />
         {children}

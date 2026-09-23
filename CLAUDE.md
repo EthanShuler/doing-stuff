@@ -344,7 +344,9 @@ paper), ported from the Claude Design "Compass" direction.
   focus-visible treatment that inline styles can't express (its values are
   hand-copies of `warmBorder(0.3)` / `shadows.hover` / `ACCENT`); Mantine's
   stylesheet provides the reset. Anything else belongs in the theme.
-- **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles).
+- **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles, keyed by
+  `VITE_CARTO_API_KEY` — a free public browser key; missing = tiles carry an
+  "API key required" watermark).
 - **@dnd-kit** (`core` + `sortable` + `utilities`) for the tier-list drag-n-drop.
   Multi-container pattern: each tier row is a droppable + `SortableContext`;
   cross-row moves happen in `onDragOver` against a board copy frozen at drag
