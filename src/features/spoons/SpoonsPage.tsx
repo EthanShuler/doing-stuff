@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { Button, SegmentedControl } from '@mantine/core'
 import type { Spoon } from '../../types'
 import { useBusy } from '../../lib/useBusy'
+import { usePhotoSession } from '../../lib/photoSession'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
 import { FloatingBanner } from '../../components/FloatingBanner'
@@ -11,6 +12,7 @@ import { useSpoonStore } from './useSpoonStore'
 import type { SpoonDraft } from './useSpoonStore'
 import { sortSpoons, spoonMarkers } from './derive'
 import { SpoonGrid } from './SpoonGrid'
+import { removeSpoonPhoto } from './photos'
 
 // Leaflet only ships to whoever opens the map (module scope — see the note
 // in DoingStuffPage).
@@ -36,13 +38,18 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
   const sorted = useMemo(() => sortSpoons(store.spoons), [store.spoons])
   const markers = useMemo(() => spoonMarkers(store.spoons), [store.spoons])
 
+  // The modal's uploads, so abandoned picks get deleted (src/lib/photoSession).
+  const photos = usePhotoSession(store.uploadPhoto, removeSpoonPhoto)
+
   const openAdd = () => {
+    photos.begin('')
     setEditingId(null)
     setDraft(emptyDraft())
     setModalOpen(true)
   }
 
   const openEdit = (spoon: Spoon) => {
+    photos.begin(spoon.imageUrl)
     setEditingId(spoon.id)
     setDraft({
       name: spoon.name,
@@ -55,6 +62,7 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
   }
 
   const closeModal = () => {
+    photos.discard()
     setModalOpen(false)
     setEditingId(null)
   }
@@ -62,30 +70,41 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
   // addSpoon awaits a geocode before inserting, so an unguarded double-click
   // has a wide window to create duplicate spoons.
   const { busy: saving, run: runSave } = useBusy()
+  const { busy: deleting, run: runDelete } = useBusy()
   const saveSpoon = () =>
     runSave(async () => {
-      if (!draft.name.trim()) return
+      if (!draft.name.trim() || deleting) return
       try {
         if (editingId) await store.updateSpoon(editingId, draft)
         else await store.addSpoon(draft)
+        photos.commit(draft.imageUrl.trim())
         closeModal()
       } catch {
         // Write failed — keep the modal open; store.error shows the reason.
       }
     })
 
-  const deleteEditingSpoon = async () => {
-    if (!editingId) {
-      closeModal()
-      return
-    }
-    if (!(await confirm({ title: 'Delete this spoon?', message: 'Its photo is removed too.' }))) return
-    try {
-      await store.deleteSpoon(editingId)
-      closeModal()
-    } catch {
-      // Keep the modal open on failure.
-    }
+  const deleteEditingSpoon = () =>
+    runDelete(async () => {
+      if (saving) return
+      if (!editingId) {
+        closeModal()
+        return
+      }
+      if (!(await confirm({ title: 'Delete this spoon?', message: 'Its photo is removed too.' }))) return
+      try {
+        await store.deleteSpoon(editingId)
+        closeModal()
+      } catch {
+        // Keep the modal open on failure.
+      }
+    })
+
+  // Cancel / Escape / click-out are ignored while a write is in flight: its
+  // late closeModal() would otherwise shut whatever modal is open by then,
+  // and the discard would race the save's own photo cleanup.
+  const requestClose = () => {
+    if (!saving && !deleting) closeModal()
   }
 
   // Only the collection waits on the first load — the control bar stays put.
@@ -133,11 +152,11 @@ export function SpoonsPage({ spaceId, configured }: { spaceId: string | null; co
         draft={draft}
         isEditing={editingId !== null}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-        onUpload={store.uploadPhoto}
+        onUpload={photos.upload}
         saving={saving}
         onSave={() => void saveSpoon()}
         onDelete={() => void deleteEditingSpoon()}
-        onClose={closeModal}
+        onClose={requestClose}
       />
     </>
   )

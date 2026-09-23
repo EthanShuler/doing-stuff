@@ -253,11 +253,24 @@ export function moveItem(
 
 // --- Deleting a list ---------------------------------------------------------
 
+/** The ids of every pool item on one custom list. */
+export function itemIdsOnList(items: TierItem[], listId: string): Set<string> {
+  const key = listKeyFor(listId)
+  return new Set(items.filter((item) => item.kind === key).map((item) => item.id))
+}
+
+/** Drop the rows (placements or completions) that belong to any of `itemIds`. */
+export function dropItemRows<R extends { itemId: string }>(rows: R[], itemIds: Set<string>): R[] {
+  return rows.filter((row) => !itemIds.has(row.itemId))
+}
+
 /**
  * Drop everything belonging to one custom list from a store snapshot — the
  * local mirror of the DB cascade (`tier_lists` → `tier_items` → placements /
  * completions). Rows on other boards are untouched; the list row itself is
- * removed by the caller.
+ * removed by the caller. The store applies the same two helpers slice by
+ * slice through functional updaters, so a write that lands mid-delete isn't
+ * clobbered.
  */
 export function pruneList<
   S extends {
@@ -266,12 +279,11 @@ export function pruneList<
     completions: TierCompletion[]
   },
 >(state: S, listId: string): S {
-  const key = listKeyFor(listId)
-  const gone = new Set(state.items.filter((item) => item.kind === key).map((item) => item.id))
+  const gone = itemIdsOnList(state.items, listId)
   return {
     ...state,
-    items: state.items.filter((item) => item.kind !== key),
-    placements: state.placements.filter((p) => !gone.has(p.itemId)),
-    completions: state.completions.filter((c) => !gone.has(c.itemId)),
+    items: state.items.filter((item) => !gone.has(item.id)),
+    placements: dropItemRows(state.placements, gone),
+    completions: dropItemRows(state.completions, gone),
   }
 }

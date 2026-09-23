@@ -206,7 +206,8 @@ export interface ActivityStore {
   /** Set (or clear, when empty) a wish's place; geocodes it for a map pin. */
   setWishlistAddress: (id: string, address: string) => Promise<void>
   deleteWishlistItem: (id: string) => Promise<void>
-  /** Mark an item done by linking it to the entry it produced. */
+  /** Mark an item done by linking it to the entry it produced. Throws on
+   *  failure (like the entry actions) so the check-off modal stays open. */
   linkWishlistItem: (id: string, entryId: string) => Promise<void>
   /** Reopen a done item (clear its entry link); the entry itself is kept. */
   unlinkWishlistItem: (id: string) => Promise<void>
@@ -756,7 +757,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
         const { error: err } = await supabase.from('wishlist_items').update({ entry_id: entryId }).eq('id', id)
         if (err) {
           setError(err.message)
-          return
+          throw err
         }
       }
       setWishlist((prev) => prev.map((item) => (item.id === id ? { ...item, entryId } : item)))

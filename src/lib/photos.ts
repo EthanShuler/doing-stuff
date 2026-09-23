@@ -2,9 +2,9 @@ import { supabase } from './supabase'
 import { downscaleImage } from './image'
 
 // Shared Supabase Storage plumbing for photo-carrying features (spoons,
-// recipes). Photos live in a PUBLIC bucket under a `<space_id>/<uuid>.jpg`
-// path (storage RLS lets only that space's members write there — see
-// schema.sql). Rows store the resulting public URL, so the UI renders plain
+// recipes, little guys). Photos live in a PUBLIC bucket under a
+// `<space_id>/<uuid>.jpg` path (storage RLS lets only that space's members
+// write there — see schema.sql). Rows store the resulting public URL, so the UI renders plain
 // <img> tags with no signed-URL plumbing.
 
 /**
@@ -23,12 +23,17 @@ export async function uploadBucketPhoto(bucket: string, spaceId: string | null, 
 }
 
 /**
- * Best-effort removal of an uploaded photo (its row deleted, or the photo
- * replaced). Fire-and-forget: a leaked object costs a few hundred KB and
- * nothing user-visible, so failures are deliberately swallowed. URLs outside
- * the bucket (seed object URLs) are ignored.
+ * Best-effort removal of an uploaded photo (its row deleted, the photo
+ * replaced, or an upload abandoned — see photoSession.ts). Fire-and-forget: a
+ * leaked object costs a few hundred KB and nothing user-visible, so failures
+ * are deliberately swallowed. Seed object URLs are revoked instead; other
+ * URLs outside the bucket are ignored.
  */
 export function removeBucketPhoto(bucket: string, url: string): void {
+  if (url.startsWith('blob:')) {
+    URL.revokeObjectURL(url)
+    return
+  }
   if (!supabase) return
   const marker = `/object/public/${bucket}/`
   const idx = url.indexOf(marker)

@@ -23,8 +23,8 @@ import { removeLittleGuyPhoto, uploadLittleGuyPhoto } from './photos'
 //   • No keys → in-memory seed so the UI can be developed offline.
 //
 // Photos ride along as public-bucket URLs (see photos.ts); the store uploads on
-// demand and best-effort deletes orphaned objects when a guy or his photo goes
-// away.
+// demand and deletes a guy's photo with him (replaced/abandoned photos are the
+// page's call — see src/lib/photoSession.ts).
 
 interface Snapshot {
   guys: LittleGuy[]
@@ -107,7 +107,8 @@ export interface LittleGuyStore {
   uploadPhoto: (file: File) => Promise<string>
   /** Add a little guy. Throws on failure (modal stays open). */
   addLittleGuy: (draft: LittleGuyDraft) => Promise<void>
-  /** Edit a little guy. Throws on failure. */
+  /** Edit a little guy. Throws on failure. Leaves the replaced photo to the
+   *  page's photo session. */
   updateLittleGuy: (id: string, draft: LittleGuyDraft) => Promise<void>
   /** Delete a little guy (and best-effort his uploaded photo). Throws on failure. */
   deleteLittleGuy: (id: string) => Promise<void>
@@ -132,8 +133,8 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
 
-  // Latest guys, read by update/delete to find the prior photo without
-  // re-creating their callbacks on every change.
+  // Latest guys, read by delete to find the photo to remove without
+  // re-creating its callback on every change.
   const guysRef = useRef(guys)
   guysRef.current = guys
 
@@ -230,7 +231,6 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
       const fields = draftFields(draft)
       if (!fields.name) return
       setError(null)
-      const prior = guysRef.current.find((g) => g.id === id)
       if (supabase && spaceId) {
         const { error: err } = await supabase
           .from('little_guys')
@@ -247,10 +247,6 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
           setError(err.message)
           throw err
         }
-      }
-      // The old photo is unreachable once the row points elsewhere.
-      if (prior && prior.imageUrl && prior.imageUrl !== fields.imageUrl) {
-        removeLittleGuyPhoto(prior.imageUrl)
       }
       setGuys((prev) => prev.map((g) => (g.id === id ? { ...g, ...fields } : g)))
     },

@@ -6,6 +6,7 @@ import { Link, useLocation } from 'react-router'
 import { ACCENT, colors, fonts, radii, text } from '../theme'
 import { supabase } from '../lib/supabase'
 import { Splash } from '../components/Splash'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 
 /** Top-level features behind the shell nav — one entry per feature, not one
  *  per route. Doing Stuff spans four routes, Tier Lists four boards, and Lists
@@ -111,9 +112,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {/* The routes are lazy chunks (see App.tsx); the boundary lives here so
           the header/nav stay mounted while one loads. react-router wraps
           in-app navigations in a transition, so this fallback is really only
-          seen on a hard load of a route. */}
+          seen on a hard load of a route. The error boundary sits outside it
+          for the same reason: a page that throws (or a chunk that fails to
+          load) keeps the shell, and navigating away resets it. */}
       <AppShell.Main>
-        <Suspense fallback={<Splash text="Loading…" mih="60vh" />}>{children}</Suspense>
+        <ErrorBoundary resetKey={pathname} mih="60vh">
+          <Suspense fallback={<Splash text="Loading…" mih="60vh" />}>{children}</Suspense>
+        </ErrorBoundary>
       </AppShell.Main>
     </AppShell>
   )

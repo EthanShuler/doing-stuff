@@ -25,11 +25,15 @@ import { SEED_SELF_ID, errorMessage, idFactory, syncTable, upsertById, useSpaceS
 //    lets only the owner write a book row, and the page shows only the
 //    viewer's. Every other list is shared.
 //  • "Done" is two different columns. A movie/TV/book row is done once
-//    checking it off has created its `tier_items` row and linked it
+//    checking it off has created (or reused) its `tier_items` row and linked it
 //    (`tier_item_id`); a free-form row has no board, so it just stamps
 //    `done_on`. Deleting that tier item later REOPENS the row — the DB's
 //    `on delete set null` fires, and the cascaded UPDATE arrives here as an
 //    ordinary realtime UPDATE on `list_items`, so nothing cross-table is read.
+
+/** A literal ILIKE pattern: `%`, `_`, and the escape `\` itself match only
+ *  themselves. */
+const likeLiteral = (text: string) => text.replace(/[\\%_]/g, (c) => `\\${c}`)
 
 interface Snapshot {
   /** The space's free-form lists ("Groceries"), in creation order. */
@@ -439,25 +443,57 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
         const boardKey = item.key as 'movie' | 'tv' | 'book'
         const personal = datesArePersonal(boardKey)
         if (supabase && spaceId) {
-          // 1. Create the tier item in the shared pool.
-          const { data: itemData, error: itemErr } = await supabase
+          // 1. Find or create the tier item in the shared pool. Unchecking a
+          //    row leaves its tier item on the board, and a check-off whose
+          //    link write failed has already inserted one — so a same-kind,
+          //    same-title (trimmed, case-insensitive) built-in item is reused
+          //    rather than duplicated.
+          const title = item.title.trim()
+          const { data: found, error: findErr } = await supabase
             .from('tier_items')
-            .insert({
-              space_id: spaceId,
-              kind: boardKey,
-              list_id: null,
-              title: item.title,
-              image_url: item.imageUrl,
-              creator: item.creator,
-              done_on: personal ? null : today(),
-            })
-            .select('id')
-            .single()
-          if (itemErr) {
-            setError(itemErr.message)
+            .select('id, title, done_on')
+            .eq('space_id', spaceId)
+            .eq('kind', boardKey)
+            .is('list_id', null)
+            .ilike('title', likeLiteral(title))
+            .order('created_at')
+          if (findErr) {
+            setError(findErr.message)
             return
           }
-          const tierItemId = (itemData as { id: string }).id
+          const existing = found.find((row) => row.title.trim().toLowerCase() === title.toLowerCase())
+          let tierItemId: string
+          if (existing) {
+            tierItemId = existing.id
+            // Movies/TV: a board item that never got a watched date gets one
+            // now. Books keep a null shared date; the completion below dates it.
+            if (!personal && existing.done_on === null) {
+              const { error: dateErr } = await supabase
+                .from('tier_items')
+                .update({ done_on: today() })
+                .eq('id', tierItemId)
+              if (dateErr) setError(dateErr.message)
+            }
+          } else {
+            const { data: itemData, error: itemErr } = await supabase
+              .from('tier_items')
+              .insert({
+                space_id: spaceId,
+                kind: boardKey,
+                list_id: null,
+                title: item.title,
+                image_url: item.imageUrl,
+                creator: item.creator,
+                done_on: personal ? null : today(),
+              })
+              .select('id')
+              .single()
+            if (itemErr) {
+              setError(itemErr.message)
+              return
+            }
+            tierItemId = (itemData as { id: string }).id
+          }
           // 2. Your own completion record (books). The tier item exists either
           //    way, so a failure here only surfaces the banner.
           if (personal && selfId) {
@@ -487,7 +523,8 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
 
         // Seed mode: stamp a fake tier item id so the row reads as done. The
         // tier boards run a SEPARATE in-memory store, so no card actually
-        // appears over there until a reload against a real backend.
+        // appears over there until a reload against a real backend — and
+        // there's no pool here to reuse from, so a re-check mints a new id.
         const fakeTierItemId = nextId()
         setItems((prev) => prev.map((w) => (w.id === item.id ? { ...w, tierItemId: fakeTierItemId } : w)))
       } finally {

@@ -696,19 +696,20 @@ drop policy if exists "members update space" on public.spaces;
 create policy "members update space" on public.spaces
   for update using (public.is_space_member(id)) with check (public.is_space_member(id));
 
+-- Deliberately no DELETE policy: the app never deletes a space, and one call
+-- from either member would cascade away everything. Do it in the SQL Editor.
 drop policy if exists "members delete space" on public.spaces;
-create policy "members delete space" on public.spaces
-  for delete using (public.is_space_member(id));
 
 -- space_members --------------------------------------------------------------
--- Members can see co-members and invite others into a space they belong to.
+-- Members can see co-members. Deliberately no INSERT policy: sign-up is open,
+-- so "any member may add a member" let a stranger pull anyone into their own
+-- space. Sharing is SQL-Editor-only (which bypasses RLS), and the creator's
+-- own first row comes from the SECURITY DEFINER on_space_created trigger.
 drop policy if exists "members read membership" on public.space_members;
 create policy "members read membership" on public.space_members
   for select using (public.is_space_member(space_id));
 
 drop policy if exists "members add members" on public.space_members;
-create policy "members add members" on public.space_members
-  for insert with check (public.is_space_member(space_id));
 
 -- A user can remove only their OWN membership (leave a space) — not kick a
 -- co-member.
@@ -910,6 +911,13 @@ grant select, insert, update, delete on
   public.recipes, public.music_practice_days, public.little_guys
   to authenticated;
 grant select, update on public.profiles to authenticated;
+-- Functions default to PUBLIC execute; only signed-in users need the helpers,
+-- and nobody needs to call the trigger functions directly.
+revoke execute on function public.is_space_member(uuid)      from public, anon;
+revoke execute on function public.shares_space_with(uuid)    from public, anon;
+revoke execute on function public.is_shared_board_item(uuid) from public, anon;
+revoke execute on function public.add_creator_as_member()    from public, anon;
+revoke execute on function public.handle_new_user()          from public, anon;
 grant execute on function public.is_space_member(uuid) to authenticated;
 grant execute on function public.shares_space_with(uuid) to authenticated;
 grant execute on function public.is_shared_board_item(uuid) to authenticated;
