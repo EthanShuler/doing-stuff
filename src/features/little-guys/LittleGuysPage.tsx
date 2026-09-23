@@ -4,6 +4,7 @@ import type { LittleGuy } from '../../types'
 import { ACCENT, colors, fonts, text } from '../../theme'
 import { supabase } from '../../lib/supabase'
 import { useBusy } from '../../lib/useBusy'
+import { usePhotoSession } from '../../lib/photoSession'
 import { SEED_SELF_ID } from '../../data/spaceSync'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
@@ -18,6 +19,7 @@ import type { OwnerFilter } from './derive'
 import { buildMembers, countLine, filterLittleGuys, OWNER_ALL, ownerOptions, sortLittleGuys } from './derive'
 import { LittleGuyGrid } from './LittleGuyGrid'
 import { LittleGuyModal } from './LittleGuyModal'
+import { removeLittleGuyPhoto } from './photos'
 
 /** The little guy collection: a photo grid of everyone on the shelf, filtered
  *  by whose they are, with add/edit behind a modal. One route (/little-guys) —
@@ -63,13 +65,18 @@ export function LittleGuysPage({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<LittleGuyDraft>(emptyDraft)
 
+  // The modal's uploads, so abandoned picks get deleted (src/lib/photoSession).
+  const photos = usePhotoSession(store.uploadPhoto, removeLittleGuyPhoto)
+
   const openAdd = () => {
+    photos.begin('')
     setEditingId(null)
     setDraft(emptyDraft())
     setModalOpen(true)
   }
 
   const openEdit = (guy: LittleGuy) => {
+    photos.begin(guy.imageUrl)
     setEditingId(guy.id)
     setDraft({
       name: guy.name,
@@ -83,35 +90,47 @@ export function LittleGuysPage({
   }
 
   const closeModal = () => {
+    photos.discard()
     setModalOpen(false)
     setEditingId(null)
   }
 
   const { busy: saving, run: runSave } = useBusy()
+  const { busy: deleting, run: runDelete } = useBusy()
   const saveLittleGuy = () =>
     runSave(async () => {
-      if (!draft.name.trim()) return
+      if (!draft.name.trim() || deleting) return
       try {
         if (editingId) await store.updateLittleGuy(editingId, draft)
         else await store.addLittleGuy(draft)
+        photos.commit(draft.imageUrl.trim())
         closeModal()
       } catch {
         // Write failed — keep the modal open; store.error shows the reason.
       }
     })
 
-  const deleteEditingLittleGuy = async () => {
-    if (!editingId) {
-      closeModal()
-      return
-    }
-    if (!(await confirm({ title: 'Delete this little guy?', message: 'His photo is removed too.' }))) return
-    try {
-      await store.deleteLittleGuy(editingId)
-      closeModal()
-    } catch {
-      // Keep the modal open on failure.
-    }
+  const deleteEditingLittleGuy = () =>
+    runDelete(async () => {
+      if (saving) return
+      if (!editingId) {
+        closeModal()
+        return
+      }
+      if (!(await confirm({ title: 'Delete this little guy?', message: 'His photo is removed too.' }))) return
+      try {
+        await store.deleteLittleGuy(editingId)
+        closeModal()
+      } catch {
+        // Keep the modal open on failure.
+      }
+    })
+
+  // Cancel / Escape / click-out are ignored while a write is in flight: its
+  // late closeModal() would otherwise shut whatever modal is open by then,
+  // and the discard would race the save's own photo cleanup.
+  const requestClose = () => {
+    if (!saving && !deleting) closeModal()
   }
 
   // The shelf waits on the first load; the control bar (minus its derived
@@ -200,11 +219,11 @@ export function LittleGuysPage({
         isEditing={editingId !== null}
         members={members}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-        onUpload={store.uploadPhoto}
+        onUpload={photos.upload}
         saving={saving}
         onSave={() => void saveLittleGuy()}
         onDelete={() => void deleteEditingLittleGuy()}
-        onClose={closeModal}
+        onClose={requestClose}
       />
     </>
   )

@@ -14,10 +14,14 @@ async function resolveSpace(userId: string): Promise<string> {
   const client = supabase
   if (!client) throw new Error('Supabase not configured.')
 
-  // RLS scopes this to spaces the user already belongs to.
+  // RLS scopes this to spaces the user already belongs to. Pinned to our own
+  // earliest membership so a user in two spaces always lands in the same one
+  // (an unordered limit(1) could flip between them from load to load).
   const { data: members, error: mErr } = await client
     .from('space_members')
     .select('space_id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
     .limit(1)
   if (mErr) throw mErr
   if (members && members.length > 0) return members[0].space_id

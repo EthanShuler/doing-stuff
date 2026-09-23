@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
 import { colors } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
+import { usePhotoSession } from '../../lib/photoSession'
 import { useTagFilter } from '../../lib/useTagFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
 import { useConfirm } from '../../components/ConfirmModal'
@@ -19,6 +20,7 @@ import { RecipeGrid } from './RecipeGrid'
 import { RecipeList } from './RecipeList'
 import { RecipeDetail } from './RecipeDetail'
 import { RecipeModal } from './RecipeModal'
+import { removeRecipePhoto } from './photos'
 
 type View = 'grid' | 'list'
 
@@ -61,13 +63,18 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<RecipeDraft>(emptyDraft)
 
+  // The modal's uploads, so abandoned picks get deleted (src/lib/photoSession).
+  const photos = usePhotoSession(store.uploadPhoto, removeRecipePhoto)
+
   const openAdd = () => {
+    photos.begin('')
     setEditingId(null)
     setDraft(emptyDraft())
     setModalOpen(true)
   }
 
   const openEdit = (recipe: Recipe) => {
+    photos.begin(recipe.imageUrl)
     setEditingId(recipe.id)
     setDraft({
       title: recipe.title,
@@ -85,37 +92,49 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
   }
 
   const closeModal = () => {
+    photos.discard()
     setModalOpen(false)
     setEditingId(null)
   }
 
   const { busy: saving, run: runSave } = useBusy()
+  const { busy: deleting, run: runDelete } = useBusy()
   const saveRecipe = () =>
     runSave(async () => {
-      if (!draft.title.trim()) return
+      if (!draft.title.trim() || deleting) return
       try {
         if (editingId) await store.updateRecipe(editingId, draft)
         else await store.addRecipe(draft)
+        photos.commit(draft.imageUrl.trim())
         closeModal()
       } catch {
         // Write failed — keep the modal open; store.error shows the reason.
       }
     })
 
-  const deleteEditingRecipe = async () => {
-    if (!editingId) {
-      closeModal()
-      return
-    }
-    if (!(await confirm({ title: 'Delete this recipe for both of you?', message: 'Its photo is removed too.' }))) return
-    try {
-      await store.deleteRecipe(editingId)
-      closeModal()
-      // If its page was open, it no longer exists — back to the index.
-      if (openId === editingId) navigate('/recipes')
-    } catch {
-      // Keep the modal open on failure.
-    }
+  const deleteEditingRecipe = () =>
+    runDelete(async () => {
+      if (saving) return
+      if (!editingId) {
+        closeModal()
+        return
+      }
+      if (!(await confirm({ title: 'Delete this recipe for both of you?', message: 'Its photo is removed too.' }))) return
+      try {
+        await store.deleteRecipe(editingId)
+        closeModal()
+        // If its page was open, it no longer exists — back to the index.
+        if (openId === editingId) navigate('/recipes')
+      } catch {
+        // Keep the modal open on failure.
+      }
+    })
+
+  // Cancel / Escape / click-out are ignored while a write is in flight: its
+  // late closeModal() would otherwise shut whatever modal is open by then,
+  // and the discard would race the save's own photo cleanup.
+  const requestClose = () => {
+    if (!saving && !deleting) closeModal()
   }
 
   // Both branches gate: a deep link to /recipes/:id would otherwise flash
@@ -218,11 +237,11 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
         isEditing={editingId !== null}
         tagSuggestions={allTags}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-        onUpload={store.uploadPhoto}
+        onUpload={photos.upload}
         saving={saving}
         onSave={() => void saveRecipe()}
         onDelete={() => void deleteEditingRecipe()}
-        onClose={closeModal}
+        onClose={requestClose}
       />
     </>
   )

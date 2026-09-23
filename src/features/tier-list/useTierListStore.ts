@@ -5,7 +5,7 @@ import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCom
 import { supabase } from '../../lib/supabase'
 import { firstGrapheme } from '../../lib/text'
 import { renormalizedPositions } from '../../lib/order'
-import { datesArePersonal, keyOf, kindColumn, listIdOf, normalizeTags, placementOwner, pruneList } from './derive'
+import { datesArePersonal, dropItemRows, itemIdsOnList, keyOf, kindColumn, listIdOf, listKeyFor, normalizeTags, placementOwner } from './derive'
 import type { ListDraft } from './ListModal'
 import { PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
@@ -277,7 +277,7 @@ export interface TierListStore {
   /** Rename / re-word a list. Throws on failure. */
   updateList: (id: string, draft: ListDraft) => Promise<void>
   /** Delete a list — ONE DB delete; Postgres cascades its items (and everyone's
-   *  placements/completions of them). Mirrored locally with pruneList.
+   *  placements/completions of them). Mirrored locally slice by slice (itemIdsOnList / dropItemRows).
    *  Throws on failure. */
   deleteList: (id: string) => Promise<void>
 }
@@ -678,13 +678,18 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       // member's placements and completions. The dependent deletes arrive as
       // their own realtime events, but mirror them now so this tab doesn't
       // render a board of orphans for a beat.
+      // Each slice goes through a functional updater so a realtime event or an
+      // optimistic drop that landed during the await survives. The item ids are
+      // read from this render's pool: an item added to the list mid-await is
+      // still filtered by kind, and its cascaded placements arrive as DELETEs.
+      const gone = itemIdsOnList(items, id)
+      const key = listKeyFor(id)
       setLists((prev) => prev.filter((l) => l.id !== id))
-      const pruned = pruneList({ items, placements, completions }, id)
-      setItems(pruned.items)
-      setPlacements(pruned.placements)
-      setCompletions(pruned.completions)
+      setItems((prev) => prev.filter((item) => item.kind !== key))
+      setPlacements((prev) => dropItemRows(prev, gone))
+      setCompletions((prev) => dropItemRows(prev, gone))
     },
-    [spaceId, items, placements, completions],
+    [spaceId, items],
   )
 
   return {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Box } from '@mantine/core'
 import { useNavigate } from 'react-router'
 import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../types'
@@ -83,6 +83,10 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   // Set when the entry modal was opened by checking off a wishlist item; on a
   // successful save we link that item to the new entry (marking it done).
   const [pendingWishId, setPendingWishId] = useState<string | null>(null)
+  // The entry a check-off already created when its link write then failed:
+  // a retry updates that entry and re-links instead of logging a duplicate.
+  // Cleared whenever the modal closes.
+  const checkOffEntry = useRef<{ wishId: string; entryId: string } | null>(null)
   // Entry whose repeat modal is open.
   const [repeatEntryId, setRepeatEntryId] = useState<string | null>(null)
 
@@ -140,6 +144,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   const checkWish = (item: WishlistItem) => {
     setEditingId(null)
     setPendingWishId(item.id)
+    checkOffEntry.current = null
     // Carry the wish's place into the entry; it re-geocodes on save.
     setDraft({ ...emptyDraft(), title: item.text, address: item.address })
     setModal('entry')
@@ -155,6 +160,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
     setEditingId(null)
     setPendingWishId(null)
     setRepeatEntryId(null)
+    checkOffEntry.current = null
   }
 
   // addEntry awaits a geocode before inserting, so an unguarded double-click
@@ -166,9 +172,21 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
       try {
         if (editingId) {
           await store.updateEntry(editingId, draft)
+        } else if (pendingWishId) {
+          // Reuse this attempt's entry if it's still around (a partner could
+          // have deleted it in the meantime).
+          const prior = checkOffEntry.current
+          let entryId: string
+          if (prior && prior.wishId === pendingWishId && store.entries.some((e) => e.id === prior.entryId)) {
+            entryId = prior.entryId
+            await store.updateEntry(entryId, draft)
+          } else {
+            entryId = await store.addEntry(draft)
+            checkOffEntry.current = { wishId: pendingWishId, entryId }
+          }
+          await store.linkWishlistItem(pendingWishId, entryId)
         } else {
-          const newEntryId = await store.addEntry(draft)
-          if (pendingWishId) await store.linkWishlistItem(pendingWishId, newEntryId)
+          await store.addEntry(draft)
         }
         closeModal()
       } catch {

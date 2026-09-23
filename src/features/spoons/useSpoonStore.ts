@@ -12,8 +12,8 @@ import { removeSpoonPhoto, uploadSpoonPhoto } from './photos'
 //   • No keys → in-memory seed so the UI can be developed offline.
 //
 // Photos ride along as public-bucket URLs (see photos.ts); the store uploads
-// on demand and best-effort deletes orphaned objects when a spoon or its
-// photo goes away.
+// on demand and deletes a spoon's photo with it. Replaced/abandoned photos are
+// the page's call, not this store's — see src/lib/photoSession.ts.
 
 interface Snapshot {
   spoons: Spoon[]
@@ -90,7 +90,8 @@ export interface SpoonStore {
   uploadPhoto: (file: File) => Promise<string>
   /** Add a spoon; geocodes the place on save. Throws on failure (modal stays open). */
   addSpoon: (draft: SpoonDraft) => Promise<void>
-  /** Edit a spoon; re-geocodes only when the place text changed. Throws on failure. */
+  /** Edit a spoon; re-geocodes only when the place text changed. Throws on
+   *  failure. Leaves the replaced photo to the page's photo session. */
   updateSpoon: (id: string, draft: SpoonDraft) => Promise<void>
   /** Delete a spoon (and best-effort its uploaded photo). Throws on failure. */
   deleteSpoon: (id: string) => Promise<void>
@@ -106,8 +107,9 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
   const clearError = useCallback(() => setError(null), [])
   const clearNotice = useCallback(() => setNotice(null), [])
 
-  // Latest spoons, read by updateSpoon to compare the prior place/photo
-  // without re-creating its callback on every change.
+  // Latest spoons, read by updateSpoon to compare the prior place and by
+  // deleteSpoon to find the photo to remove, without re-creating their
+  // callbacks on every change.
   const spoonsRef = useRef(spoons)
   spoonsRef.current = spoons
 
@@ -248,10 +250,6 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
           setError(err.message)
           throw err
         }
-      }
-      // The old photo is unreachable once the row points elsewhere.
-      if (prior && prior.imageUrl && prior.imageUrl !== fields.imageUrl) {
-        removeSpoonPhoto(prior.imageUrl)
       }
       setSpoons((prev) => prev.map((s) => (s.id === id ? { ...s, ...fields } : s)))
     },

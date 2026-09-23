@@ -17,6 +17,8 @@ import {
   normalizeTags,
   placementOwner,
   pruneList,
+  itemIdsOnList,
+  dropItemRows,
   tierSwatch,
 } from './derive'
 import { palette } from '../../theme'
@@ -513,6 +515,21 @@ describe('pruneList', () => {
     const before = state.items.length
     pruneList(state, 'l1')
     expect(state.items.length).toBe(before)
+  })
+})
+
+describe('itemIdsOnList / dropItemRows', () => {
+  it('collects only the list’s item ids', () => {
+    const a = item({ kind: 'list:l1' })
+    const b = item({ kind: 'list:l2' })
+    const c = item({ kind: 'movie' })
+    expect([...itemIdsOnList([a, b, c], 'l1')]).toEqual([a.id])
+  })
+
+  it('drops rows for the given ids and keeps the rest', () => {
+    const rows = [placement({ itemId: 'x' }), placement({ itemId: 'y' }), completion({ itemId: 'x' })]
+    expect(dropItemRows(rows, new Set(['x'])).map((r) => r.itemId)).toEqual(['y'])
+    expect(dropItemRows(rows, new Set())).toEqual(rows)
   })
 })
 

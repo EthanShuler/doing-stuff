@@ -28,8 +28,9 @@ export function LittleGuyModal({
   /** Space members, in join order — the owner options. */
   members: Member[]
   onChange: (patch: Partial<LittleGuyDraft>) => void
-  /** Downscale + upload a picked photo; resolves to its URL (see useLittleGuyStore). */
-  onUpload: (file: File) => Promise<string>
+  /** Downscale + upload a picked photo; resolves to its URL, or null
+   *  when the modal closed mid-upload (see src/lib/photoSession.ts). */
+  onUpload: (file: File) => Promise<string | null>
   saving: boolean
   onSave: () => void
   onDelete: () => void
@@ -52,7 +53,7 @@ export function LittleGuyModal({
     setUploading(true)
     try {
       const imageUrl = await onUpload(file)
-      if (session === uploadSession.current) onChange({ imageUrl })
+      if (imageUrl && session === uploadSession.current) onChange({ imageUrl })
     } catch {
       // Upload failed — store.error shows the reason; the draft keeps its old image.
     } finally {
@@ -113,7 +114,7 @@ export function LittleGuyModal({
           </Box>
           <FileButton onChange={(file) => void pickPhoto(file)} accept="image/*">
             {(props) => (
-              <Button {...props} variant="secondary" size="compact-sm" radius={8} mt={10} fullWidth loading={uploading}>
+              <Button {...props} variant="secondary" size="compact-sm" radius={8} mt={10} fullWidth loading={uploading} disabled={saving}>
                 {draft.imageUrl ? 'Replace photo' : 'Upload photo'}
               </Button>
             )}
@@ -121,6 +122,7 @@ export function LittleGuyModal({
           {draft.imageUrl && (
             <UnstyledButton
               onClick={() => onChange({ imageUrl: '' })}
+              disabled={saving}
               w="100%"
               mt={6}
               style={{ fontFamily: fonts.sans, fontSize: text.caption, fontWeight: 600, color: colors.muted, textAlign: 'center' }}

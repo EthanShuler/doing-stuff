@@ -12,8 +12,8 @@ import { removeRecipePhoto, uploadRecipePhoto } from './photos'
 //   • No keys → in-memory seed so the UI can be developed offline.
 //
 // Photos ride along as public-bucket URLs (see photos.ts); the store uploads
-// on demand and best-effort deletes orphaned objects when a recipe or its
-// photo goes away. Profiles are fetched for the detail page's byline.
+// on demand and deletes a recipe's photo with it (replaced/abandoned photos
+// are the page's call — see src/lib/photoSession.ts). Profiles are fetched for the detail page's byline.
 
 interface Snapshot {
   recipes: Recipe[]
@@ -159,7 +159,8 @@ export interface RecipeStore {
   uploadPhoto: (file: File) => Promise<string>
   /** Add a recipe. Throws on failure (modal stays open). */
   addRecipe: (draft: RecipeDraft) => Promise<void>
-  /** Edit a recipe. Throws on failure. */
+  /** Edit a recipe. Throws on failure. Leaves the replaced photo to the
+   *  page's photo session. */
   updateRecipe: (id: string, draft: RecipeDraft) => Promise<void>
   /** Delete a recipe (and best-effort its uploaded photo). Throws on failure. */
   deleteRecipe: (id: string) => Promise<void>
@@ -188,8 +189,8 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
 
-  // Latest recipes, read by update/delete to find the prior photo without
-  // re-creating their callbacks on every change.
+  // Latest recipes, read by delete to find the photo to remove without
+  // re-creating its callback on every change.
   const recipesRef = useRef(recipes)
   recipesRef.current = recipes
 
@@ -285,7 +286,6 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
       const fields = draftFields(draft)
       if (!fields.title) return
       setError(null)
-      const prior = recipesRef.current.find((r) => r.id === id)
       if (supabase && spaceId) {
         const { error: err } = await supabase
           .from('recipes')
@@ -306,10 +306,6 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
           setError(err.message)
           throw err
         }
-      }
-      // The old photo is unreachable once the row points elsewhere.
-      if (prior && prior.imageUrl && prior.imageUrl !== fields.imageUrl) {
-        removeRecipePhoto(prior.imageUrl)
       }
       setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)))
     },
