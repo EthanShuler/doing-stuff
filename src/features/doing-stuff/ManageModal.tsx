@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Box, Button, Group, Paper, Text, TextInput, UnstyledButton } from '@mantine/core'
 import type { Activity, Category, Home } from '../../types'
 import { colors, fonts, palette, radii, swatchFor, text } from '../../theme'
@@ -15,7 +15,7 @@ interface ManageModalProps {
   onSetActivityEmoji: (id: string, emoji: string) => void
   onAddCategory: (name: string, colorIndex: number) => void
   onDeleteCategory: (id: string) => void
-  onSetHome: (address: string) => void
+  onSetHome: (address: string) => Promise<void>
   onClose: () => void
 }
 
@@ -71,8 +71,18 @@ export function ManageModal({
     setHomeDraft(home.address)
   }, [home.address])
 
+  // Save clicks blur the input first, so one save fires commitHome twice —
+  // and home.address only updates after the geocode + write resolve. Remember
+  // the text in flight so the second call (and any Enter-then-blur) is a no-op
+  // instead of a second Nominatim request.
+  const committing = useRef<string | null>(null)
   const commitHome = () => {
-    if (homeDraft.trim() !== home.address) onSetHome(homeDraft)
+    const next = homeDraft.trim()
+    if (next === home.address || next === committing.current) return
+    committing.current = next
+    void onSetHome(homeDraft).finally(() => {
+      if (committing.current === next) committing.current = null
+    })
   }
 
   const homeUnlocated = home.address.trim().length > 0 && home.lat === null

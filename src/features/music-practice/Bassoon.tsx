@@ -194,18 +194,18 @@ function CenterReadout({ chosen, isSaved }: { chosen: CircleKey | null; isSaved:
     >
       {chosen ? (
         <>
-          <Text fz={11} c={colors.faint} style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <Text fz={wheelPx(11)} c={colors.faint} style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {isSaved ? 'Today' : 'Selected'}
           </Text>
-          <Text fz={48} lh={1.05} c={colors.ink} style={{ fontFamily: fonts.serif }}>
+          <Text fz={wheelPx(48)} lh={1.05} c={colors.ink} style={{ fontFamily: fonts.serif }}>
             {chosen.major}
           </Text>
-          <Text fz={13} c={colors.inkSoft}>
+          <Text fz={wheelPx(13)} c={colors.inkSoft}>
             {chosen.minor} · {chosen.keySig}
           </Text>
         </>
       ) : (
-        <Text fz={15} c={colors.muted} style={{ fontFamily: fonts.serif }}>
+        <Text fz={wheelPx(15)} c={colors.muted} style={{ fontFamily: fonts.serif }}>
           Pick today's key
         </Text>
       )}
@@ -216,7 +216,12 @@ function CenterReadout({ chosen, isSaved }: { chosen: CircleKey | null; isSaved:
 // --- SVG pie-wedge wheel ----------------------------------------------------
 
 const VIEW = 400 // svg user-space (viewBox); rendered box is SVG_SIZE
+// Max rendered size. The wheel shrinks to fit narrower columns (a 360px
+// phone leaves ~312px inside PageFrame's gutters), so it's never fixed-width.
 const SVG_SIZE = 380
+/** A px size at full wheel width, scaled down with the wheel (container
+ *  query units — the wheel's Box is the inline-size container). */
+const wheelPx = (px: number) => `min(${px}px, ${((px / SVG_SIZE) * 100).toFixed(2)}cqi)`
 const CX = VIEW / 2
 // Three concentric bands: majors (outer), key signatures (thin middle),
 // relative minors (inner), around the center readout hole.
@@ -243,8 +248,10 @@ function annularSector(ri: number, ro: number, a0: number, a1: number): string {
 
 function WheelSvg({ saved, pending, chosen, isSaved, onSelect }: WheelProps) {
   return (
-    <Box style={{ position: 'relative', width: SVG_SIZE, height: SVG_SIZE }}>
-      <svg width={SVG_SIZE} height={SVG_SIZE} viewBox={`0 0 ${VIEW} ${VIEW}`} role="group" aria-label="Circle of fifths">
+    <Box
+      style={{ position: 'relative', width: '100%', maxWidth: SVG_SIZE, aspectRatio: '1', containerType: 'inline-size' }}
+    >
+      <svg width="100%" height="100%" viewBox={`0 0 ${VIEW} ${VIEW}`} role="group" aria-label="Circle of fifths">
         {CIRCLE.map((k) => {
           // Slot centered at 12 o'clock for C, clockwise; ±15° half-slice.
           const c = k.pos * 30 - 90

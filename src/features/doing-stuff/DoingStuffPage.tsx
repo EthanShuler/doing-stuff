@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router'
 import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../types'
 import { useActivityStore } from './useActivityStore'
 import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist, wishMarkers } from './derive'
-import { currentYearMonth, today } from '../../lib/format'
+import { currentYearMonth, formatDate, today } from '../../lib/format'
 import { useBusy } from '../../lib/useBusy'
 import type { YearMonth } from '../../lib/format'
 import { useConfirm } from '../../components/ConfirmModal'
@@ -213,6 +213,17 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
     store.deleteWishlistItem(id)
   }
 
+  // A repeat is logged shared data behind a small "Remove" link, so it asks
+  // first like every other delete.
+  const deleteRepeat = async (repeatId: string) => {
+    const repeat = store.repeats.find((r) => r.id === repeatId)
+    const message = repeat ? `The ${formatDate(repeat.date)} visit comes off this entry for both of you.` : undefined
+    if (!(await confirm({ title: 'Remove this repeat?', message }))) return
+    store.deleteRepeat(repeatId).catch(() => {
+      // Failure surfaces via the store.error banner.
+    })
+  }
+
   const deleteEditingEntry = async () => {
     if (!editingId) {
       closeModal()
@@ -338,7 +349,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
         firstDate={repeatEntry ? repeatEntry.date : today()}
         repeats={repeatEntry ? store.repeats.filter((r) => r.entryId === repeatEntry.id) : []}
         onAdd={(date) => (repeatEntry ? store.addRepeat(repeatEntry.id, date) : Promise.resolve())}
-        onRemove={(repeatId) => store.deleteRepeat(repeatId).catch(() => {})}
+        onRemove={(repeatId) => void deleteRepeat(repeatId)}
         onClose={closeModal}
       />
 
