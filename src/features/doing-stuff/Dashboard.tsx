@@ -11,23 +11,24 @@ import {
   TextInput,
   UnstyledButton,
 } from '@mantine/core'
-import type { Category, SortKey, ViewMode } from '../../types'
-import type { DisplayRow, Stats } from './derive'
+import type { Activity, Category, SortKey, ViewMode } from '../../types'
+import type { DisplayRow, EntryFilter, Stats } from './derive'
 import { ACCENT, colors, fonts, swatchFor, warmBorder } from '../../theme'
 import { formatDate } from '../../lib/format'
 import { Stars } from '../../components/Stars'
-import { CategoryPills } from '../../components/CategoryPills'
+import { CategoryPills } from './CategoryPills'
 import { EmptyCard } from '../../components/EmptyCard'
 
 interface DashboardProps {
   stats: Stats
   categories: Category[]
+  activities: Activity[]
   rows: DisplayRow[]
-  filterCategoryId: string
+  filter: EntryFilter
   search: string
   sort: SortKey
   view: ViewMode
-  onFilter: (categoryId: string) => void
+  onFilter: (filter: EntryFilter) => void
   onSearch: (search: string) => void
   onSort: (sort: SortKey) => void
   onView: (view: ViewMode) => void
@@ -47,8 +48,9 @@ const monoLabelStyle = {
 export function Dashboard({
   stats,
   categories,
+  activities,
   rows,
-  filterCategoryId,
+  filter,
   search,
   sort,
   view,
@@ -79,7 +81,7 @@ export function Dashboard({
 
       {/* CONTROLS */}
       <Group justify="space-between" align="center" gap={16} mt={28} wrap="wrap">
-        <CategoryPills categories={categories} value={filterCategoryId} onChange={onFilter} />
+        <CategoryPills categories={categories} activities={activities} filter={filter} onChange={onFilter} />
         <Group align="center" gap={14} wrap="wrap">
           <TextInput
             value={search}

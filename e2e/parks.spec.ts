@@ -34,9 +34,27 @@ test('list groups by region and filters by status', async ({ page }) => {
   await expect(page.getByText('Arches', { exact: true })).toBeVisible()
 
   // A member pill shows only their parks.
-  await page.getByRole('button', { name: 'Jordan' }).click()
+  await page.getByRole('button', { name: 'All', exact: true }).click()
+  await page.getByRole('button', { name: 'Jordan', exact: true }).click()
   await expect(page.getByText('Denali', { exact: true })).toBeVisible()
   await expect(page.getByText('Grand Canyon', { exact: true })).toBeHidden()
+})
+
+test('map pins follow the status filter, which survives the List toggle', async ({ page }) => {
+  await page.goto('/parks')
+  await expect(page.locator('.leaflet-marker-icon')).toHaveCount(63)
+  await page.getByRole('button', { name: 'Together' }).click()
+  await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3)
+
+  // Right-click Together: shared-trip parks drop out, everything else stays.
+  await page.getByRole('button', { name: 'All', exact: true }).click()
+  await page.getByRole('button', { name: 'Together' }).click({ button: 'right' })
+  await expect(page.locator('.leaflet-marker-icon')).toHaveCount(60)
+
+  await pickSegment(page, 'List')
+  await expect(page.getByText('− Together', { exact: true })).toBeVisible()
+  await expect(page.getByText('Yosemite', { exact: true })).toBeHidden()
+  await expect(page.getByText('Arches', { exact: true })).toBeVisible()
 })
 
 test('park detail modal lists trips and the visit form gates on attendees', async ({ page }) => {

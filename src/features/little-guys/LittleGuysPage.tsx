@@ -4,6 +4,7 @@ import type { LittleGuy } from '../../types'
 import { ACCENT, colors, fonts, text } from '../../theme'
 import { supabase } from '../../lib/supabase'
 import { useBusy } from '../../lib/useBusy'
+import { pickKeys, useTriFilter } from '../../lib/triFilter'
 import { usePhotoSession } from '../../lib/photoSession'
 import { SEED_SELF_ID } from '../../data/spaceSync'
 import { useConfirm } from '../../components/ConfirmModal'
@@ -11,11 +12,10 @@ import { ControlBar } from '../../components/ControlBar'
 import { EmptyCard } from '../../components/EmptyCard'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
-import { Pill } from '../../components/Pill'
+import { Pill, TriPill } from '../../components/Pill'
 import { Splash } from '../../components/Splash'
 import { useLittleGuyStore } from './useLittleGuyStore'
 import type { LittleGuyDraft } from './useLittleGuyStore'
-import type { OwnerFilter } from './derive'
 import { buildMembers, countLine, filterLittleGuys, OWNER_ALL, ownerOptions, sortLittleGuys } from './derive'
 import { LittleGuyGrid } from './LittleGuyGrid'
 import { LittleGuyModal } from './LittleGuyModal'
@@ -37,17 +37,20 @@ export function LittleGuysPage({
   const store = useLittleGuyStore(spaceId)
   const confirm = useConfirm()
   const [search, setSearch] = useState('')
-  const [owner, setOwner] = useState<OwnerFilter>(OWNER_ALL)
+  const ownerFilter = useTriFilter()
 
   const members = useMemo(
     () => buildMembers(store.memberIds, store.profiles),
     [store.memberIds, store.profiles],
   )
-  const shown = useMemo(
-    () => sortLittleGuys(filterLittleGuys(store.guys, search, owner)),
-    [store.guys, search, owner],
-  )
   const ownerPills = useMemo(() => ownerOptions(store.guys, members), [store.guys, members])
+  // Only pills on screen can filter — "Nobody in particular" disappears once
+  // every guy has an owner, and a member who left takes theirs along.
+  const owners = pickKeys(ownerFilter.state, ownerPills.map((o) => o.value))
+  const shown = useMemo(
+    () => sortLittleGuys(filterLittleGuys(store.guys, search, owners)),
+    [store.guys, search, owners],
+  )
 
   // New guys default to the signed-in member's shelf — the common case is
   // logging your own.
@@ -138,7 +141,7 @@ export function LittleGuysPage({
   const loadingData = configured && store.loading
 
   const searching = search.trim().length > 0
-  const filtering = searching || owner !== OWNER_ALL
+  const filtering = searching || Object.keys(owners).length > 0
 
   return (
     <>
@@ -185,15 +188,26 @@ export function LittleGuysPage({
                 "All" pill to choose between (a solo space, no owners set). */}
             {ownerPills.length > 1 && (
               <Group gap={8} mt={16} wrap="wrap">
-                {ownerPills.map((option) => (
-                  <Pill
-                    key={option.value}
-                    label={`${option.label} ${option.count}`}
-                    active={owner === option.value}
-                    activeBg={ACCENT}
-                    onClick={() => setOwner(option.value)}
-                  />
-                ))}
+                {ownerPills.map((option) =>
+                  option.value === OWNER_ALL ? (
+                    <Pill
+                      key={option.value}
+                      label={`${option.label} ${option.count}`}
+                      active={Object.keys(owners).length === 0}
+                      activeBg={ACCENT}
+                      onClick={ownerFilter.clear}
+                    />
+                  ) : (
+                    <TriPill
+                      key={option.value}
+                      label={`${option.label} ${option.count}`}
+                      state={owners[option.value]}
+                      activeBg={ACCENT}
+                      onCycle={() => ownerFilter.cycle(option.value)}
+                      onCycleBack={() => ownerFilter.cycleBack(option.value)}
+                    />
+                  ),
+                )}
               </Group>
             )}
 

@@ -152,6 +152,27 @@ test('tag pills cycle include → exclude → off', async ({ page }) => {
   await expect(page.getByText('Filtered by tag — clear the filter to rearrange.')).not.toBeVisible()
 })
 
+test('right-clicking a tag pill runs the cycle backwards', async ({ page }) => {
+  await page.goto('/movies')
+  await openShelf(page, 'unranked')
+
+  // Right-click: straight to exclude.
+  await page.getByText('fantasy', { exact: true }).click({ button: 'right' })
+  await expect(page.getByText('− fantasy', { exact: true })).toBeVisible()
+  await expect(page.getByText('Spirited Away')).not.toBeVisible()
+  await expect(page.getByText('Paddington 2')).toBeVisible()
+
+  // Again: include.
+  await page.getByText('− fantasy', { exact: true }).click({ button: 'right' })
+  await expect(page.getByText('Spirited Away')).toBeVisible()
+  await expect(page.getByText('Paddington 2')).not.toBeVisible()
+
+  // Again: off.
+  await page.getByText('fantasy', { exact: true }).click({ button: 'right' })
+  await expect(page.getByText('Paddington 2')).toBeVisible()
+  await expect(page.getByText('Filtered by tag — clear the filter to rearrange.')).not.toBeVisible()
+})
+
 // --- custom lists ------------------------------------------------------------
 // Seed list l1 is "Fruits": Mango ranked S by Avery; Durian and Honeycrisp
 // apple both unranked (a custom list has no second shelf).

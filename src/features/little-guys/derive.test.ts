@@ -91,28 +91,33 @@ describe('filterLittleGuys', () => {
   ]
 
   it('returns everything with no search and the All pill', () => {
-    expect(filterLittleGuys(guys, '', OWNER_ALL)).toHaveLength(4)
+    expect(filterLittleGuys(guys, '', {})).toHaveLength(4)
   })
 
   it('fuzzy-matches names', () => {
-    expect(filterLittleGuys(guys, 'stv', OWNER_ALL).map((g) => g.id)).toEqual(['g2'])
+    expect(filterLittleGuys(guys, 'stv', {}).map((g) => g.id)).toEqual(['g2'])
   })
 
   it('filters to one member’s guys', () => {
-    expect(filterLittleGuys(guys, '', 'u1').map((g) => g.id)).toEqual(['g1', 'g2'])
+    expect(filterLittleGuys(guys, '', { u1: 'include' }).map((g) => g.id)).toEqual(['g1', 'g2'])
   })
 
   it('filters to the ownerless ones', () => {
-    expect(filterLittleGuys(guys, '', OWNER_UNASSIGNED).map((g) => g.id)).toEqual(['g4'])
+    expect(filterLittleGuys(guys, '', { [OWNER_UNASSIGNED]: 'include' }).map((g) => g.id)).toEqual(['g4'])
   })
 
   it('applies search and owner together', () => {
-    expect(filterLittleGuys(guys, 'peek', 'u2')).toEqual([])
-    expect(filterLittleGuys(guys, 'peek', 'u1').map((g) => g.id)).toEqual(['g1'])
+    expect(filterLittleGuys(guys, 'peek', { u2: 'include' })).toEqual([])
+    expect(filterLittleGuys(guys, 'peek', { u1: 'include' }).map((g) => g.id)).toEqual(['g1'])
+  })
+
+  it('ORs included owners and drops excluded ones', () => {
+    expect(filterLittleGuys(guys, '', { u2: 'include', [OWNER_UNASSIGNED]: 'include' }).map((g) => g.id)).toEqual(['g3', 'g4'])
+    expect(filterLittleGuys(guys, '', { u1: 'exclude' }).map((g) => g.id)).toEqual(['g3', 'g4'])
   })
 
   it('ignores whitespace-only searches', () => {
-    expect(filterLittleGuys(guys, '   ', OWNER_ALL)).toHaveLength(4)
+    expect(filterLittleGuys(guys, '   ', {})).toHaveLength(4)
   })
 })
 

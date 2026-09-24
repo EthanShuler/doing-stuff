@@ -1,13 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Activity, Category, Entry, Profile, Repeat, WishlistItem } from '../../types'
 import { ACCENT, FALLBACK_COLOR, swatchFor } from '../../theme'
+import type { EntryFilter } from './derive'
 import {
   calendarDays,
   computeStats,
+  cycleCategory,
+  entryMatcher,
   filterAndSort,
   fuzzyMatch,
   joinRows,
   mapMarkers,
+  NO_ENTRY_FILTER,
+  pruneEntryFilter,
   sortWishlist,
   wishMarkers,
 } from './derive'
@@ -66,6 +71,8 @@ const repeat = (id: string, entryId: string, date: string): Repeat => ({
 
 const CATS = [cat('c1', 'Outdoor', 0), cat('c2', 'City', 1)]
 const ACTS = [act('a1', 'c1', 'Park', '🌳'), act('a2', 'c2', 'Movie')]
+const ALL = entryMatcher(NO_ENTRY_FILTER, ACTS)
+const only = (categoryId: string) => entryMatcher({ categories: { [categoryId]: 'include' }, activities: {} }, ACTS)
 
 describe('joinRows', () => {
   it('joins each entry to its activity and category', () => {
@@ -150,6 +157,61 @@ describe('fuzzyMatch', () => {
   })
 })
 
+describe('entryMatcher', () => {
+  // c1 Outdoor: a1 Park, a3 Swim · c2 City: a2 Movie
+  const acts = [...ACTS, act('a3', 'c1', 'Swim')]
+  const match = (categories: EntryFilter['categories'], activities: EntryFilter['activities'] = {}) =>
+    entryMatcher({ categories, activities }, acts)
+
+  it('passes everything with no pills set', () => {
+    expect(match({})('c1', 'a1')).toBe(true)
+    expect(match({})(null, 'gone')).toBe(true)
+  })
+
+  it('ORs included categories and vetoes excluded ones', () => {
+    expect(match({ c1: 'include' })('c1', 'a1')).toBe(true)
+    expect(match({ c1: 'include' })('c2', 'a2')).toBe(false)
+    expect(match({ c1: 'include', c2: 'include' })('c2', 'a2')).toBe(true)
+    expect(match({ c1: 'exclude' })('c1', 'a1')).toBe(false)
+    expect(match({ c1: 'exclude' })('c2', 'a2')).toBe(true)
+    expect(match({ c1: 'exclude' })(null, 'gone')).toBe(true)
+  })
+
+  it('an included activity narrows only its own category', () => {
+    const m = match({ c1: 'include', c2: 'include' }, { a1: 'include' })
+    expect(m('c1', 'a1')).toBe(true)
+    expect(m('c1', 'a3')).toBe(false)
+    expect(m('c2', 'a2')).toBe(true)
+  })
+
+  it('an excluded activity drops just that activity', () => {
+    const m = match({ c1: 'include' }, { a3: 'exclude' })
+    expect(m('c1', 'a1')).toBe(true)
+    expect(m('c1', 'a3')).toBe(false)
+  })
+
+  it('ignores activity pills under a category that is not included', () => {
+    expect(match({}, { a3: 'exclude' })('c1', 'a3')).toBe(true)
+    expect(match({ c2: 'include' }, { a1: 'include' })('c2', 'a2')).toBe(true)
+  })
+})
+
+describe('cycleCategory / pruneEntryFilter', () => {
+  it('cycles forward and back, dropping activity states once a category stops being included', () => {
+    let f: EntryFilter = cycleCategory(NO_ENTRY_FILTER, 'c1', 'forward', ACTS)
+    expect(f.categories).toEqual({ c1: 'include' })
+    f = { ...f, activities: { a1: 'include' } }
+    f = cycleCategory(f, 'c1', 'forward', ACTS)
+    expect(f).toEqual({ categories: { c1: 'exclude' }, activities: {} })
+    expect(cycleCategory(NO_ENTRY_FILTER, 'c1', 'back', ACTS).categories).toEqual({ c1: 'exclude' })
+  })
+
+  it('prunes pill states for deleted categories and activities', () => {
+    const f = pruneEntryFilter({ categories: { c1: 'include', gone: 'include' }, activities: { a1: 'include', x: 'exclude' } }, CATS, ACTS)
+    expect(f).toEqual({ categories: { c1: 'include' }, activities: { a1: 'include' } })
+  })
+})
+
 describe('filterAndSort', () => {
   const rows = joinRows(
     [
@@ -162,23 +224,23 @@ describe('filterAndSort', () => {
   )
 
   it('filters by category id, or passes everything for "all"', () => {
-    expect(filterAndSort(rows, 'c2', 'recent').map((r) => r.id)).toEqual(['e2', 'e3'])
-    expect(filterAndSort(rows, 'all', 'recent')).toHaveLength(3)
+    expect(filterAndSort(rows, only('c2'), 'recent').map((r) => r.id)).toEqual(['e2', 'e3'])
+    expect(filterAndSort(rows, ALL, 'recent')).toHaveLength(3)
   })
 
   it('filters titles with the fuzzy search', () => {
-    expect(filterAndSort(rows, 'all', 'recent', 'lts').map((r) => r.id)).toEqual(['e3'])
+    expect(filterAndSort(rows, ALL, 'recent', 'lts').map((r) => r.id)).toEqual(['e3'])
   })
 
   it('sorts by recency, by rating (date as tiebreak), and by category name', () => {
-    expect(filterAndSort(rows, 'all', 'recent').map((r) => r.id)).toEqual(['e2', 'e3', 'e1'])
-    expect(filterAndSort(rows, 'all', 'rating').map((r) => r.id)).toEqual(['e3', 'e1', 'e2'])
-    expect(filterAndSort(rows, 'all', 'category').map((r) => r.id)).toEqual(['e2', 'e3', 'e1'])
+    expect(filterAndSort(rows, ALL, 'recent').map((r) => r.id)).toEqual(['e2', 'e3', 'e1'])
+    expect(filterAndSort(rows, ALL, 'rating').map((r) => r.id)).toEqual(['e3', 'e1', 'e2'])
+    expect(filterAndSort(rows, ALL, 'category').map((r) => r.id)).toEqual(['e2', 'e3', 'e1'])
   })
 
   it('does not mutate its input', () => {
     const before = rows.map((r) => r.id)
-    filterAndSort(rows, 'all', 'rating')
+    filterAndSort(rows, ALL, 'rating')
     expect(rows.map((r) => r.id)).toEqual(before)
   })
 })
@@ -245,7 +307,7 @@ describe('calendarDays', () => {
   const JUNE = { year: 2026, month: 6 }
 
   it('builds full weeks including the neighboring months (June 2026 starts on a Monday)', () => {
-    const days = calendarDays(JUNE, [], [], ACTS, CATS, 'all')
+    const days = calendarDays(JUNE, [], [], ACTS, CATS, ALL)
     expect(days).toHaveLength(35)
     expect(days[0]).toMatchObject({ date: '2026-05-31', inMonth: false })
     expect(days[1]).toMatchObject({ date: '2026-06-01', dayOfMonth: 1, inMonth: true })
@@ -253,7 +315,7 @@ describe('calendarDays', () => {
   })
 
   it('flags today (system time pinned to 2026-06-15)', () => {
-    const days = calendarDays(JUNE, [], [], ACTS, CATS, 'all')
+    const days = calendarDays(JUNE, [], [], ACTS, CATS, ALL)
     expect(days.filter((d) => d.isToday).map((d) => d.date)).toEqual(['2026-06-15'])
   })
 
@@ -264,7 +326,7 @@ describe('calendarDays', () => {
       [repeat('r1', 'e1', '2026-06-20')],
       ACTS,
       CATS,
-      'all',
+      ALL,
     )
     const byDate = new Map(days.map((d) => [d.date, d.marks]))
     expect(byDate.get('2026-06-12')).toMatchObject([{ key: 'e:e1', entryId: 'e1', title: 'Picnic' }])
@@ -281,7 +343,7 @@ describe('calendarDays', () => {
       [],
       ACTS,
       CATS,
-      'c2',
+      only('c2'),
     )
     const marks = days.find((d) => d.date === '2026-06-12')!.marks
     expect(marks.map((m) => m.entryId)).toEqual(['e2'])

@@ -1,24 +1,25 @@
 import { Box, Button, Text } from '@mantine/core'
 import { Marker, Popup } from 'react-leaflet'
 import { useState } from 'react'
-import type { Category, Home } from '../../types'
-import type { MapMarker } from './derive'
+import type { Activity, Category, Home } from '../../types'
+import type { EntryFilter, MapMarker } from './derive'
+import { entryFilterActive, entryMatcher, NO_ENTRY_FILTER, pruneEntryFilter } from './derive'
+import type { CycleDirection, TriFilterState } from '../../lib/triFilter'
+import { cycleTri } from '../../lib/triFilter'
 import { ACCENT, colors, fonts } from '../../theme'
 import { formatDate, stars } from '../../lib/format'
-import { Pill } from '../../components/Pill'
-import { CategoryPills } from '../../components/CategoryPills'
+import { TriPill } from '../../components/Pill'
+import { CategoryPills } from './CategoryPills'
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MapCanvas, Recenter, emojiIcon } from '../../components/MapCanvas'
 
 interface MapViewProps {
   home: Home
   categories: Category[]
+  activities: Activity[]
   markers: MapMarker[]
   /** Open the entry modal for the entry behind a pin. */
   onEditEntry: (id: string) => void
 }
-
-/** Map filter: 'all', a category id (entry pins), or 'wishlist' (⭐ pins). */
-type MapFilter = string
 
 const PLACE_ZOOM = 13
 
@@ -29,32 +30,39 @@ const eyebrowStyle = {
   textTransform: 'uppercase' as const,
 }
 
-export function MapView({ home, categories, markers, onEditEntry }: MapViewProps) {
+export function MapView({ home, categories, activities, markers, onEditEntry }: MapViewProps) {
   // Only show categories that actually have pins on the map, so the filter row
   // doesn't list empty categories.
   const shownIds = new Set(markers.filter((m) => m.kind === 'entry').map((m) => m.categoryId))
   const shownCategories = categories.filter((c) => shownIds.has(c.id))
+  const pinnedActivityIds = new Set(markers.filter((m) => m.kind === 'entry').map((m) => m.activityId))
+  const pinnedActivities = activities.filter((a) => pinnedActivityIds.has(a.id))
   const hasWishes = markers.some((m) => m.kind === 'wish')
 
-  // Map-local filter: 'all', a category id, or 'wishlist'. Kept here (not in
-  // the shared dashboard filter) because 'wishlist' is map-specific. A filter
-  // whose pins are gone (category deleted, last pinned entry removed or
-  // hidden) would strand an empty map with its pill missing — fall back to
-  // 'all' whenever the selection no longer appears in the pill row.
-  const [rawFilter, setFilter] = useState<MapFilter>('all')
-  const filter =
-    rawFilter === 'all' ||
-    (rawFilter === 'wishlist' && hasWishes) ||
-    shownCategories.some((c) => c.id === rawFilter)
-      ? rawFilter
-      : 'all'
+  // Map-local filter: the category/activity pills plus a Wishlist pill. Kept
+  // here (not in the shared dashboard filter) because the Wishlist pill is
+  // map-specific. Pills whose pins are gone (category deleted, last pinned
+  // entry removed or hidden) are pruned, so a stale include can't strand an
+  // empty map with its pill missing.
+  const [rawFilter, setFilter] = useState<EntryFilter>(NO_ENTRY_FILTER)
+  const [wishFilter, setWishFilter] = useState<TriFilterState>({})
+  const filter = pruneEntryFilter(rawFilter, shownCategories, pinnedActivities)
+  const wish = hasWishes ? wishFilter.wishlist : undefined
+  const match = entryMatcher(filter, activities)
+  const categoryIncludes = Object.values(filter.categories).includes('include')
 
-  const visibleMarkers =
-    filter === 'all'
-      ? markers
-      : filter === 'wishlist'
-        ? markers.filter((m) => m.kind === 'wish')
-        : markers.filter((m) => m.kind === 'entry' && m.categoryId === filter)
+  // Includes are OR across both halves: with only Wishlist included the entry
+  // pins hide, with only categories included the ⭐ pins do.
+  const visibleMarkers = markers.filter((m) =>
+    m.kind === 'wish'
+      ? wish === 'include' || (wish === undefined && !categoryIncludes)
+      : match(m.categoryId, m.activityId) && (categoryIncludes || wish !== 'include'),
+  )
+  const clearFilter = () => {
+    setFilter(NO_ENTRY_FILTER)
+    setWishFilter({})
+  }
+  const cycleWish = (direction: CycleDirection) => setWishFilter((prev) => cycleTri(prev, 'wishlist', direction))
 
   const hasHome = home.lat !== null && home.lng !== null
   const center: [number, number] = hasHome
@@ -74,14 +82,23 @@ export function MapView({ home, categories, markers, onEditEntry }: MapViewProps
 
       {/* CATEGORY / WISHLIST FILTER */}
       {(shownCategories.length > 0 || hasWishes) && (
-        <CategoryPills categories={shownCategories} value={filter} onChange={setFilter} mt={20}>
+        <CategoryPills
+          categories={shownCategories}
+          activities={pinnedActivities}
+          filter={filter}
+          onChange={setFilter}
+          allActive={!entryFilterActive(filter) && wish === undefined}
+          onClear={clearFilter}
+          mt={20}
+        >
           {hasWishes && (
-            <Pill
+            <TriPill
               label="Wishlist"
-              active={filter === 'wishlist'}
+              state={wish}
               activeBg={ACCENT}
-              dotColor={filter === 'wishlist' ? colors.onAccent : ACCENT}
-              onClick={() => setFilter('wishlist')}
+              dot={ACCENT}
+              onCycle={() => cycleWish('forward')}
+              onCycleBack={() => cycleWish('back')}
             />
           )}
         </CategoryPills>

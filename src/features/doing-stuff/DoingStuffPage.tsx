@@ -3,7 +3,19 @@ import { Box } from '@mantine/core'
 import { useNavigate } from 'react-router'
 import type { EntryDraft, Screen, SortKey, ViewMode, WishlistItem } from '../../types'
 import { useActivityStore } from './useActivityStore'
-import { calendarDays, computeStats, filterAndSort, joinRows, mapMarkers, sortWishlist, wishMarkers } from './derive'
+import type { EntryFilter } from './derive'
+import {
+  calendarDays,
+  computeStats,
+  entryMatcher,
+  filterAndSort,
+  joinRows,
+  mapMarkers,
+  NO_ENTRY_FILTER,
+  pruneEntryFilter,
+  sortWishlist,
+  wishMarkers,
+} from './derive'
 import { currentYearMonth, formatDate, today } from '../../lib/format'
 import { useBusy } from '../../lib/useBusy'
 import type { YearMonth } from '../../lib/format'
@@ -64,13 +76,12 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   const setScreen = (next: Screen) => navigate(SCREEN_PATHS[next])
 
   // View state (not persisted).
-  const [rawFilterCategoryId, setFilterCategoryId] = useState('all')
-  // Deleting a category (locally or via a partner's realtime delete) can leave
-  // the filter pointing at nothing — fall back to 'all', not an empty view.
-  const filterCategoryId =
-    rawFilterCategoryId === 'all' || store.categories.some((c) => c.id === rawFilterCategoryId)
-      ? rawFilterCategoryId
-      : 'all'
+  // Category + activity pills, shared by Log and Calendar. Deleting a category
+  // or activity (locally or via a partner's realtime delete) prunes its pill
+  // state, so the view never filters on a pill that's gone.
+  const [rawFilter, setFilter] = useState<EntryFilter>(NO_ENTRY_FILTER)
+  const filter = pruneEntryFilter(rawFilter, store.categories, store.activities)
+  const match = useMemo(() => entryMatcher(filter, store.activities), [filter, store.activities])
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
   const [view, setView] = useState<ViewMode>('cards')
@@ -92,8 +103,8 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
 
   const rows = useMemo(() => {
     const joined = joinRows(store.entries, store.activities, store.categories, store.profiles, userId, store.repeats)
-    return filterAndSort(joined, filterCategoryId, sort, search)
-  }, [store.entries, store.activities, store.categories, store.profiles, store.repeats, filterCategoryId, sort, search, userId])
+    return filterAndSort(joined, match, sort, search)
+  }, [store.entries, store.activities, store.categories, store.profiles, store.repeats, match, sort, search, userId])
 
   const wishlistItems = useMemo(() => sortWishlist(store.wishlist), [store.wishlist])
 
@@ -109,8 +120,8 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   )
 
   const calendarGrid = useMemo(
-    () => calendarDays(calendarMonth, store.entries, store.repeats, store.activities, store.categories, filterCategoryId),
-    [calendarMonth, store.entries, store.repeats, store.activities, store.categories, filterCategoryId],
+    () => calendarDays(calendarMonth, store.entries, store.repeats, store.activities, store.categories, match),
+    [calendarMonth, store.entries, store.repeats, store.activities, store.categories, match],
   )
 
   const openAdd = (date?: string) => {
@@ -291,6 +302,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
                 <MapView
                   home={store.home}
                   categories={store.categories}
+                  activities={store.activities}
                   markers={markers}
                   onEditEntry={openEdit}
                 />
@@ -298,8 +310,9 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
             ) : screen === 'calendar' ? (
               <CalendarView
                 categories={store.categories}
-                filterCategoryId={filterCategoryId}
-                onFilter={setFilterCategoryId}
+                activities={store.activities}
+                filter={filter}
+                onFilter={setFilter}
                 days={calendarGrid}
                 month={calendarMonth}
                 onMonthChange={setCalendarMonth}
@@ -311,12 +324,13 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
               <Dashboard
                 stats={stats}
                 categories={store.categories}
+                activities={store.activities}
                 rows={rows}
-                filterCategoryId={filterCategoryId}
+                filter={filter}
                 search={search}
                 sort={sort}
                 view={view}
-                onFilter={setFilterCategoryId}
+                onFilter={setFilter}
                 onSearch={setSearch}
                 onSort={setSort}
                 onView={setView}

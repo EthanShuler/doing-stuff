@@ -6,7 +6,7 @@ import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { useBusy } from '../../lib/useBusy'
-import { useTagFilter } from '../../lib/useTagFilter'
+import { keysIn, useTriFilter } from '../../lib/triFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
@@ -102,11 +102,14 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const [listDraft, setListDraft] = useState<ListDraft>(emptyListDraft)
   const [editingList, setEditingList] = useState(false)
 
-  // Tag filter (shared tri-state pills — see src/lib/useTagFilter). While any
+  // Tag filter (shared tri-state pills — see src/lib/triFilter). While any
   // state is set the board shows only matching items — read-only, because
   // drops between visible neighbors would land at arbitrary positions
   // relative to the hidden cards.
-  const { tagFilter, includedTags, excludedTags, filterActive, toggleTag, clearTagFilter } = useTagFilter()
+  const tagFilter = useTriFilter()
+  const { active: filterActive, clear: clearTagFilter } = tagFilter
+  const includedTags = keysIn(tagFilter.state, 'include')
+  const excludedTags = keysIn(tagFilter.state, 'exclude')
   useEffect(() => clearTagFilter(), [key])
   // Every board renders this same component, so a board switch (a picker pill,
   // or browser back/forward) must drop an open modal: saving a movie draft
@@ -123,7 +126,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const viewerId = showingPartner ? partner.id : store.selfId
   const board = useMemo(
     () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, key, shared),
-    [store.items, tagFilter, store.placements, store.completions, viewerId, key, shared],
+    [store.items, tagFilter.state, store.placements, store.completions, viewerId, key, shared],
   )
 
   // Placement position per item on the board you drag — yours, or the shared
@@ -321,9 +324,9 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
             <TagFilterPills
               tags={kindTags}
               allLabel={`All ${noun}s`}
-              tagFilter={tagFilter}
-              filterActive={filterActive}
-              onToggle={toggleTag}
+              state={tagFilter.state}
+              onCycle={tagFilter.cycle}
+              onCycleBack={tagFilter.cycleBack}
               onClear={clearTagFilter}
             />
 
