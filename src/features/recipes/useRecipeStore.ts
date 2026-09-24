@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Recipe } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { errorMessage, idFactory, PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { PROFILE_COLUMNS, SEED_PROFILES, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { usePhotoRows } from '../../data/usePhotoRows'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeRecipePhoto, uploadRecipePhoto } from './photos'
 
@@ -11,9 +12,9 @@ import { removeRecipePhoto, uploadRecipePhoto } from './photos'
 //     the space (shared data — uniform space-member RLS).
 //   • No keys → in-memory seed so the UI can be developed offline.
 //
-// Photos ride along as public-bucket URLs (see photos.ts); the store uploads
-// on demand and deletes a recipe's photo with it (replaced/abandoned photos
-// are the page's call — see src/lib/photoSession.ts). Profiles are fetched for the detail page's byline.
+// Photos ride along as public-bucket URLs (see photos.ts); the writes —
+// upload, add/edit, delete-with-photo — are the shared usePhotoRows
+// (replaced/abandoned photos are the page's call — see src/lib/photoSession.ts). Profiles are fetched for the detail page's byline.
 
 interface Snapshot {
   recipes: Recipe[]
@@ -129,9 +130,6 @@ const toRecipe = (r: RecipeRow): Recipe => ({
 const RECIPE_COLUMNS =
   'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,created_by,created_at'
 
-// In-memory fallback only: stable client ids for seed-mode edits.
-const nextId = idFactory('rx', 100)
-
 /** The fields the add/edit modal writes. All plain strings except tags. */
 export interface RecipeDraft {
   title: string
@@ -180,6 +178,20 @@ const draftFields = (draft: RecipeDraft) => ({
   notes: draft.notes.trim(),
 })
 
+/** Cleaned-up draft → `recipes` columns (insert and update write the same set). */
+const recipeColumns = (fields: ReturnType<typeof draftFields>) => ({
+  title: fields.title,
+  image_url: fields.imageUrl,
+  ingredients: fields.ingredients,
+  steps: fields.steps,
+  source: fields.source,
+  source_url: fields.sourceUrl,
+  tags: fields.tags,
+  servings: fields.servings,
+  total_time: fields.totalTime,
+  notes: fields.notes,
+})
+
 export function useRecipeStore(spaceId: string | null): RecipeStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
   const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed()))
@@ -188,11 +200,6 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
-
-  // Latest recipes, read by delete to find the photo to remove without
-  // re-creating its callback on every change.
-  const recipesRef = useRef(recipes)
-  recipesRef.current = recipes
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
@@ -229,104 +236,35 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     wire,
   })
 
-  const uploadPhoto = useCallback(
-    async (file: File) => {
-      setError(null)
-      try {
-        return await uploadRecipePhoto(spaceId, file)
-      } catch (err) {
-        setError(errorMessage(err))
-        throw err
-      }
-    },
-    [spaceId],
-  )
+  const rows = usePhotoRows({
+    spaceId,
+    table: 'recipes',
+    columns: RECIPE_COLUMNS,
+    toItem: toRecipe,
+    toColumns: recipeColumns,
+    seedIdPrefix: 'rx',
+    uploadPhoto: uploadRecipePhoto,
+    removePhoto: removeRecipePhoto,
+    items: recipes,
+    setItems: setRecipes,
+    setError,
+  })
+  const { insert, update } = rows
 
   const addRecipe = useCallback(
     async (draft: RecipeDraft) => {
       const fields = draftFields(draft)
-      if (!fields.title) return
-      setError(null)
-      if (supabase && spaceId) {
-        const { data, error: err } = await supabase
-          .from('recipes')
-          .insert({
-            space_id: spaceId,
-            title: fields.title,
-            image_url: fields.imageUrl,
-            ingredients: fields.ingredients,
-            steps: fields.steps,
-            source: fields.source,
-            source_url: fields.sourceUrl,
-            tags: fields.tags,
-            servings: fields.servings,
-            total_time: fields.totalTime,
-            notes: fields.notes,
-          })
-          .select(RECIPE_COLUMNS)
-          .single()
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-        const created = toRecipe(data as RecipeRow)
-        upsertById(setRecipes, created)
-        return
-      }
-      setRecipes((prev) => [
-        ...prev,
-        { id: nextId(), ...fields, createdBy: SEED_SELF_ID, createdAt: new Date().toISOString() },
-      ])
+      if (fields.title) await insert(fields)
     },
-    [spaceId],
+    [insert],
   )
 
   const updateRecipe = useCallback(
     async (id: string, draft: RecipeDraft) => {
       const fields = draftFields(draft)
-      if (!fields.title) return
-      setError(null)
-      if (supabase && spaceId) {
-        const { error: err } = await supabase
-          .from('recipes')
-          .update({
-            title: fields.title,
-            image_url: fields.imageUrl,
-            ingredients: fields.ingredients,
-            steps: fields.steps,
-            source: fields.source,
-            source_url: fields.sourceUrl,
-            tags: fields.tags,
-            servings: fields.servings,
-            total_time: fields.totalTime,
-            notes: fields.notes,
-          })
-          .eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)))
+      if (fields.title) await update(id, fields)
     },
-    [spaceId],
-  )
-
-  const deleteRecipe = useCallback(
-    async (id: string) => {
-      setError(null)
-      const prior = recipesRef.current.find((r) => r.id === id)
-      if (supabase && spaceId) {
-        const { error: err } = await supabase.from('recipes').delete().eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      if (prior?.imageUrl) removeRecipePhoto(prior.imageUrl)
-      setRecipes((prev) => prev.filter((r) => r.id !== id))
-    },
-    [spaceId],
+    [update],
   )
 
   return {
@@ -335,9 +273,9 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     loading,
     error,
     clearError,
-    uploadPhoto,
+    uploadPhoto: rows.uploadPhoto,
     addRecipe,
     updateRecipe,
-    deleteRecipe,
+    deleteRecipe: rows.remove,
   }
 }

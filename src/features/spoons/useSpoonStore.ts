@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Spoon } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { resolveCoordsWithNotice } from '../../lib/geocode'
-import { errorMessage, idFactory, syncTable, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { syncTable, useSpaceSync } from '../../data/spaceSync'
+import { usePhotoRows } from '../../data/usePhotoRows'
 import { removeSpoonPhoto, uploadSpoonPhoto } from './photos'
 
 // Data seam for the spoon collection, mirroring the other stores' two modes:
@@ -11,9 +12,10 @@ import { removeSpoonPhoto, uploadSpoonPhoto } from './photos'
 //     the space (shared data — uniform space-member RLS).
 //   • No keys → in-memory seed so the UI can be developed offline.
 //
-// Photos ride along as public-bucket URLs (see photos.ts); the store uploads
-// on demand and deletes a spoon's photo with it. Replaced/abandoned photos are
-// the page's call, not this store's — see src/lib/photoSession.ts.
+// Photos ride along as public-bucket URLs (see photos.ts); the writes —
+// upload, add/edit, delete-with-photo — are the shared usePhotoRows, with the
+// place geocoded here first. Replaced/abandoned photos are the page's call,
+// not this store's — see src/lib/photoSession.ts.
 
 interface Snapshot {
   spoons: Spoon[]
@@ -63,9 +65,6 @@ const toSpoon = (r: SpoonRow): Spoon => ({
 
 const SPOON_COLUMNS = 'id,name,image_url,place,lat,lng,acquired_on,notes,created_by,created_at'
 
-// In-memory fallback only: stable client ids for seed-mode edits.
-const nextId = idFactory('sx', 100)
-
 /** The fields the add/edit modal writes. `acquiredOn` is '' for "unknown". */
 export interface SpoonDraft {
   name: string
@@ -97,6 +96,20 @@ export interface SpoonStore {
   deleteSpoon: (id: string) => Promise<void>
 }
 
+/** A save's fields: the cleaned-up draft plus the resolved coords. */
+type SpoonFields = Pick<Spoon, 'name' | 'imageUrl' | 'place' | 'lat' | 'lng' | 'acquiredOn' | 'notes'>
+
+/** Spoon fields → `spoons` columns (insert and update write the same set). */
+const spoonColumns = (fields: SpoonFields) => ({
+  name: fields.name,
+  image_url: fields.imageUrl,
+  place: fields.place,
+  lat: fields.lat,
+  lng: fields.lng,
+  acquired_on: fields.acquiredOn,
+  notes: fields.notes,
+})
+
 export function useSpoonStore(spaceId: string | null): SpoonStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
   const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed()))
@@ -106,12 +119,6 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
   const [notice, setNotice] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
   const clearNotice = useCallback(() => setNotice(null), [])
-
-  // Latest spoons, read by updateSpoon to compare the prior place and by
-  // deleteSpoon to find the photo to remove, without re-creating their
-  // callbacks on every change.
-  const spoonsRef = useRef(spoons)
-  spoonsRef.current = spoons
 
   // Geocode a place for a save: coords or null, with a non-blocking notice
   // when a non-empty place can't be located.
@@ -151,18 +158,20 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
     wire,
   })
 
-  const uploadPhoto = useCallback(
-    async (file: File) => {
-      setError(null)
-      try {
-        return await uploadSpoonPhoto(spaceId, file)
-      } catch (err) {
-        setError(errorMessage(err))
-        throw err
-      }
-    },
-    [spaceId],
-  )
+  const rows = usePhotoRows({
+    spaceId,
+    table: 'spoons',
+    columns: SPOON_COLUMNS,
+    toItem: toSpoon,
+    toColumns: spoonColumns,
+    seedIdPrefix: 'sx',
+    uploadPhoto: uploadSpoonPhoto,
+    removePhoto: removeSpoonPhoto,
+    items: spoons,
+    setItems: setSpoons,
+    setError,
+  })
+  const { find, insert, update } = rows
 
   const addSpoon = useCallback(
     async (draft: SpoonDraft) => {
@@ -171,7 +180,7 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
       setError(null)
       const place = draft.place.trim()
       const point = await resolveCoords(place)
-      const fields = {
+      await insert({
         name,
         imageUrl: draft.imageUrl.trim(),
         place,
@@ -179,36 +188,9 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
         lng: point?.lng ?? null,
         acquiredOn: draft.acquiredOn || null,
         notes: draft.notes.trim(),
-      }
-      if (supabase && spaceId) {
-        const { data, error: err } = await supabase
-          .from('spoons')
-          .insert({
-            space_id: spaceId,
-            name: fields.name,
-            image_url: fields.imageUrl,
-            place: fields.place,
-            lat: fields.lat,
-            lng: fields.lng,
-            acquired_on: fields.acquiredOn,
-            notes: fields.notes,
-          })
-          .select(SPOON_COLUMNS)
-          .single()
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-        const created = toSpoon(data as SpoonRow)
-        upsertById(setSpoons, created)
-        return
-      }
-      setSpoons((prev) => [
-        ...prev,
-        { id: nextId(), ...fields, createdBy: null, createdAt: new Date().toISOString() },
-      ])
+      })
     },
-    [spaceId, resolveCoords],
+    [resolveCoords, insert],
   )
 
   const updateSpoon = useCallback(
@@ -216,61 +198,23 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
       const name = draft.name.trim()
       if (!name) return
       setError(null)
-      const prior = spoonsRef.current.find((s) => s.id === id)
+      const prior = find(id)
       const place = draft.place.trim()
       // Re-geocode only when the place text actually changed; otherwise keep
       // the stored coords (Nominatim rate policy — and the fan-out is stable).
       const changedPlace = place !== (prior?.place ?? '')
       const point = changedPlace ? await resolveCoords(place) : null
-      const lat = changedPlace ? point?.lat ?? null : prior?.lat ?? null
-      const lng = changedPlace ? point?.lng ?? null : prior?.lng ?? null
-      const fields = {
+      await update(id, {
         name,
         imageUrl: draft.imageUrl.trim(),
         place,
-        lat,
-        lng,
+        lat: changedPlace ? point?.lat ?? null : prior?.lat ?? null,
+        lng: changedPlace ? point?.lng ?? null : prior?.lng ?? null,
         acquiredOn: draft.acquiredOn || null,
         notes: draft.notes.trim(),
-      }
-      if (supabase && spaceId) {
-        const { error: err } = await supabase
-          .from('spoons')
-          .update({
-            name: fields.name,
-            image_url: fields.imageUrl,
-            place: fields.place,
-            lat: fields.lat,
-            lng: fields.lng,
-            acquired_on: fields.acquiredOn,
-            notes: fields.notes,
-          })
-          .eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      setSpoons((prev) => prev.map((s) => (s.id === id ? { ...s, ...fields } : s)))
+      })
     },
-    [spaceId, resolveCoords],
-  )
-
-  const deleteSpoon = useCallback(
-    async (id: string) => {
-      setError(null)
-      const prior = spoonsRef.current.find((s) => s.id === id)
-      if (supabase && spaceId) {
-        const { error: err } = await supabase.from('spoons').delete().eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      if (prior?.imageUrl) removeSpoonPhoto(prior.imageUrl)
-      setSpoons((prev) => prev.filter((s) => s.id !== id))
-    },
-    [spaceId],
+    [resolveCoords, find, update],
   )
 
   return {
@@ -280,9 +224,9 @@ export function useSpoonStore(spaceId: string | null): SpoonStore {
     notice,
     clearError,
     clearNotice,
-    uploadPhoto,
+    uploadPhoto: rows.uploadPhoto,
     addSpoon,
     updateSpoon,
-    deleteSpoon,
+    deleteSpoon: rows.remove,
   }
 }

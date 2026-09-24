@@ -1,18 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { LittleGuy, Profile } from '../../types'
 import { supabase } from '../../lib/supabase'
-import {
-  PROFILE_COLUMNS,
-  SEED_PROFILES,
-  SEED_SELF_ID,
-  errorMessage,
-  idFactory,
-  syncTable,
-  toProfile,
-  upsertById,
-  useSpaceSync,
-} from '../../data/spaceSync'
+import { PROFILE_COLUMNS, SEED_PROFILES, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { usePhotoRows } from '../../data/usePhotoRows'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeLittleGuyPhoto, uploadLittleGuyPhoto } from './photos'
 
@@ -22,9 +13,9 @@ import { removeLittleGuyPhoto, uploadLittleGuyPhoto } from './photos'
 //     and the ordered membership, since each guy has an owner to name.
 //   • No keys → in-memory seed so the UI can be developed offline.
 //
-// Photos ride along as public-bucket URLs (see photos.ts); the store uploads on
-// demand and deletes a guy's photo with him (replaced/abandoned photos are the
-// page's call — see src/lib/photoSession.ts).
+// Photos ride along as public-bucket URLs (see photos.ts); the writes —
+// upload, add/edit, delete-with-photo — are the shared usePhotoRows
+// (replaced/abandoned photos are the page's call — see src/lib/photoSession.ts).
 
 interface Snapshot {
   guys: LittleGuy[]
@@ -78,9 +69,6 @@ const toLittleGuy = (r: LittleGuyRow): LittleGuy => ({
 
 const LITTLE_GUY_COLUMNS = 'id,name,image_url,source,owner_id,personality,description,created_by,created_at'
 
-// In-memory fallback only: stable client ids for seed-mode edits.
-const nextId = idFactory('gx', 100)
-
 /** The fields the add/edit modal writes. `ownerId` is null for "nobody in
  *  particular". */
 export interface LittleGuyDraft {
@@ -123,6 +111,16 @@ const draftFields = (draft: LittleGuyDraft) => ({
   description: draft.description.trim(),
 })
 
+/** Cleaned-up draft → `little_guys` columns (insert and update write the same set). */
+const littleGuyColumns = (fields: ReturnType<typeof draftFields>) => ({
+  name: fields.name,
+  image_url: fields.imageUrl,
+  source: fields.source,
+  owner_id: fields.ownerId,
+  personality: fields.personality,
+  description: fields.description,
+})
+
 export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
   // Keyless dev mode seeds synchronously so the UI never flashes empty.
   const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed()))
@@ -132,11 +130,6 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
-
-  // Latest guys, read by delete to find the photo to remove without
-  // re-creating its callback on every change.
-  const guysRef = useRef(guys)
-  guysRef.current = guys
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
@@ -178,96 +171,35 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
     wire,
   })
 
-  const uploadPhoto = useCallback(
-    async (file: File) => {
-      setError(null)
-      try {
-        return await uploadLittleGuyPhoto(spaceId, file)
-      } catch (err) {
-        setError(errorMessage(err))
-        throw err
-      }
-    },
-    [spaceId],
-  )
+  const rows = usePhotoRows({
+    spaceId,
+    table: 'little_guys',
+    columns: LITTLE_GUY_COLUMNS,
+    toItem: toLittleGuy,
+    toColumns: littleGuyColumns,
+    seedIdPrefix: 'gx',
+    uploadPhoto: uploadLittleGuyPhoto,
+    removePhoto: removeLittleGuyPhoto,
+    items: guys,
+    setItems: setGuys,
+    setError,
+  })
+  const { insert, update } = rows
 
   const addLittleGuy = useCallback(
     async (draft: LittleGuyDraft) => {
       const fields = draftFields(draft)
-      if (!fields.name) return
-      setError(null)
-      if (supabase && spaceId) {
-        const { data, error: err } = await supabase
-          .from('little_guys')
-          .insert({
-            space_id: spaceId,
-            name: fields.name,
-            image_url: fields.imageUrl,
-            source: fields.source,
-            owner_id: fields.ownerId,
-            personality: fields.personality,
-            description: fields.description,
-          })
-          .select(LITTLE_GUY_COLUMNS)
-          .single()
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-        const created = toLittleGuy(data as LittleGuyRow)
-        upsertById(setGuys, created)
-        return
-      }
-      setGuys((prev) => [
-        ...prev,
-        { id: nextId(), ...fields, createdBy: SEED_SELF_ID, createdAt: new Date().toISOString() },
-      ])
+      if (fields.name) await insert(fields)
     },
-    [spaceId],
+    [insert],
   )
 
   const updateLittleGuy = useCallback(
     async (id: string, draft: LittleGuyDraft) => {
       const fields = draftFields(draft)
-      if (!fields.name) return
-      setError(null)
-      if (supabase && spaceId) {
-        const { error: err } = await supabase
-          .from('little_guys')
-          .update({
-            name: fields.name,
-            image_url: fields.imageUrl,
-            source: fields.source,
-            owner_id: fields.ownerId,
-            personality: fields.personality,
-            description: fields.description,
-          })
-          .eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      setGuys((prev) => prev.map((g) => (g.id === id ? { ...g, ...fields } : g)))
+      if (fields.name) await update(id, fields)
     },
-    [spaceId],
-  )
-
-  const deleteLittleGuy = useCallback(
-    async (id: string) => {
-      setError(null)
-      const prior = guysRef.current.find((g) => g.id === id)
-      if (supabase && spaceId) {
-        const { error: err } = await supabase.from('little_guys').delete().eq('id', id)
-        if (err) {
-          setError(err.message)
-          throw err
-        }
-      }
-      if (prior?.imageUrl) removeLittleGuyPhoto(prior.imageUrl)
-      setGuys((prev) => prev.filter((g) => g.id !== id))
-    },
-    [spaceId],
+    [update],
   )
 
   return {
@@ -277,9 +209,9 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
     loading,
     error,
     clearError,
-    uploadPhoto,
+    uploadPhoto: rows.uploadPhoto,
     addLittleGuy,
     updateLittleGuy,
-    deleteLittleGuy,
+    deleteLittleGuy: rows.remove,
   }
 }
