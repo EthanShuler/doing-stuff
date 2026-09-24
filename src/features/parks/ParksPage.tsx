@@ -8,7 +8,8 @@ import { Splash } from '../../components/Splash'
 import { useParkStore } from './useParkStore'
 import type { Park } from './parks'
 import { PARKS } from './parks'
-import { buildMembers, parkStats, parkStatuses } from './derive'
+import { buildMembers, filterParks, parkStats, parkStatuses, TOGETHER, UNVISITED } from './derive'
+import { pickKeys, useTriFilter } from '../../lib/triFilter'
 import type { DotVariant } from './StatusDot'
 import { StatusDot, togetherVariant } from './StatusDot'
 
@@ -16,6 +17,7 @@ import { StatusDot, togetherVariant } from './StatusDot'
 // in DoingStuffPage).
 const ParkMap = lazy(() => import('./ParkMap').then((m) => ({ default: m.ParkMap })))
 import { ParkList } from './ParkList'
+import { ParkFilterPills } from './ParkFilterPills'
 import { ParkModal } from './ParkModal'
 import { LogVisitModal } from './LogVisitModal'
 
@@ -61,6 +63,22 @@ export function ParksPage({
   const stats = useMemo(
     () => parkStats(statuses, store.memberIds, PARKS.length),
     [statuses, store.memberIds],
+  )
+
+  // Status pills, shared by the map and the list. A member who has left the
+  // space loses their pill, so their key is pruned rather than stranding a
+  // filter nobody can see.
+  const filter = useTriFilter()
+  const activeFilter = pickKeys(filter.state, [...store.memberIds, TOGETHER, UNVISITED])
+  const shownParks = useMemo(() => filterParks(PARKS, statuses, activeFilter), [statuses, activeFilter])
+  const filters = (
+    <ParkFilterPills
+      members={members}
+      filter={activeFilter}
+      onCycle={filter.cycle}
+      onCycleBack={filter.cycleBack}
+      onClear={filter.clear}
+    />
   )
 
   const detailVisits = useMemo(
@@ -114,10 +132,10 @@ export function ParksPage({
           <Splash text="Loading your space…" mih="40vh" />
         ) : screen === 'map' ? (
           <Suspense fallback={<Splash text="Loading the map…" mih="50vh" />}>
-            <ParkMap statuses={statuses} members={members} onOpen={setDetailPark} />
+            <ParkMap parks={shownParks} statuses={statuses} members={members} filters={filters} onOpen={setDetailPark} />
           </Suspense>
         ) : (
-          <ParkList statuses={statuses} members={members} onOpen={setDetailPark} />
+          <ParkList parks={shownParks} statuses={statuses} members={members} filters={filters} onOpen={setDetailPark} />
         )}
       </PageFrame>
 

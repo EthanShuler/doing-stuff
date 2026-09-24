@@ -44,7 +44,12 @@ Doing Stuff has four screens (routes) behind an in-feature toggle: **Log**
 (dashboard: stats, category filter, fuzzy title search, cards/table views,
 sort), **Wishlist**, **Map** (Leaflet; emoji pins for entries, ⭐ for open
 wishes, 🏠 for home, with its own category/wishlist filter), and **Calendar**
-(month grid of entries + repeats). All four routes render the same
+(month grid of entries + repeats). The category filter (`CategoryPills`,
+shared by Log and Calendar; the Map keeps its own copy plus a Wishlist pill)
+is tri-state like every filter row, and including a category opens a second
+row of its **activity** pills — the subcategory filter: an included activity
+narrows its category to the included activities, an excluded one drops just
+that activity (`entryMatcher` in the doing-stuff `derive.ts`). All four routes render the same
 `DoingStuffPage` component, so its store (and realtime channel) survives screen
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
@@ -96,8 +101,8 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   tier-list `copy.ts`, mirrored by `hasUndatedShelf()` in its `derive.ts`)
   — and free-text
   **`tags`** (`text[]`, e.g. "disney", "fantasy") shared like the item; the
-  board page filters by them with multi-select pills (OR semantics, matched
-  case-insensitively). A filtered board is **read-only** — hidden cards make
+  board page filters by them with tri-state pills (see the tri-state filter
+  convention below; matched case-insensitively). A filtered board is **read-only** — hidden cards make
   drop positions ambiguous — so it renders `BoardView` with clickable cards.
   Items also carry a free-text **`creator`** — who made it, shared like the
   title and shown as a faint line under the card title; the modal labels it
@@ -221,7 +226,8 @@ is, not who may edit him: the rows are shared, so either member can log or fix
 up any guy. One route: an A–Z photo card grid (name · personality · owner)
 with fuzzy name search (`src/lib/fuzzy.ts`) and an **owner pill row** (All /
 each member in join order / Nobody in particular, each with its count — the
-last pill appears only when some guy is ownerless). Adding and editing happen
+last pill appears only when some guy is ownerless; tri-state like every
+filter row). Adding and editing happen
 in one modal, which defaults a new guy's owner to the signed-in member;
 deleting confirms and takes his photo with him. Deliberately no dates, no map,
 no wishlist — a shelf, not a log.
@@ -251,10 +257,12 @@ grayscale. `MEMBER_COLORS`/`parkPin`/`memberColor` live in the parks
 `derive.ts`; `StatusDot.tsx` is the single dot renderer (stats, legend, list)
 with `pinVariant` mirrored by ParkMap's divIcon HTML. Keep the shape-plus-
 color rule for any future meaning-carrying color in the app. One route with an in-page **Map / List** toggle and a stats strip
-(each member n/63 + Together n/63). The map always shows all 63 pins
-(continental-US default framing; Alaska/Hawaiʻi/territories are a pan away)
-with a display-name legend; the list groups by region with
-All / member / Together / Unvisited filter pills. Clicking a pin's popup or a
+(each member n/63 + Together n/63). Both screens share one tri-state
+**All / member / Together / Unvisited** filter pill row (`ParkFilterPills`,
+state owned by `ParksPage` so it survives the toggle; `parkKeys` /
+`filterParks` in the parks `derive.ts`). The map shows the filtered pins —
+all 63 unfiltered (continental-US default framing; Alaska/Hawaiʻi/territories
+are a pan away) — with a display-name legend; the list groups by region. Clicking a pin's popup or a
 list row opens the park detail modal — static facts + visit history +
 add/edit/delete trips behind an internal mode switch (deletes confirm) — and a
 header "+ Log visit" button opens the same trip fields behind a searchable
@@ -548,6 +556,7 @@ src/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     fuzzy.ts               fuzzyMatch() subsequence title search (Log + recipes)
     text.ts                firstGrapheme() — one-emoji fields (activities, lists)
+    triFilter.ts           tri-state filter pills: cycleTri, triMatcher, useTriFilter
     geocode.ts             Nominatim address → lat/lng (on save only)
     image.ts               client-side photo downscale (≤1200px JPEG) for uploads
     imageUrl.ts            posterSrc() render-time TMDB/Open Library size rewrite
@@ -565,7 +574,6 @@ src/
     usePhotoRows.ts        shared writes for photo collections (upload, add/edit, delete + photo)
   components/              shared UI
     AuthScreen.tsx         login / sign-up (no-op without keys)
-    CategoryPills.tsx      "All" + per-category filter pill row
     ComingSoon.tsx         placeholder page for unbuilt features
     ConfirmModal.tsx       ConfirmProvider / useConfirm / useConfirmOpen
     ControlBar.tsx         every page's top row: left controls, right action, rule
@@ -578,7 +586,7 @@ src/
     PageFrame.tsx          PAGE_MAX_WIDTH + each page's padded, centered column
     PhotoCard.tsx          PhotoCardGrid + PhotoCard (spoons / guys / recipes)
     PickerRow.tsx          in-page pill row picking a board/list (tier lists, lists)
-    Pill.tsx               category filter pill
+    Pill.tsx               filter pill + TriPill (click / right-click tri-state)
     Splash.tsx             centered loading/fatal message
     Stars.tsx              read-only rating display
     TitleSearchInput.tsx   title field with debounced TMDB / Open Library suggestions
@@ -595,6 +603,7 @@ src/
       EntryModal.tsx       new / edit entry (category→activity dropdowns)
       RepeatModal.tsx      log / remove repeats of an entry
       ManageModal.tsx      categories & activities editor + home base
+      CategoryPills.tsx    tri-state category pills + the activity (subcategory) row
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
     tier-list/             movie/TV/book + custom boards (ice cream is one)
@@ -643,8 +652,9 @@ src/
       useParkStore.ts      data seam: park_visits CRUD + ordered members (or seed)
       derive.ts            pure statuses, stats, filters, regions, pin colors
       derive.test.ts       vitest coverage for derive.ts + dataset sanity
-      ParkMap.tsx          Leaflet map: all 63 pins colored by who's been + legend
-      ParkList.tsx         region-grouped list + status filter pills
+      ParkMap.tsx          Leaflet map: filtered pins colored by who's been + legend
+      ParkList.tsx         region-grouped list of the filtered parks
+      ParkFilterPills.tsx  tri-state status pills shared by map + list
       ParkModal.tsx        park facts + visit history + add/edit visit form
       LogVisitModal.tsx    header flow: searchable park picker + trip fields
       VisitFields.tsx      shared trip fields (date, attendees, notes)
@@ -681,6 +691,16 @@ store hook; only truly cross-feature code goes in `src/components/`, `src/data/`
 and `src/lib/`.
 
 ## Conventions & where logic lives
+
+- **Every filter pill row is tri-state** (`src/lib/triFilter.ts` + `TriPill`
+  in `Pill.tsx`): each pill is off / include / exclude; a click cycles
+  off → include → exclude → off and a **right-click runs it backwards**
+  (off → exclude → include → off), so excluding is one click. Includes are
+  OR, excludes veto; an "All" pill clears the row. Each `TriPill` carries a
+  native hover tooltip saying so, and the tag rows add a small italic hint
+  once a filter is set. Prune pill state whose key has disappeared
+  (`pickKeys`) so a stale include never strands an empty view. A new filter
+  row should use the same pieces; `PickerRow` is navigation, not a filter.
 
 - **Keep data-shaping pure and in `src/features/doing-stuff/derive.ts`.** Joining
   entries to their activity/category, filtering, sorting, stats, map markers, and

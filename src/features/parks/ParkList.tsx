@@ -1,63 +1,31 @@
-import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Box, Group, Text, UnstyledButton } from '@mantine/core'
 import { colors, fonts } from '../../theme'
-import { Pill } from '../../components/Pill'
 import type { Park } from './parks'
-import { PARKS } from './parks'
-import type { Member, ParkFilter, ParkStatus } from './derive'
-import { filterParks, groupByRegion } from './derive'
+import type { Member, ParkStatus } from './derive'
+import { groupByRegion } from './derive'
 import { StatusDot } from './StatusDot'
 
-/** Pill row value: 'all' | 'together' | 'unvisited' | a member id. */
-type FilterValue = string
-
-function toFilter(value: FilterValue): ParkFilter {
-  if (value === 'all' || value === 'together' || value === 'unvisited') return value
-  return { memberId: value }
-}
-
+/** The region-grouped list of `parks` (already filtered by the page's pills). */
 export function ParkList({
+  parks,
   statuses,
   members,
+  filters,
   onOpen,
 }: {
+  parks: Park[]
   statuses: Map<string, ParkStatus>
   members: Member[]
+  /** The filter pill row, owned by the page so it survives the Map/List switch. */
+  filters: ReactNode
   onOpen: (park: Park) => void
 }) {
-  const [filter, setFilter] = useState<FilterValue>('all')
-  const groups = groupByRegion(filterParks(PARKS, statuses, toFilter(filter)))
+  const groups = groupByRegion(parks)
 
   return (
     <>
-      {/* STATUS FILTER */}
-      <Group gap={8} mt={20} wrap="wrap">
-        <Pill label="All" active={filter === 'all'} activeBg={colors.ink} onClick={() => setFilter('all')} />
-        {members.map((m) => (
-          <Pill
-            key={m.id}
-            label={m.name || 'Member'}
-            active={filter === m.id}
-            activeBg={m.color}
-            dotColor={filter === m.id ? colors.onAccent : m.color}
-            onClick={() => setFilter(m.id)}
-          />
-        ))}
-        {members.length > 1 && (
-          <Pill
-            label="Together"
-            active={filter === 'together'}
-            activeBg={colors.ink}
-            onClick={() => setFilter('together')}
-          />
-        )}
-        <Pill
-          label="Unvisited"
-          active={filter === 'unvisited'}
-          activeBg={colors.muted}
-          onClick={() => setFilter('unvisited')}
-        />
-      </Group>
+      {filters}
 
       {groups.length === 0 && (
         <Text fz={13} c={colors.muted} mt={24} style={{ fontFamily: fonts.serif, fontStyle: 'italic' }}>

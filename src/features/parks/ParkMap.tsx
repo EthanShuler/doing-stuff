@@ -4,8 +4,8 @@ import type L from 'leaflet'
 import { colors, fonts } from '../../theme'
 import { MapCanvas, cachedDivIcon } from '../../components/MapCanvas'
 import { formatDateWithYear } from '../../lib/format'
+import type { ReactNode } from 'react'
 import type { Park } from './parks'
-import { PARKS } from './parks'
 import type { Member, ParkStatus } from './derive'
 import { parkPin } from './derive'
 import type { DotVariant } from './StatusDot'
@@ -67,22 +67,30 @@ function LegendItem({ variant, label }: { variant: DotVariant; label: string }) 
   )
 }
 
+/** Every park in `parks` (already filtered by the page's pills) as a pin. */
 export function ParkMap({
+  parks,
   statuses,
   members,
+  filters,
   onOpen,
 }: {
+  parks: Park[]
   statuses: Map<string, ParkStatus>
   members: Member[]
+  /** The filter pill row, owned by the page so it survives the Map/List switch. */
+  filters: ReactNode
   onOpen: (park: Park) => void
 }) {
   const memberIds = members.map((m) => m.id)
 
   return (
     <>
+      {filters}
+
       {/* Legend: who owns which color, and the two shape-coded combined
           states. Person-fixed, so it reads the same on both logins. */}
-      <Group gap={20} mt={18} wrap="wrap">
+      <Group gap={20} mt={14} wrap="wrap">
         {members.map((m) => (
           <LegendItem key={m.id} variant={{ kind: 'solid', color: m.color }} label={m.name || 'Member'} />
         ))}
@@ -94,7 +102,7 @@ export function ParkMap({
       {/* Continental-US default framing; Alaska, Hawaiʻi, and the territories
           are a pan away. */}
       <MapCanvas>
-        {PARKS.map((park) => {
+        {parks.map((park) => {
           const status = statuses.get(park.code)
           return (
             <Marker

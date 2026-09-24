@@ -5,7 +5,7 @@ import type { Recipe } from '../../types'
 import { colors } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
 import { usePhotoSession } from '../../lib/photoSession'
-import { useTagFilter } from '../../lib/useTagFilter'
+import { keysIn, useTriFilter } from '../../lib/triFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
@@ -50,13 +50,16 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
   const [view, setView] = useState<View>('grid')
   const [search, setSearch] = useState('')
 
-  // Tri-state tag pills, shared with the tier boards (src/lib/useTagFilter).
-  const { tagFilter, includedTags, excludedTags, filterActive, toggleTag, clearTagFilter } = useTagFilter()
+  // Tri-state tag pills, shared with the tier boards (src/lib/triFilter).
+  const tagFilter = useTriFilter()
+  const { active: filterActive, clear: clearTagFilter } = tagFilter
+  const includedTags = keysIn(tagFilter.state, 'include')
+  const excludedTags = keysIn(tagFilter.state, 'exclude')
   const allTags = useMemo(() => distinctRecipeTags(store.recipes), [store.recipes])
 
   const shown = useMemo(
     () => sortRecipes(filterRecipes(store.recipes, search, includedTags, excludedTags)),
-    [store.recipes, search, tagFilter],
+    [store.recipes, search, tagFilter.state],
   )
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -207,9 +210,9 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
             <TagFilterPills
               tags={allTags}
               allLabel="All recipes"
-              tagFilter={tagFilter}
-              filterActive={filterActive}
-              onToggle={toggleTag}
+              state={tagFilter.state}
+              onCycle={tagFilter.cycle}
+              onCycleBack={tagFilter.cycleBack}
               onClear={clearTagFilter}
             />
 

@@ -1,3 +1,5 @@
+import { keysMatcher } from './triFilter'
+
 // Shared free-text tag semantics (tier boards + recipes): tags are stored as
 // the user typed them, but compared case-insensitively so "Disney" and
 // "disney" behave as one tag even if both spellings were saved.
@@ -19,16 +21,9 @@ export function distinctTagList(tagLists: Iterable<string[]>): string[] {
   return [...byKey.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 }
 
-/** The tri-state filter predicate. Includes are OR (any selected tag matches —
- *  the pills widen, not narrow); anything carrying an excluded tag is dropped
- *  even if it also matches an include. Untagged rows survive an exclude-only
- *  filter ("everything besides disney" keeps the untagged ones) but not an
- *  include filter. Empty selections match everything. */
+/** The tri-state tag predicate (see keysMatcher in src/lib/triFilter.ts),
+ *  compared case-insensitively. */
 export function tagMatcher(included: string[], excluded: string[]): (tags: string[]) => boolean {
-  const wanted = new Set(included.map(tagKey))
-  const banned = new Set(excluded.map(tagKey))
-  return (tags) => {
-    if (tags.some((tag) => banned.has(tagKey(tag)))) return false
-    return wanted.size === 0 || tags.some((tag) => wanted.has(tagKey(tag)))
-  }
+  const matches = keysMatcher(included.map(tagKey), excluded.map(tagKey))
+  return (tags) => matches(tags.map(tagKey))
 }

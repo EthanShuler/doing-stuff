@@ -20,11 +20,18 @@ test('owner pills filter the shelf to one person', async ({ page }) => {
   await expect(page.getByText('Bartholomew')).toBeVisible()
   await expect(page.getByText('Sleepy Steve')).toBeHidden()
 
+  // Includes are OR: adding the ownerless pill widens the shelf.
   await page.getByRole('button', { name: 'Nobody in particular 1' }).click()
   await expect(page.getByText('Desk Guy')).toBeVisible()
-  await expect(page.getByText('Bartholomew')).toBeHidden()
+  await expect(page.getByText('Bartholomew')).toBeVisible()
+  await expect(page.getByText('Sleepy Steve')).toBeHidden()
 
   await page.getByRole('button', { name: 'All 5' }).click()
+  await expect(page.getByText('Sleepy Steve')).toBeVisible()
+
+  // Right-click excludes straight away.
+  await page.getByRole('button', { name: 'Jordan 2' }).click({ button: 'right' })
+  await expect(page.getByText('Bartholomew')).toBeHidden()
   await expect(page.getByText('Sleepy Steve')).toBeVisible()
 })
 

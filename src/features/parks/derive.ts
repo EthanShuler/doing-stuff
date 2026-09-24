@@ -4,6 +4,8 @@ import { PARK_REGIONS } from './parks'
 import { ACCENT, ACCENT_BLUE } from '../../theme'
 import { displayNameFor } from '../../lib/profile'
 import { compareDatedDesc } from '../../lib/format'
+import type { TriFilterState } from '../../lib/triFilter'
+import { triMatcher } from '../../lib/triFilter'
 
 // Pure data-shaping for the parks tracker — no React in here (same pattern as
 // the other features' derive modules; covered by derive.test.ts).
@@ -100,19 +102,26 @@ export function parkStats(
   return { perMember, together, total }
 }
 
-/** List/legend filter: everything, one member's parks, shared trips, or the
- *  ones still to conquer. */
-export type ParkFilter = 'all' | 'together' | 'unvisited' | { memberId: string }
+/** Filter pill keys besides member ids (uuids, so they never collide). */
+export const TOGETHER = 'together'
+export const UNVISITED = 'unvisited'
 
+/** A park's filter keys: every member who's been, 'together' for a shared
+ *  trip, 'unvisited' for nobody yet. */
+export function parkKeys(status: ParkStatus | undefined): string[] {
+  if (!status || status.visitorIds.length === 0) return [UNVISITED]
+  return status.together ? [...status.visitorIds, TOGETHER] : status.visitorIds
+}
+
+/** The map + list status filter — tri-state pills (src/lib/triFilter.ts), so
+ *  "Avery's parks, minus the shared trips" is Avery on, Together excluded. */
 export function filterParks(
   parks: Park[],
   statuses: Map<string, ParkStatus>,
-  filter: ParkFilter,
+  filter: TriFilterState,
 ): Park[] {
-  if (filter === 'all') return parks
-  if (filter === 'unvisited') return parks.filter((p) => !statuses.has(p.code))
-  if (filter === 'together') return parks.filter((p) => statuses.get(p.code)?.together)
-  return parks.filter((p) => statuses.get(p.code)?.visitorIds.includes(filter.memberId))
+  const matches = triMatcher(filter)
+  return parks.filter((p) => matches(parkKeys(statuses.get(p.code))))
 }
 
 /** The list view's region sections, in the canonical region order. Parks keep

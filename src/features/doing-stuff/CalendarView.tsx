@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { Box, Button, Group, Text, UnstyledButton } from '@mantine/core'
-import type { Category } from '../../types'
-import type { CalendarDay, CalendarMark } from './derive'
+import type { Activity, Category } from '../../types'
+import type { CalendarDay, CalendarMark, EntryFilter } from './derive'
 import type { YearMonth } from '../../lib/format'
 import { ACCENT, colors, fonts, warmBorder } from '../../theme'
 import { monthLabel, shiftMonth } from '../../lib/format'
-import { CategoryPills } from '../../components/CategoryPills'
+import { CategoryPills } from './CategoryPills'
 
 interface CalendarViewProps {
   categories: Category[]
-  filterCategoryId: string
-  onFilter: (categoryId: string) => void
+  activities: Activity[]
+  filter: EntryFilter
+  onFilter: (filter: EntryFilter) => void
   /** The 6×7 (or 5×7) grid for `month`, prebuilt in App via calendarDays(). */
   days: CalendarDay[]
   month: YearMonth
@@ -30,7 +31,8 @@ const CHIP_CAP = 3
 
 export function CalendarView({
   categories,
-  filterCategoryId,
+  activities,
+  filter,
   onFilter,
   days,
   month,
@@ -72,7 +74,7 @@ export function CalendarView({
             </Button>
           )}
         </Group>
-        <CategoryPills categories={categories} value={filterCategoryId} onChange={onFilter} />
+        <CategoryPills categories={categories} activities={activities} filter={filter} onChange={onFilter} />
       </Group>
 
       {/* GRID */}

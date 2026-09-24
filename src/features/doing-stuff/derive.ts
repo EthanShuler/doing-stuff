@@ -4,6 +4,8 @@ import { ACCENT, FALLBACK_COLOR, colors, swatchFor } from '../../theme'
 import { currentMonthPrefix, isoDate, today } from '../../lib/format'
 import { fuzzyMatch } from '../../lib/fuzzy'
 import { displayNameFor } from '../../lib/profile'
+import type { CycleDirection, TriFilterState } from '../../lib/triFilter'
+import { cycleTri, keysIn, pickKeys } from '../../lib/triFilter'
 
 /** An entry joined with its activity + category, ready for display. */
 export interface DisplayRow {
@@ -12,6 +14,7 @@ export interface DisplayRow {
   categoryName: string
   categoryId: string | null
   categoryColor: string
+  activityId: string
   activityName: string
   /** Most recent date (max of the first entry and any repeats). Drives the
    *  displayed date and the "recent" sort, so a repeat resurfaces the entry. */
@@ -73,6 +76,7 @@ export function joinRows(
       categoryName: category ? category.name : '—',
       categoryId: category ? category.id : null,
       categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
+      activityId: entry.activityId,
       activityName: activity ? activity.name : '(deleted)',
       date: latestDate,
       firstDate: entry.date,
@@ -95,6 +99,8 @@ export interface MapMarker {
   /** Parent activity's emoji (entries), 📍 fallback, or ⭐ for wishes. */
   emoji: string
   title: string
+  /** Entries only: the activity id, for the map's activity pills. '' for wishes. */
+  activityId: string
   /** Entries only: the activity name shown under the title. '' for wishes. */
   activityName: string
   /** Parent category id (entries); null for wishes and deleted categories. */
@@ -133,6 +139,7 @@ export function mapMarkers(entries: Entry[], activities: Activity[], categories:
       lng: entry.lng,
       emoji: activity && activity.emoji ? activity.emoji : DEFAULT_PIN,
       title: entry.title || (activity ? activity.name : '(deleted)'),
+      activityId: entry.activityId,
       activityName: activity ? activity.name : '(deleted)',
       categoryId: category ? category.id : null,
       categoryColor: category ? swatchFor(category.colorIndex).color : FALLBACK_COLOR,
@@ -160,6 +167,7 @@ export function wishMarkers(items: WishlistItem[]): MapMarker[] {
       lng: item.lng,
       emoji: WISH_PIN,
       title: item.text,
+      activityId: '',
       activityName: '',
       categoryId: null,
       categoryColor: WISH_COLOR,
@@ -175,16 +183,76 @@ export function wishMarkers(items: WishlistItem[]): MapMarker[] {
 // re-exported so this stays the doing-stuff derive surface.
 export { fuzzyMatch }
 
+/** The category + activity pill filter (Log, Calendar, and the Map's own
+ *  copy). Both halves are tri-state (src/lib/triFilter.ts). */
+export interface EntryFilter {
+  categories: TriFilterState
+  activities: TriFilterState
+}
+
+export const NO_ENTRY_FILTER: EntryFilter = { categories: {}, activities: {} }
+
+export const entryFilterActive = (filter: EntryFilter) =>
+  Object.keys(filter.categories).length > 0 || Object.keys(filter.activities).length > 0
+
+/** Does an outing of this category + activity survive the filter? */
+export type EntryMatch = (categoryId: string | null, activityId: string) => boolean
+
+/**
+ * Build the EntryFilter predicate. Categories: includes are OR, an excluded
+ * category drops its entries. Activities refine the included categories — the
+ * activity pills only appear under one — so including an activity narrows its
+ * category to the included activities ("Outdoor → just Park"), and excluding
+ * one drops just that activity ("Outdoor, but not Swimming"). Activity states
+ * under a category that isn't included are ignored.
+ */
+export function entryMatcher(filter: EntryFilter, activities: Activity[]): EntryMatch {
+  const included = new Set(keysIn(filter.categories, 'include'))
+  const excluded = new Set(keysIn(filter.categories, 'exclude'))
+  const categoryOf = new Map(activities.map((a) => [a.id, a.categoryId]))
+  const underIncluded = (activityId: string) => included.has(categoryOf.get(activityId) ?? '')
+  const activityIn = new Set(keysIn(filter.activities, 'include').filter(underIncluded))
+  const activityOut = new Set(keysIn(filter.activities, 'exclude').filter(underIncluded))
+  const narrowed = new Set([...activityIn].map((id) => categoryOf.get(id)))
+
+  return (categoryId, activityId) => {
+    if (categoryId !== null && excluded.has(categoryId)) return false
+    if (activityOut.has(activityId)) return false
+    if (included.size === 0) return true
+    if (categoryId === null || !included.has(categoryId)) return false
+    return !narrowed.has(categoryId) || activityIn.has(activityId)
+  }
+}
+
+/** Cycle a category pill. A category that stops being included takes its
+ *  activity pills' states with it — those pills disappear from the row. */
+export function cycleCategory(
+  filter: EntryFilter,
+  categoryId: string,
+  direction: CycleDirection,
+  activities: Activity[],
+): EntryFilter {
+  const categories = cycleTri(filter.categories, categoryId, direction)
+  const kept = activities.filter((a) => categories[a.categoryId] === 'include').map((a) => a.id)
+  return { categories, activities: pickKeys(filter.activities, kept) }
+}
+
+/** Drop pill states for deleted categories/activities (locally or via a
+ *  partner's realtime delete), so the view never filters on a missing pill. */
+export function pruneEntryFilter(filter: EntryFilter, categories: Category[], activities: Activity[]): EntryFilter {
+  return {
+    categories: pickKeys(filter.categories, categories.map((c) => c.id)),
+    activities: pickKeys(filter.activities, activities.map((a) => a.id)),
+  }
+}
+
 export function filterAndSort(
   rows: DisplayRow[],
-  filterCategoryId: string,
+  match: EntryMatch,
   sort: SortKey,
   search = '',
 ): DisplayRow[] {
-  let result = rows
-  if (filterCategoryId !== 'all') {
-    result = result.filter((row) => row.categoryId === filterCategoryId)
-  }
+  let result = rows.filter((row) => match(row.categoryId, row.activityId))
   if (search.trim()) {
     result = result.filter((row) => fuzzyMatch(row.title, search))
   }
@@ -251,8 +319,7 @@ export interface CalendarDay {
 /**
  * Build the month grid for `ym` (year + 1-based month), week starting Sunday.
  * Flattens both first-entry dates and repeat dates into per-day marks, so a
- * return visit shows on its own day. Honors the category filter ('all' = no
- * filter). Pure aside from reading "today" for the highlight. Leading/trailing
+ * return visit shows on its own day. Honors the category/activity filter. Pure aside from reading "today" for the highlight. Leading/trailing
  * cells from the neighboring months are included with `inMonth: false`.
  */
 export function calendarDays(
@@ -261,7 +328,7 @@ export function calendarDays(
   repeats: Repeat[],
   activities: Activity[],
   categories: Category[],
-  filterCategoryId: string,
+  match: EntryMatch,
 ): CalendarDay[] {
   const activityById = new Map(activities.map((a) => [a.id, a]))
   const categoryById = new Map(categories.map((c) => [c.id, c]))
@@ -271,7 +338,7 @@ export function calendarDays(
     const activity = activityById.get(entry.activityId)
     const category = activity ? categoryById.get(activity.categoryId) : undefined
     const categoryId = category ? category.id : null
-    if (filterCategoryId !== 'all' && categoryId !== filterCategoryId) return null
+    if (!match(categoryId, entry.activityId)) return null
     const swatch = category ? swatchFor(category.colorIndex) : null
     return {
       key,

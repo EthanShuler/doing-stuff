@@ -134,23 +134,29 @@ describe('filterParks', () => {
   )
 
   it('passes everything through for all', () => {
-    expect(filterParks(PARKS, statuses, 'all')).toHaveLength(63)
+    expect(filterParks(PARKS, statuses, {})).toHaveLength(63)
   })
 
   it('keeps only untouched parks for unvisited', () => {
-    const codes = filterParks(PARKS, statuses, 'unvisited').map((p) => p.code)
+    const codes = filterParks(PARKS, statuses, { unvisited: 'include' }).map((p) => p.code)
     expect(codes).toHaveLength(61)
     expect(codes).not.toContain('yose')
     expect(codes).not.toContain('zion')
   })
 
   it('keeps shared trips for together and per-member parks for a member', () => {
-    expect(filterParks(PARKS, statuses, 'together').map((p) => p.code)).toEqual(['yose'])
-    expect(filterParks(PARKS, statuses, { memberId: 'u1' }).map((p) => p.code).sort()).toEqual([
+    expect(filterParks(PARKS, statuses, { together: 'include' }).map((p) => p.code)).toEqual(['yose'])
+    expect(filterParks(PARKS, statuses, { u1: 'include' }).map((p) => p.code).sort()).toEqual([
       'yose',
       'zion',
     ])
-    expect(filterParks(PARKS, statuses, { memberId: 'u2' }).map((p) => p.code)).toEqual(['yose'])
+    expect(filterParks(PARKS, statuses, { u2: 'include' }).map((p) => p.code)).toEqual(['yose'])
+  })
+
+  it('ORs includes and vetoes excludes', () => {
+    expect(filterParks(PARKS, statuses, { u1: 'include', together: 'exclude' }).map((p) => p.code)).toEqual(['zion'])
+    expect(filterParks(PARKS, statuses, { unvisited: 'exclude' }).map((p) => p.code).sort()).toEqual(['yose', 'zion'])
+    expect(filterParks(PARKS, statuses, { u2: 'include', unvisited: 'include' })).toHaveLength(62)
   })
 })
 

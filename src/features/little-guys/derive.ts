@@ -1,13 +1,14 @@
 import type { LittleGuy, Profile } from '../../types'
 import { displayNameFor } from '../../lib/profile'
 import { fuzzyMatch } from '../../lib/fuzzy'
+import type { TriFilterState } from '../../lib/triFilter'
+import { triMatcher } from '../../lib/triFilter'
 
 // Pure data-shaping for the little guy collection — no React in here (same
 // pattern as the other features' derive modules; covered by derive.test.ts).
 
-/** The owner filter's value: OWNER_ALL, OWNER_UNASSIGNED, or a member's user id
- *  (a uuid, so it can never collide with the two sentinels). */
-export type OwnerFilter = string
+/** Owner pill keys: OWNER_ALL (the reset pill), OWNER_UNASSIGNED, or a member's
+ *  user id (a uuid, so it can never collide with the two sentinels). */
 export const OWNER_ALL = 'all'
 export const OWNER_UNASSIGNED = 'unassigned'
 
@@ -49,20 +50,19 @@ export function sortLittleGuys(guys: LittleGuy[]): LittleGuy[] {
 }
 
 /** The collection filter: fuzzy name search (shared with the Log dashboard and
- *  the recipe index) plus the owner pills. */
-export function filterLittleGuys(guys: LittleGuy[], search: string, owner: OwnerFilter): LittleGuy[] {
+ *  the recipe index) plus the tri-state owner pills (src/lib/triFilter.ts). */
+export function filterLittleGuys(guys: LittleGuy[], search: string, owners: TriFilterState): LittleGuy[] {
   let result = guys
   if (search.trim()) {
     result = result.filter((guy) => fuzzyMatch(guy.name, search))
   }
-  if (owner === OWNER_ALL) return result
-  if (owner === OWNER_UNASSIGNED) return result.filter((guy) => !guy.ownerId)
-  return result.filter((guy) => guy.ownerId === owner)
+  const matches = triMatcher(owners)
+  return result.filter((guy) => matches([guy.ownerId ?? OWNER_UNASSIGNED]))
 }
 
 /** One owner filter pill: its value, label, and how many guys it would show. */
 export interface OwnerOption {
-  value: OwnerFilter
+  value: string
   label: string
   count: number
 }
