@@ -465,7 +465,10 @@ This load/realtime plumbing is shared: `src/data/spaceSync.ts` owns
 (one table's INSERT/UPDATE/DELETE handlers), `upsertById`/`removeById`, the
 profile row mapper, and `idFactory` for seed-mode ids. A new feature's store
 supplies only its row mappers, `fetchAll`, a `wire` callback, actions, and
-seed data — follow `useTierListStore` as the template.
+seed data — follow `useTierListStore` as the template. A collection whose
+rows carry one uploaded photo (spoons, recipes, little guys) gets its
+upload / insert / update / delete-with-photo from `src/data/usePhotoRows.ts`
+instead of re-writing them.
 
 ### Space bootstrap & the sharing model
 
@@ -559,6 +562,7 @@ src/
     useSession.ts          Supabase auth session hook
     useSpace.ts            resolves/creates the active space after login
     spaceSync.ts           store plumbing: useSpaceSync, syncTable, upsertById…
+    usePhotoRows.ts        shared writes for photo collections (upload, add/edit, delete + photo)
   components/              shared UI
     AuthScreen.tsx         login / sign-up (no-op without keys)
     CategoryPills.tsx      "All" + per-category filter pill row
