@@ -20,6 +20,7 @@ const FEATURES = [
   { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
   { label: 'Tier Lists', path: '/movies', matches: ['/movies', '/tv', '/books', '/tiers'] },
   { label: 'Lists', path: '/lists/movies', matches: ['/lists'] },
+  { label: 'Seasons', path: '/seasons', matches: ['/seasons'] },
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
   { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },
@@ -31,7 +32,9 @@ const isActive = (matches: string[], pathname: string) =>
   matches.some((m) => m === pathname || (m !== '/' && pathname.startsWith(`${m}/`)))
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.
- *  Eight nav items need ~980px, so the drawer holds them until `md`. */
+ *  The nine nav items need ~870px (plus the brand and, live, Sign out), so
+ *  the drawer holds them until `md` (992px) — checked with a screenshot at
+ *  exactly 992 when Seasons made it nine. */
 export function AppLayout({ children }: { children: ReactNode }) {
   const [navOpened, { toggle, close }] = useDisclosure(false)
   const { pathname } = useLocation()

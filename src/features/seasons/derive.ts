@@ -457,3 +457,122 @@ export function cloneSeasonItems(
   }))
   return [...clones.filter((c) => c.parentId === null), ...clones.filter((c) => c.parentId !== null)]
 }
+
+// --- Drafts from rows ---------------------------------------------------------------
+
+/** A blank item draft, optionally pre-filled (a quick-add's section, a day's
+ *  planned date). */
+export const blankItemDraft = (patch: Partial<SeasonItemDraft> = {}): SeasonItemDraft => ({
+  section: '',
+  subsection: '',
+  title: '',
+  note: '',
+  url: '',
+  parentId: null,
+  fixedOn: null,
+  byOn: null,
+  plannedOn: null,
+  ...patch,
+})
+
+/** The item modal's draft for an existing item. */
+export const draftFromItem = (item: SeasonItem): SeasonItemDraft => ({
+  section: item.section,
+  subsection: item.subsection,
+  title: item.title,
+  note: item.note,
+  url: item.url,
+  parentId: item.parentId,
+  fixedOn: item.fixedOn,
+  byOn: item.byOn,
+  plannedOn: item.plannedOn,
+})
+
+// --- Labels the screens show ------------------------------------------------------------
+
+/** "3 weekends left" / "1 weekend left" / "no weekends left". */
+export function weekendsLeftPhrase(n: number): string {
+  if (n <= 0) return 'no weekends left'
+  return n === 1 ? '1 weekend left' : `${n} weekends left`
+}
+
+export type TagTone = 'fixed' | 'planned' | 'deadline' | 'urgent' | 'overdue'
+
+/** The small chip at the end of a bucket-list row. The label always carries
+ *  the meaning in words / an icon (📌, ⚠) — tone only adds emphasis, never
+ *  stands alone (Ethan is red-green colorblind). */
+export interface ItemTag {
+  tone: TagTone
+  label: string
+}
+
+/**
+ * Which chip a row wears: its fixed day ("📌 Sat 11/7"), else its planned day
+ * ("Sat 10/3"), else — open items only — its deadline: "by 10/31", or with a
+ * warning once it's close ("⚠ by 10/18 · 2 weekends left") or past
+ * ("⚠ by 10/18 · overdue"). null = nothing to show.
+ */
+export function itemTag(item: SeasonItem, today: string, list: Weekend[]): ItemTag | null {
+  if (item.fixedOn) return { tone: 'fixed', label: `📌 ${dayLabel(item.fixedOn)}` }
+  if (item.plannedOn) return { tone: 'planned', label: dayLabel(item.plannedOn) }
+  const u = urgency(item, today, list)
+  if (!u || !item.byOn) return null
+  const by = `by ${shortDate(item.byOn)}`
+  if (u.level === 'overdue') return { tone: 'overdue', label: `⚠ ${by} · overdue` }
+  if (u.level === 'urgent') return { tone: 'urgent', label: `⚠ ${by} · ${weekendsLeftPhrase(u.weekendsLeft)}` }
+  return { tone: 'deadline', label: by }
+}
+
+/** Whether the season hasn't started, is on, or is over. */
+export type SeasonPhase = 'upcoming' | 'current' | 'over'
+
+export function seasonPhase(season: Pick<Season, 'startsOn' | 'endsOn'>, today: string): SeasonPhase {
+  if (today < season.startsOn) return 'upcoming'
+  return today > season.endsOn ? 'over' : 'current'
+}
+
+/** "This weekend" / "Next weekend" for the first two cards, else null. On a
+ *  Mon–Thu, "this weekend" is the coming one. */
+export function relativeWeekendLabel(w: Weekend, today: string): string | null {
+  const thisFri = weekendFriday(today)
+  if (w.fri === thisFri) return 'This weekend'
+  if (w.fri === addDays(thisFri, 7)) return 'Next weekend'
+  return null
+}
+
+/** The scheduler's chips, one row per remaining weekend: only the days that
+ *  are still plannable (not past, inside the season). Empty weekends drop. */
+export interface WeekendDayGroup {
+  weekend: Weekend
+  days: string[]
+}
+
+export function weekendDayGroups(season: Pick<Season, 'startsOn' | 'endsOn'>, today: string): WeekendDayGroup[] {
+  return weekends(season, today)
+    .map((weekend) => ({
+      weekend,
+      days: [weekend.fri, weekend.sat, weekend.sun].filter(
+        (d) => d >= today && d >= season.startsOn && d <= season.endsOn,
+      ),
+    }))
+    .filter((g) => g.days.length > 0)
+}
+
+/** Whether a weekend-card day can still take plans: not past, inside the
+ *  season. (Past / out-of-season days still list what's on them.) */
+export const isPlannableDay = (season: Pick<Season, 'startsOn' | 'endsOn'>, day: string, today: string): boolean =>
+  day >= today && day >= season.startsOn && day <= season.endsOn
+
+/** The status pill counts / control-bar line. */
+export function statusCounts(items: SeasonItem[]): Record<ItemStatus, number> {
+  const out: Record<ItemStatus, number> = { unplanned: 0, planned: 0, done: 0 }
+  for (const item of items) out[itemStatus(item)] += 1
+  return out
+}
+
+/** The parent's title for a sub-option ("hard cider"), so a child shown out
+ *  of context (the Unplanned tray, a day column) still reads. */
+export function parentTitle(items: SeasonItem[], item: SeasonItem): string | null {
+  if (!item.parentId) return null
+  return items.find((i) => i.id === item.parentId)?.title ?? null
+}

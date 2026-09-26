@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { pickSegment } from './helpers'
 
 // Runs under the 'mobile' project (390×844 — see playwright.config; the file
 // name has to contain "mobile" to match its testMatch).
@@ -22,6 +23,7 @@ const ROUTES = [
   '/lists/books',
   // The picker row is longest here too — three built-ins + the seed's list.
   '/lists/g1',
+  '/seasons/fall-2026',
   '/parks',
   '/spoons',
   '/little-guys',
@@ -48,5 +50,17 @@ test('an open modal doesn\'t scroll the page sideways at 390px', async ({ page }
   await page.goto('/spoons')
   await page.getByRole('button', { name: '+ Add spoon' }).click()
   await expect(page.getByRole('heading', { name: 'Add a spoon' })).toBeVisible()
+  expect(await overflow(page)).toBeLessThanOrEqual(0)
+})
+
+test('the Seasons plan screen (and its scheduler) doesn\'t scroll sideways at 390px', async ({ page }) => {
+  // Pinned to a Saturday in the seed season so there are weekend cards to lay out.
+  await page.clock.setFixedTime(new Date('2026-09-26T12:00:00'))
+  await page.goto('/seasons/fall-2026')
+  await pickSegment(page, 'Plan')
+  await expect(page.locator('[data-day="2026-10-03"]')).toBeVisible()
+  expect(await overflow(page)).toBeLessThanOrEqual(0)
+  await page.locator('[data-tray="unplanned"]').getByRole('button', { name: 'Plan “color walk”' }).click()
+  await expect(page.getByRole('dialog', { name: 'Plan “color walk”' })).toBeVisible()
   expect(await overflow(page)).toBeLessThanOrEqual(0)
 })

@@ -2,34 +2,44 @@ import { describe, expect, it } from 'vitest'
 import type { Season, SeasonItem } from '../../types'
 import {
   addDays,
+  blankItemDraft,
   byPosition,
   canNestUnder,
   cloneSeasonItems,
   currentSeason,
   dayLabel,
   dayOf,
+  draftFromItem,
   filterItems,
   groupSections,
+  isPlannableDay,
   itemStatus,
+  itemTag,
   itemsByDay,
   missed,
   nextPosition,
   parentChoices,
+  parentTitle,
   positionAfter,
   pruneItem,
   pruneSeason,
+  relativeWeekendLabel,
+  seasonPhase,
   sectionKeys,
   shortDate,
   sortSeasons,
+  statusCounts,
   subsectionsOf,
   unplanned,
   urgency,
   weekdayOf,
+  weekendDayGroups,
   weekendDays,
   weekendFriday,
   weekendLabel,
   weekendPlans,
   weekends,
+  weekendsLeftPhrase,
 } from './derive'
 import { seed } from './useSeasonStore'
 
@@ -547,5 +557,117 @@ describe('Fall 2026 seed', () => {
     expect(items.filter((i) => i.fixedOn).map((i) => [i.title, i.fixedOn])).toEqual([['Twin Cities Book Festival', '2026-11-07']])
     expect(items.filter((i) => i.byOn === '2026-10-18')).toHaveLength(3)
     expect(items.filter((i) => i.byOn === '2026-10-31')).toHaveLength(6)
+  })
+})
+
+describe('drafts', () => {
+  it('builds a blank draft with overrides', () => {
+    expect(blankItemDraft({ section: 'Unsorted', plannedOn: '2026-10-03' })).toEqual({
+      section: 'Unsorted',
+      subsection: '',
+      title: '',
+      note: '',
+      url: '',
+      parentId: null,
+      fixedOn: null,
+      byOn: null,
+      plannedOn: '2026-10-03',
+    })
+  })
+  it('round-trips an item into its editable fields', () => {
+    const it1 = item({ title: 'x', note: 'n', url: 'u', byOn: '2026-10-31', parentId: 'p' })
+    expect(draftFromItem(it1)).toMatchObject({ title: 'x', note: 'n', url: 'u', byOn: '2026-10-31', parentId: 'p' })
+  })
+})
+
+describe('weekendsLeftPhrase', () => {
+  it('handles zero, one, and many', () => {
+    expect(weekendsLeftPhrase(0)).toBe('no weekends left')
+    expect(weekendsLeftPhrase(1)).toBe('1 weekend left')
+    expect(weekendsLeftPhrase(4)).toBe('4 weekends left')
+  })
+})
+
+describe('itemTag', () => {
+  const today = '2026-10-05' // a Monday
+  const list = weekends(FALL, today)
+  it('shows the fixed day with a pin, over any planned day', () => {
+    expect(itemTag(item({ fixedOn: '2026-11-07', plannedOn: '2026-10-10' }), today, list)).toEqual({
+      tone: 'fixed',
+      label: '📌 Sat 11/7',
+    })
+  })
+  it('shows the planned day, even when done', () => {
+    expect(itemTag(item({ plannedOn: '2026-10-10' }), today, list)).toEqual({ tone: 'planned', label: 'Sat 10/10' })
+    expect(itemTag(item({ plannedOn: '2026-10-10', doneOn: '2026-10-10' }), today, list)?.label).toBe('Sat 10/10')
+  })
+  it('words the deadline: plain, urgent, overdue', () => {
+    expect(itemTag(item({ byOn: '2026-10-31' }), today, list)).toEqual({ tone: 'deadline', label: 'by 10/31' })
+    // Weekends of 10/9 and 10/16 are left before 10/18.
+    expect(itemTag(item({ byOn: '2026-10-18' }), today, list)).toEqual({
+      tone: 'urgent',
+      label: '⚠ by 10/18 · 2 weekends left',
+    })
+    expect(itemTag(item({ byOn: '2026-10-01' }), today, list)).toEqual({ tone: 'overdue', label: '⚠ by 10/1 · overdue' })
+  })
+  it('is null for a done or plain undated item', () => {
+    expect(itemTag(item(), today, list)).toBeNull()
+    expect(itemTag(item({ byOn: '2026-10-18', doneOn: '2026-10-04' }), today, list)).toBeNull()
+  })
+})
+
+describe('seasonPhase', () => {
+  it('is upcoming, current (inclusive ends), or over', () => {
+    expect(seasonPhase(FALL, '2026-09-21')).toBe('upcoming')
+    expect(seasonPhase(FALL, '2026-09-22')).toBe('current')
+    expect(seasonPhase(FALL, '2026-11-15')).toBe('current')
+    expect(seasonPhase(FALL, '2026-11-16')).toBe('over')
+  })
+})
+
+describe('relativeWeekendLabel', () => {
+  const w = (fri: string) => ({ fri, sat: addDays(fri, 1), sun: addDays(fri, 2) })
+  it('names this and next weekend from a Saturday', () => {
+    expect(relativeWeekendLabel(w('2026-09-25'), '2026-09-26')).toBe('This weekend')
+    expect(relativeWeekendLabel(w('2026-10-02'), '2026-09-26')).toBe('Next weekend')
+    expect(relativeWeekendLabel(w('2026-10-09'), '2026-09-26')).toBeNull()
+  })
+  it('treats the coming weekend as this one on a weekday', () => {
+    expect(relativeWeekendLabel(w('2026-10-02'), '2026-09-29')).toBe('This weekend')
+  })
+})
+
+describe('weekendDayGroups / isPlannableDay', () => {
+  it('groups plannable days per weekend, dropping past days', () => {
+    const groups = weekendDayGroups(FALL, '2026-09-26')
+    expect(groups[0]).toEqual({
+      weekend: { fri: '2026-09-25', sat: '2026-09-26', sun: '2026-09-27' },
+      days: ['2026-09-26', '2026-09-27'],
+    })
+    expect(groups.flatMap((g) => g.days)).toEqual(weekendDays(FALL, '2026-09-26'))
+    expect(groups.at(-1)?.weekend.fri).toBe('2026-11-13')
+  })
+  it('drops a weekend with no plannable day left', () => {
+    // Season ends on a Friday; on that Friday evening only Friday remains.
+    const groups = weekendDayGroups({ startsOn: '2026-09-01', endsOn: '2026-10-02' }, '2026-10-02')
+    expect(groups).toEqual([{ weekend: { fri: '2026-10-02', sat: '2026-10-03', sun: '2026-10-04' }, days: ['2026-10-02'] }])
+  })
+  it('knows a plannable day', () => {
+    expect(isPlannableDay(FALL, '2026-09-26', '2026-09-26')).toBe(true)
+    expect(isPlannableDay(FALL, '2026-09-25', '2026-09-26')).toBe(false)
+    expect(isPlannableDay(FALL, '2026-11-20', '2026-09-26')).toBe(false)
+  })
+})
+
+describe('statusCounts / parentTitle', () => {
+  it('counts each status bucket', () => {
+    const items = [item(), item({ plannedOn: '2026-10-03' }), item({ fixedOn: '2026-11-07' }), item({ doneOn: '2026-09-26' })]
+    expect(statusCounts(items)).toEqual({ unplanned: 1, planned: 2, done: 1 })
+  })
+  it('finds a sub-option’s parent title', () => {
+    const parent = item({ title: 'hard cider' })
+    const child = item({ parentId: parent.id })
+    expect(parentTitle([parent, child], child)).toBe('hard cider')
+    expect(parentTitle([parent, child], parent)).toBeNull()
   })
 })
