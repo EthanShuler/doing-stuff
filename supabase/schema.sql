@@ -281,12 +281,30 @@ create table if not exists public.tier_item_completions (
   unique (item_id, user_id)
 );
 
+-- PER-PERSON tags ("comfort", "rewatch") — each member's own filter labels
+-- for an item, alongside the item's SHARED `tags`. One row per person per
+-- item holding the whole list (no row = no personal tags). The UI only ever
+-- shows the viewer's own; RLS is the same split as completions (members read
+-- all, write only their own) — hidden by the UI, not secret.
+create table if not exists public.tier_item_user_tags (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  item_id     uuid not null references public.tier_items (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  tags        text[] not null default '{}',
+  created_at  timestamptz not null default now(),
+  -- One tag row per person per item — also the upsert conflict target.
+  unique (item_id, user_id)
+);
+
 create index if not exists tier_items_space_idx      on public.tier_items (space_id);
 create index if not exists tier_items_list_idx       on public.tier_items (list_id);
 create index if not exists tier_placements_space_idx on public.tier_placements (space_id);
 create index if not exists tier_placements_item_idx  on public.tier_placements (item_id);
 create index if not exists tier_item_completions_space_idx on public.tier_item_completions (space_id);
 create index if not exists tier_item_completions_item_idx  on public.tier_item_completions (item_id);
+create index if not exists tier_item_user_tags_space_idx on public.tier_item_user_tags (space_id);
+create index if not exists tier_item_user_tags_item_idx  on public.tier_item_user_tags (item_id);
 
 -- Whether an item sits on a custom list flagged `shared` — the gate for
 -- writing a null-owner placement of it. SECURITY DEFINER like
@@ -678,6 +696,7 @@ alter table public.tier_lists       enable row level security;
 alter table public.tier_items       enable row level security;
 alter table public.tier_placements  enable row level security;
 alter table public.tier_item_completions enable row level security;
+alter table public.tier_item_user_tags enable row level security;
 alter table public.lists            enable row level security;
 alter table public.list_items       enable row level security;
 alter table public.music_practice_days enable row level security;
@@ -837,6 +856,25 @@ drop policy if exists "delete own reads" on public.tier_item_completions;
 create policy "delete own reads" on public.tier_item_completions
   for delete using (user_id = auth.uid());
 
+-- Personal tags: the same split as completions — members read all rows (the
+-- app shows only the viewer's own), write only their own.
+drop policy if exists "members read user tags" on public.tier_item_user_tags;
+create policy "members read user tags" on public.tier_item_user_tags
+  for select using (public.is_space_member(space_id));
+
+drop policy if exists "insert own user tags" on public.tier_item_user_tags;
+create policy "insert own user tags" on public.tier_item_user_tags
+  for insert with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "update own user tags" on public.tier_item_user_tags;
+create policy "update own user tags" on public.tier_item_user_tags
+  for update using (user_id = auth.uid())
+  with check (public.is_space_member(space_id) and user_id = auth.uid());
+
+drop policy if exists "delete own user tags" on public.tier_item_user_tags;
+create policy "delete own user tags" on public.tier_item_user_tags
+  for delete using (user_id = auth.uid());
+
 -- lists ------------------------------------------------------------------------
 -- The free-form list rows themselves are shared space data.
 drop policy if exists "space members all" on public.lists;
@@ -907,7 +945,7 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_lists, public.tier_items, public.tier_placements,
-  public.tier_item_completions, public.lists, public.list_items, public.spoons, public.park_visits,
+  public.tier_item_completions, public.tier_item_user_tags, public.lists, public.list_items, public.spoons, public.park_visits,
   public.recipes, public.music_practice_days, public.little_guys
   to authenticated;
 grant select, update on public.profiles to authenticated;
@@ -936,7 +974,7 @@ declare
 begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
-          'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'lists', 'list_items', 'spoons',
+          'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'tier_item_user_tags', 'lists', 'list_items', 'spoons',
           'park_visits', 'recipes', 'little_guys']
   loop
     if not exists (

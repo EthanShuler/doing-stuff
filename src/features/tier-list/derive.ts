@@ -1,4 +1,4 @@
-import type { ListKey, Tier, TierItem, TierList, TierPlacement, TierCompletion } from '../../types'
+import type { ListKey, Tier, TierItem, TierList, TierPlacement, TierCompletion, TierUserTags } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
@@ -114,6 +114,37 @@ export function filterByTags(items: TierItem[], included: string[], excluded: st
   if (included.length === 0 && excluded.length === 0) return items
   const matches = tagMatcher(included, excluded)
   return items.filter((item) => matches(item.tags))
+}
+
+// --- Personal tags ------------------------------------------------------------
+// Each member's own labels for an item ("comfort", "rewatch") live in
+// TierUserTags rows, one per (item, member). Only the VIEWER's own ever show —
+// even on the partner's board, "Mine" filters by your tags.
+
+/** One member's tags per item id (items they haven't tagged are absent). */
+export function userTagMap(rows: TierUserTags[], userId: string | null): Map<string, string[]> {
+  return new Map(rows.filter((r) => r.userId === userId).map((r) => [r.itemId, r.tags]))
+}
+
+/** One member's tags on one kind's items, deduped and sorted like
+ *  distinctTags. Drives the "Mine" pill row and the modal's suggestions. */
+export function distinctUserTags(items: TierItem[], rows: TierUserTags[], userId: string | null, key: ListKey): string[] {
+  const mine = userTagMap(rows, userId)
+  return distinctTagList(items.filter((item) => item.kind === key).map((item) => mine.get(item.id) ?? []))
+}
+
+/** filterByTags over one member's personal tags instead of the shared ones. */
+export function filterByUserTags(
+  items: TierItem[],
+  rows: TierUserTags[],
+  userId: string | null,
+  included: string[],
+  excluded: string[],
+): TierItem[] {
+  if (included.length === 0 && excluded.length === 0) return items
+  const mine = userTagMap(rows, userId)
+  const matches = tagMatcher(included, excluded)
+  return items.filter((item) => matches(mine.get(item.id) ?? []))
 }
 
 /** One viewer's board: items per tier (in ranked order) + the two shelves. */

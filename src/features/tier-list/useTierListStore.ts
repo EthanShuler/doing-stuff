@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCompletion } from '../../types'
+import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCompletion, TierUserTags } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { firstGrapheme } from '../../lib/text'
 import { renormalizedPositions } from '../../lib/order'
@@ -30,6 +30,10 @@ import type { ProfileRow } from '../../data/spaceSync'
 // derive.ts): movies/TV/custom lists carry one SHARED `done_on` on the item;
 // books ignore it and track each member's OWN `done_on` in
 // `tier_item_completions`. Same column name on both sides on purpose.
+//
+// Tags split the same way: `tier_items.tags` are SHARED; each member's own
+// tags live in `tier_item_user_tags` (one row per item per member, members
+// read all, write only their own). The page only ever shows the viewer's.
 
 interface Snapshot {
   /** The space's own lists ("Fruits"), in creation order. */
@@ -37,6 +41,7 @@ interface Snapshot {
   items: TierItem[]
   placements: TierPlacement[]
   completions: TierCompletion[]
+  userTags: TierUserTags[]
   profiles: Profile[]
 }
 
@@ -125,6 +130,15 @@ function seed(): Snapshot {
       { id: 'r4', itemId: 'b3', userId: 'u2', doneOn: '2026-06-20' },
       { id: 'r5', itemId: 'b4', userId: 'u1', doneOn: '2026-06-25' },
     ],
+    // Personal tags for both members, so the "Mine" row differs by viewer
+    // (and the partner's never shows up on yours).
+    userTags: [
+      { id: 'ut1', itemId: 'm1', userId: 'u1', tags: ['comfort', 'rewatch'] },
+      { id: 'ut2', itemId: 'm4', userId: 'u1', tags: ['comfort'] },
+      { id: 'ut3', itemId: 'm2', userId: 'u2', tags: ['date night'] },
+      { id: 'ut4', itemId: 't1', userId: 'u1', tags: ['rewatch'] },
+      { id: 'ut5', itemId: 'b1', userId: 'u1', tags: ['reread'] },
+    ],
   }
 }
 
@@ -165,6 +179,12 @@ type TierCompletionRow = {
   user_id: string
   done_on: string
 }
+type TierUserTagsRow = {
+  id: string
+  item_id: string
+  user_id: string
+  tags: string[] | null
+}
 
 const toTierList = (r: TierListRow): TierList => ({
   id: r.id,
@@ -200,11 +220,18 @@ const toTierCompletion = (r: TierCompletionRow): TierCompletion => ({
   userId: r.user_id,
   doneOn: r.done_on,
 })
+const toTierUserTags = (r: TierUserTagsRow): TierUserTags => ({
+  id: r.id,
+  itemId: r.item_id,
+  userId: r.user_id,
+  tags: r.tags ?? [],
+})
 
 const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,created_by,created_at'
 const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
+const TIER_USER_TAGS_COLUMNS = 'id,item_id,user_id,tags'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('tx', 500)
@@ -222,6 +249,10 @@ const upsertPlacement = (set: Dispatch<SetStateAction<TierPlacement[]>>, p: Tier
 const upsertCompletion = (set: Dispatch<SetStateAction<TierCompletion[]>>, r: TierCompletion) =>
   set((prev) => [...prev.filter((x) => !(x.itemId === r.itemId && x.userId === r.userId)), r])
 
+// And for a member's personal tag row: unique per (itemId, userId).
+const upsertUserTags = (set: Dispatch<SetStateAction<TierUserTags[]>>, r: TierUserTags) =>
+  set((prev) => [...prev.filter((x) => !(x.itemId === r.itemId && x.userId === r.userId)), r])
+
 export interface TierListStore {
   /** The space's own lists, oldest first (picker pill order). */
   lists: TierList[]
@@ -232,6 +263,8 @@ export interface TierListStore {
   /** All members' personal completions (book read records today); deriveBoard
    *  picks one viewer's. */
   completions: TierCompletion[]
+  /** All members' personal tag rows; the page shows only the viewer's own. */
+  userTags: TierUserTags[]
   profiles: Profile[]
   /** Whose board "You" is: the auth user, or the seed self in keyless mode. */
   selfId: string | null
@@ -243,12 +276,12 @@ export interface TierListStore {
   /** Add to the shared pool. `creator` is who made it (author/director — see
    *  copy.ts). `dateOn` is an ISO date or null (= none yet): the shared
    *  watched date for movies/TV, YOUR OWN read date for books. `tags` are
-   *  shared filter labels (normalized before saving).
+   *  shared filter labels, `myTags` YOUR OWN (both normalized before saving).
    *  Throws only when the item itself fails (the modal stays open). */
-  addItem: (key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => Promise<void>
-  /** Edit a pool item's title/image/creator/tags + its date (same per-kind
-   *  date semantics as addItem). Throws only when the item write fails. */
-  updateItem: (id: string, key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => Promise<void>
+  addItem: (key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => Promise<void>
+  /** Edit a pool item's title/image/creator/tags + its date and your own tags
+   *  (same semantics as addItem). Throws only when the item write fails. */
+  updateItem: (id: string, key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => Promise<void>
   /** Remove from the pool — deletes EVERYONE's placements (and, for books,
    *  read records) of it. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
@@ -270,6 +303,9 @@ export interface TierListStore {
    *  deletes the row — "I haven't read this". Inline flow — records the error
    *  and resyncs. */
   setDoneOn: (itemId: string, doneOn: string | null) => Promise<void>
+  /** Replace YOUR OWN tags on an item (an empty list deletes the row). Inline
+   *  flow — records the error and resyncs. */
+  setMyTags: (itemId: string, tags: string[]) => Promise<void>
 
   /** Create a space-defined list. Resolves the created row so the caller can
    *  navigate to its board. Throws on failure (the modal stays open). */
@@ -298,6 +334,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   const [items, setItems] = useState<TierItem[]>(initial?.items ?? [])
   const [placements, setPlacements] = useState<TierPlacement[]>(initial?.placements ?? [])
   const [completions, setCompletions] = useState<TierCompletion[]>(initial?.completions ?? [])
+  const [userTags, setUserTags] = useState<TierUserTags[]>(initial?.userTags ?? [])
   const [profiles, setProfiles] = useState<Profile[]>(initial?.profiles ?? [])
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
@@ -310,11 +347,12 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // optimistic drop. Throws on the first failed query.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [ls, its, places, comps_, profs] = await Promise.all([
+    const [ls, its, places, comps_, utags, profs] = await Promise.all([
       supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
       supabase.from('tier_item_completions').select(TIER_COMPLETION_COLUMNS).eq('space_id', spaceId).order('created_at'),
+      supabase.from('tier_item_user_tags').select(TIER_USER_TAGS_COLUMNS).eq('space_id', spaceId),
       // RLS scopes this to the current user + anyone they share a space with.
       supabase.from('profiles').select(PROFILE_COLUMNS),
     ])
@@ -322,12 +360,14 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     if (its.error) throw its.error
     if (places.error) throw places.error
     if (comps_.error) throw comps_.error
+    if (utags.error) throw utags.error
     if (profs.error) throw profs.error
     return {
       lists: (ls.data as TierListRow[]).map(toTierList),
       items: (its.data as TierItemRow[]).map(toTierItem),
       placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
       completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
+      userTags: (utags.data as TierUserTagsRow[]).map(toTierUserTags),
       profiles: (profs.data as ProfileRow[]).map(toProfile),
     }
   }, [spaceId])
@@ -337,6 +377,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     setItems(snap.items)
     setPlacements(snap.placements)
     setCompletions(snap.completions)
+    setUserTags(snap.userTags)
     setProfiles(snap.profiles)
   }, [])
 
@@ -359,6 +400,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     channel = syncTable(channel, spaceFilter, 'tier_items', toTierItem, setItems)
     channel = syncTable(channel, spaceFilter, 'tier_placements', toTierPlacement, setPlacements, upsertPlacement)
     channel = syncTable(channel, spaceFilter, 'tier_item_completions', toTierCompletion, setCompletions, upsertCompletion)
+    channel = syncTable(channel, spaceFilter, 'tier_item_user_tags', toTierUserTags, setUserTags, upsertUserTags)
     return channel
   }, [])
 
@@ -416,10 +458,51 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     [spaceId, selfId, resync],
   )
 
+  // Your own tags on an item: an empty list deletes the row, anything else
+  // upserts it. Like setDoneOn, only ever touches rows with your user_id.
+  const setMyTags = useCallback(
+    async (itemId: string, tags: string[]) => {
+      if (!selfId) return
+      const clean = normalizeTags(tags)
+      setError(null)
+      if (clean.length === 0) {
+        setUserTags((prev) => prev.filter((r) => !(r.itemId === itemId && r.userId === selfId)))
+        if (!supabase || !spaceId) return
+        const { error: err } = await supabase
+          .from('tier_item_user_tags')
+          .delete()
+          .eq('item_id', itemId)
+          .eq('user_id', selfId)
+        if (err) {
+          setError(err.message)
+          resync()
+        }
+        return
+      }
+      upsertUserTags(setUserTags, { id: nextId(), itemId, userId: selfId, tags: clean })
+      if (!supabase || !spaceId) return
+      const { data, error: err } = await supabase
+        .from('tier_item_user_tags')
+        .upsert(
+          { space_id: spaceId, item_id: itemId, user_id: selfId, tags: clean },
+          { onConflict: 'item_id,user_id' },
+        )
+        .select(TIER_USER_TAGS_COLUMNS)
+        .single()
+      if (err) {
+        setError(err.message)
+        resync()
+        return
+      }
+      upsertUserTags(setUserTags, toTierUserTags(data as TierUserTagsRow))
+    },
+    [spaceId, selfId, resync],
+  )
+
   // --- Pool actions. These throw on failure so the item modal can stay open. ---
 
   const addItem = useCallback(
-    async (key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => {
+    async (key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -446,6 +529,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         // The item exists either way now, so a failed read-record write only
         // surfaces the error banner (setDoneOn resyncs) — no throw.
         if (personal && dateOn) await setDoneOn(created.id, dateOn)
+        if (myTags.length > 0) await setMyTags(created.id, myTags)
         return
       }
       const created: TierItem = {
@@ -461,12 +545,13 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       }
       setItems((prev) => [...prev, created])
       if (personal && dateOn) await setDoneOn(created.id, dateOn)
+      if (myTags.length > 0) await setMyTags(created.id, myTags)
     },
-    [spaceId, selfId, setDoneOn],
+    [spaceId, selfId, setDoneOn, setMyTags],
   )
 
   const updateItem = useCallback(
-    async (id: string, key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[]) => {
+    async (id: string, key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -496,8 +581,12 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       // Sync your read record to the field: a date upserts, blank deletes.
       // Inline flow (no throw) — the item edit above already landed.
       if (personal) await setDoneOn(id, dateOn)
+      // Skip the write when your tags didn't change — most edits don't touch them.
+      const before = userTags.find((r) => r.itemId === id && r.userId === selfId)?.tags ?? []
+      const after = normalizeTags(myTags)
+      if (before.join('\u0000') !== after.join('\u0000')) await setMyTags(id, after)
     },
-    [spaceId, setDoneOn],
+    [spaceId, selfId, userTags, setDoneOn, setMyTags],
   )
 
   const deleteItem = useCallback(
@@ -515,6 +604,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setItems((prev) => prev.filter((x) => x.id !== id))
       setPlacements((prev) => prev.filter((p) => p.itemId !== id))
       setCompletions((prev) => prev.filter((r) => r.itemId !== id))
+      setUserTags((prev) => prev.filter((r) => r.itemId !== id))
     },
     [spaceId],
   )
@@ -688,6 +778,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setItems((prev) => prev.filter((item) => item.kind !== key))
       setPlacements((prev) => dropItemRows(prev, gone))
       setCompletions((prev) => dropItemRows(prev, gone))
+      setUserTags((prev) => dropItemRows(prev, gone))
     },
     [spaceId, items],
   )
@@ -697,6 +788,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     items,
     placements,
     completions,
+    userTags,
     profiles,
     selfId,
     loading,
@@ -710,6 +802,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     placeTier,
     setSharedDoneOn,
     setDoneOn,
+    setMyTags,
     addList,
     updateList,
     deleteList,

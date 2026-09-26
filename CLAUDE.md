@@ -100,9 +100,13 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   has no second shelf and its item modal no date field (`dates: null` in the
   tier-list `copy.ts`, mirrored by `hasUndatedShelf()` in its `derive.ts`)
   — and free-text
-  **`tags`** (`text[]`, e.g. "disney", "fantasy") shared like the item; the
-  board page filters by them with tri-state pills (see the tri-state filter
-  convention below; matched case-insensitively). A filtered board is **read-only** — hidden cards make
+  **`tags`** (`text[]`, e.g. "disney", "fantasy") shared like the item — the
+  **Shared tags** — plus each member's own **My tags** (see Personal tags
+  below). The board page filters by them with two labeled tri-state pill
+  rows, **Shared** then **Mine**, which AND together (see the tri-state filter
+  convention below; matched case-insensitively; each row's state is pruned to
+  tags still in use). "Mine" is always the **viewer's own** tags — also on the
+  partner's board. A filtered board is **read-only** — hidden cards make
   drop positions ambiguous — so it renders `BoardView` with clickable cards.
   Items also carry a free-text **`creator`** — who made it, shared like the
   title and shown as a faint line under the card title; the modal labels it
@@ -138,6 +142,14 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   for books, shelf drags and the modal's date field write the viewer's own
   completion row and never touch the item's shared `done_on`.
   Same split RLS as placements (read everyone's, write only your own).
+- **Personal tags** (`tier_item_user_tags`) — **one person's** own filter
+  labels for an item ("comfort", "rewatch"): a `tags text[]`, upsert on
+  `unique (item_id, user_id)`, no row = none (saving an empty list deletes
+  it). Same split RLS as completions, so they're **hidden by the UI, not
+  secret** — the app only ever reads the signed-in member's rows
+  (`userTagMap` / `distinctUserTags` / `filterByUserTags` in the tier-list
+  `derive.ts`). Work on every board, shared custom lists included; the item
+  modal edits them in a second "My tags" field.
 
 All four routes render the same `TierListPage` (a `kind` prop for a built-in,
 the URL's list id for `/tiers/:id`), so the store —
@@ -506,15 +518,16 @@ schema in `supabase/schema.sql` is already applied to the current project.
 
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
-  `tier_item_completions`, `lists`, `list_items`, `spoons`, `park_visits`,
+  `tier_item_completions`, `tier_item_user_tags`, `lists`, `list_items`, `spoons`, `park_visits`,
   `recipes`, `music_practice_days`, `little_guys`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
   exceptions: `profiles` (read self + co-members, update self),
-  **`tier_placements` / `tier_item_completions` / `music_practice_days`** (members
+  **`tier_placements` / `tier_item_completions` / `tier_item_user_tags` /
+  `music_practice_days`** (members
   read all, but insert/update/delete require `user_id = auth.uid()` — rankings,
-  book read state, and daily practice are personal; `tier_placements` alone
+  book read state, personal tags, and daily practice are personal; `tier_placements` alone
   also admits **null-owner rows for items on a `shared` custom list**, via
   `is_shared_board_item()`), and **`list_items`**
   (members read all; writes to BOOK rows additionally require
