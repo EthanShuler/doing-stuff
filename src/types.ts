@@ -144,7 +144,8 @@ export interface TierItem {
    *  ignore it entirely: they show no dates and have no second shelf, so an
    *  item there is either ranked or unranked. */
   doneOn: string | null
-  /** Free-text filter labels ("disney", "fantasy"). Shared, like the item. */
+  /** Free-text filter labels ("disney", "fantasy"). Shared, like the item —
+   *  each member's own labels live in TierUserTags instead. */
   tags: string[]
   /** Who made it — author for books, director for movies, etc. (per-kind label
    *  in copy.ts). Free text, shared like the title. '' = unknown/not entered. */
@@ -169,6 +170,15 @@ export interface TierCompletion {
   userId: string
   /** ISO date this member finished it. */
   doneOn: string
+}
+
+/** One member's OWN tags for an item — one row in `tier_item_user_tags`,
+ *  alongside the item's shared `tags`. The UI only shows the viewer's own. */
+export interface TierUserTags {
+  id: string
+  itemId: string
+  userId: string
+  tags: string[]
 }
 
 /**

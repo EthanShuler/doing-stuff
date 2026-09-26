@@ -6,7 +6,7 @@ import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { useBusy } from '../../lib/useBusy'
-import { keysIn, useTriFilter } from '../../lib/triFilter'
+import { keysIn, pickKeys, useTriFilter } from '../../lib/triFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
@@ -14,7 +14,7 @@ import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
-import { datesArePersonal, deriveBoard, distinctTags, filterByTags, isSharedBoard, listIdOf, listKeyFor, placementOwner } from './derive'
+import { datesArePersonal, deriveBoard, distinctTags, distinctUserTags, filterByTags, filterByUserTags, isSharedBoard, listIdOf, listKeyFor, placementOwner, userTagMap } from './derive'
 import type { ShelfId } from './derive'
 import { copyFor } from './copy'
 import { TierBoard } from './TierBoard'
@@ -35,6 +35,7 @@ const emptyDraft = (): ItemDraft => ({
   imageUrl: '',
   doneOn: today(),
   tags: [],
+  myTags: [],
   creator: '',
 })
 
@@ -102,15 +103,26 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const [listDraft, setListDraft] = useState<ListDraft>(emptyListDraft)
   const [editingList, setEditingList] = useState(false)
 
-  // Tag filter (shared tri-state pills — see src/lib/triFilter). While any
-  // state is set the board shows only matching items — read-only, because
-  // drops between visible neighbors would land at arbitrary positions
-  // relative to the hidden cards.
+  // Tag filters — two tri-state pill rows (see src/lib/triFilter): the
+  // item's SHARED tags, and YOUR OWN tags ("Mine" filters by yours even on
+  // the partner's board). The rows AND together. While either is set the
+  // board shows only matching items — read-only, because drops between
+  // visible neighbors would land at arbitrary positions relative to the
+  // hidden cards. Each row's state is pruned to tags still in use, so a
+  // retagged item can't strand a stale filter with its pill gone.
   const tagFilter = useTriFilter()
-  const { active: filterActive, clear: clearTagFilter } = tagFilter
-  const includedTags = keysIn(tagFilter.state, 'include')
-  const excludedTags = keysIn(tagFilter.state, 'exclude')
-  useEffect(() => clearTagFilter(), [key])
+  const myTagFilter = useTriFilter()
+  const { clear: clearTagFilter } = tagFilter
+  const { clear: clearMyTagFilter } = myTagFilter
+  const kindTags = distinctTags(store.items, key)
+  const myKindTags = distinctUserTags(store.items, store.userTags, store.selfId, key)
+  const sharedTagState = pickKeys(tagFilter.state, kindTags)
+  const myTagState = pickKeys(myTagFilter.state, myKindTags)
+  const filterActive = Object.keys(sharedTagState).length > 0 || Object.keys(myTagState).length > 0
+  useEffect(() => {
+    clearTagFilter()
+    clearMyTagFilter()
+  }, [key])
   // Every board renders this same component, so a board switch (a picker pill,
   // or browser back/forward) must drop an open modal: saving a movie draft
   // onto /tv would file it under the wrong board, and a book edit saved on a
@@ -121,13 +133,15 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     setListModalOpen(false)
     setOpenShelves(SHELVES_COLLAPSED)
   }, [key])
-  const kindTags = useMemo(() => distinctTags(store.items, key), [store.items, key])
-
   const viewerId = showingPartner ? partner.id : store.selfId
-  const board = useMemo(
-    () => deriveBoard(filterByTags(store.items, includedTags, excludedTags), store.placements, store.completions, viewerId, key, shared),
-    [store.items, tagFilter.state, store.placements, store.completions, viewerId, key, shared],
+  const visibleItems = filterByUserTags(
+    filterByTags(store.items, keysIn(sharedTagState, 'include'), keysIn(sharedTagState, 'exclude')),
+    store.userTags,
+    store.selfId,
+    keysIn(myTagState, 'include'),
+    keysIn(myTagState, 'exclude'),
   )
+  const board = deriveBoard(visibleItems, store.placements, store.completions, viewerId, key, shared)
 
   // Placement position per item on the board you drag — yours, or the shared
   // one — for the neighbor lookup when a drop lands.
@@ -150,7 +164,14 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     const dateOn = personal
       ? store.completions.find((r) => r.itemId === item.id && r.userId === store.selfId)?.doneOn ?? ''
       : item.doneOn ?? ''
-    setDraft({ title: item.title, imageUrl: item.imageUrl, doneOn: dateOn, tags: item.tags, creator: item.creator })
+    setDraft({
+      title: item.title,
+      imageUrl: item.imageUrl,
+      doneOn: dateOn,
+      tags: item.tags,
+      myTags: userTagMap(store.userTags, store.selfId).get(item.id) ?? [],
+      creator: item.creator,
+    })
     setModalOpen(true)
   }
 
@@ -167,8 +188,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         // A custom list tracks no date — never write one, even though the
         // draft carries today's by default.
         const dateOn = dates ? draft.doneOn || null : null
-        if (editingId) await store.updateItem(editingId, key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
-        else await store.addItem(key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags)
+        if (editingId) await store.updateItem(editingId, key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags, draft.myTags)
+        else await store.addItem(key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags, draft.myTags)
         closeModal()
       } catch {
         // Write failed — keep the modal open; store.error shows the reason.
@@ -320,14 +341,25 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
           <Splash text="Loading your space…" mih="40vh" />
         ) : (
           <>
-            {/* Tag filter pills — only once something on this kind is tagged. */}
+            {/* Tag filter pills — each row only once something on this kind
+                carries that kind of tag. "Mine" is always YOUR tags. */}
             <TagFilterPills
+              label="Shared"
               tags={kindTags}
               allLabel={`All ${noun}s`}
-              state={tagFilter.state}
+              state={sharedTagState}
               onCycle={tagFilter.cycle}
               onCycleBack={tagFilter.cycleBack}
               onClear={clearTagFilter}
+            />
+            <TagFilterPills
+              label="Mine"
+              tags={myKindTags}
+              allLabel={`All ${noun}s`}
+              state={myTagState}
+              onCycle={myTagFilter.cycle}
+              onCycleBack={myTagFilter.cycleBack}
+              onClear={clearMyTagFilter}
             />
 
             {showingPartner ? (
@@ -429,6 +461,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         draft={draft}
         isEditing={editingId !== null}
         tagSuggestions={kindTags}
+        myTagSuggestions={myKindTags}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
         saving={saving}
         onSave={saveItem}

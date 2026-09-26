@@ -20,6 +20,8 @@ export interface ItemDraft {
   doneOn: string
   /** Shared filter labels ("disney", "fantasy"). */
   tags: string[]
+  /** The editor's OWN filter labels — only they ever see these. */
+  myTags: string[]
   /** Who made it — author/director/etc. (label per kind in copy.ts). */
   creator: string
 }
@@ -31,6 +33,7 @@ export function ItemModal({
   draft,
   isEditing,
   tagSuggestions = [],
+  myTagSuggestions = [],
   onChange,
   saving,
   onSave,
@@ -49,6 +52,8 @@ export function ItemModal({
   /** Tags already used on this kind's items, offered as autocomplete options
    *  so spellings converge instead of forking ("Disney" vs "disney"). */
   tagSuggestions?: string[]
+  /** Your own tags already used on this kind — same idea, per person. */
+  myTagSuggestions?: string[]
   onChange: (patch: Partial<ItemDraft>) => void
   saving: boolean
   onSave: () => void
@@ -133,11 +138,20 @@ export function ItemModal({
             />
           )}
           <TagsInput
-            label="Tags"
+            label="Shared tags"
             value={draft.tags}
             onChange={(tags) => onChange({ tags })}
             data={tagSuggestions}
             placeholder={draft.tags.length === 0 ? 'e.g. fantasy, disney (optional)' : undefined}
+            mb={18}
+          />
+          <TagsInput
+            label="My tags"
+            description="Only you see these."
+            value={draft.myTags}
+            onChange={(myTags) => onChange({ myTags })}
+            data={myTagSuggestions}
+            placeholder={draft.myTags.length === 0 ? 'e.g. comfort, rewatch (optional)' : undefined}
             mb={6}
           />
           <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>

@@ -108,7 +108,8 @@ test('ice cream add/edit modal has no date field', async ({ page }) => {
   await page.goto('/tiers/l0')
   await page.getByRole('button', { name: '+ Add flavor' }).click()
   await expect(page.getByRole('heading', { name: 'Add a flavor' })).toBeVisible()
-  await expect(page.getByRole('combobox', { name: 'Tags' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Shared tags' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'My tags' })).toBeVisible()
   await expect(page.locator('input[type="date"]')).toHaveCount(0)
 })
 
@@ -122,8 +123,43 @@ test('tag filter makes the board read-only and hides non-matches', async ({ page
   await expect(page.getByText('Everything Everywhere All at Once')).toBeVisible()
   await expect(page.getByText('Spirited Away')).not.toBeVisible() // fantasy/ghibli only
 
-  await page.getByText('All movies', { exact: true }).click()
+  // The Shared row's reset pill comes first (the Mine row has its own).
+  await page.getByText('All movies', { exact: true }).first().click()
   await expect(page.getByText('Spirited Away')).toBeVisible()
+})
+
+// Personal tags (seed): Avery's own — Spirited Away "comfort, rewatch",
+// Paddington 2 "comfort"; Jordan's own — The Princess Bride "date night".
+test('"Mine" filters by your own tags, on your board and the partner’s', async ({ page }) => {
+  await page.goto('/movies')
+  await expect(page.getByText('Mine', { exact: true })).toBeVisible()
+  await expect(page.getByText('date night', { exact: true })).toHaveCount(0) // Jordan's, never shown
+
+  await page.getByText('comfort', { exact: true }).click()
+  await expect(page.getByText('Filtered by tag — clear the filter to rearrange.')).toBeVisible()
+  await expect(tierRow(page, 'S').getByText('Spirited Away')).toBeVisible()
+  await expect(tierRow(page, 'S').getByText('Paddington 2')).toBeVisible()
+  await expect(page.getByText('The Princess Bride')).not.toBeVisible()
+
+  // Jordan's board, still filtered by YOUR "comfort": Spirited Away is their A.
+  await pickSegment(page, 'Jordan')
+  await expect(page.getByText('date night', { exact: true })).toHaveCount(0)
+  await expect(tierRow(page, 'A').getByText('Spirited Away')).toBeVisible()
+  await expect(page.getByText('The Princess Bride')).not.toBeVisible()
+})
+
+test('adding your own tag in the modal makes a "Mine" pill', async ({ page }) => {
+  await page.goto('/movies')
+  await tierRow(page, 'A').getByText('The Princess Bride').click()
+  const myTags = page.getByRole('combobox', { name: 'My tags' })
+  await myTags.fill('swashbuckler')
+  await myTags.press('Enter')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'swashbuckler', exact: true }).click()
+  await expect(tierRow(page, 'A').getByText('The Princess Bride')).toBeVisible()
+  await expect(page.getByText('Spirited Away')).not.toBeVisible()
 })
 
 test('tag pills cycle include → exclude → off', async ({ page }) => {

@@ -8,6 +8,7 @@ import type { TriFilterState } from '../lib/triFilter'
  *  backwards), and a hint appears once any state is set. Renders nothing when
  *  no tags are in use. */
 export function TagFilterPills({
+  label,
   tags,
   allLabel,
   state,
@@ -15,6 +16,8 @@ export function TagFilterPills({
   onCycleBack,
   onClear,
 }: {
+  /** Optional row heading ("Shared" / "Mine") for a page with several rows. */
+  label?: string
   tags: string[]
   /** Label for the reset pill, e.g. "All recipes" / "All movies". */
   allLabel: string
@@ -27,6 +30,11 @@ export function TagFilterPills({
   const filterActive = Object.keys(state).length > 0
   return (
     <Group gap={8} mt={16} wrap="wrap">
+      {label && (
+        <Text fz={12} fw={600} c={colors.muted} w={52} style={{ fontFamily: fonts.sans }}>
+          {label}
+        </Text>
+      )}
       <Pill label={allLabel} active={!filterActive} activeBg={ACCENT} onClick={onClear} />
       {tags.map((tag) => (
         <TriPill

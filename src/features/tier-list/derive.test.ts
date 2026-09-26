@@ -5,6 +5,9 @@ import {
   datesArePersonal,
   deriveBoard,
   distinctTags,
+  distinctUserTags,
+  filterByUserTags,
+  userTagMap,
   filterByTags,
   findContainer,
   hasUndatedShelf,
@@ -21,6 +24,7 @@ import {
   dropItemRows,
   tierSwatch,
 } from './derive'
+import type { TierUserTags } from '../../types'
 import { palette } from '../../theme'
 
 // --- factories ---------------------------------------------------------------
@@ -402,6 +406,42 @@ describe('filterByTags', () => {
 
   it('exclude wins over include when an item carries both', () => {
     expect(filterByTags([disney, fantasy, disneyFantasy], ['fantasy'], ['disney'])).toEqual([fantasy])
+  })
+})
+
+describe('personal tags', () => {
+  const tags = (itemId: string, userId: string, list: string[]): TierUserTags => ({ id: `${itemId}-${userId}`, itemId, userId, tags: list })
+  const a = item({ id: 'ua', kind: 'movie' })
+  const b = item({ id: 'ub', kind: 'movie' })
+  const c = item({ id: 'uc', kind: 'tv' })
+  const rows = [
+    tags('ua', 'u1', ['comfort', 'Rewatch']),
+    tags('ub', 'u1', ['rewatch']),
+    tags('uc', 'u1', ['sitcom']),
+    tags('ub', 'u2', ['date night']),
+  ]
+
+  it('userTagMap keeps only the given member’s rows', () => {
+    expect(userTagMap(rows, 'u2')).toEqual(new Map([['ub', ['date night']]]))
+    expect(userTagMap(rows, null).size).toBe(0)
+  })
+
+  it('distinctUserTags collects one member’s tags on one kind, deduped and sorted', () => {
+    expect(distinctUserTags([a, b, c], rows, 'u1', 'movie')).toEqual(['comfort', 'Rewatch'])
+    expect(distinctUserTags([a, b, c], rows, 'u2', 'movie')).toEqual(['date night'])
+    expect(distinctUserTags([a, b, c], rows, 'u2', 'tv')).toEqual([])
+  })
+
+  it('filterByUserTags matches the member’s own tags, never the partner’s', () => {
+    expect(filterByUserTags([a, b], rows, 'u1', ['rewatch'], [])).toEqual([a, b])
+    expect(filterByUserTags([a, b], rows, 'u1', [], ['comfort'])).toEqual([b])
+    // u2's "date night" is theirs alone.
+    expect(filterByUserTags([a, b], rows, 'u1', ['date night'], [])).toEqual([])
+    expect(filterByUserTags([a, b], rows, 'u2', ['date night'], [])).toEqual([b])
+  })
+
+  it('empty selections filter nothing', () => {
+    expect(filterByUserTags([a, b, c], rows, 'u1', [], [])).toEqual([a, b, c])
   })
 })
 

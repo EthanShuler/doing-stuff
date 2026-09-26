@@ -653,6 +653,48 @@ export type Database = {
           },
         ]
       }
+      tier_item_user_tags: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          space_id: string
+          tags: string[]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          space_id: string
+          tags?: string[]
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          space_id?: string
+          tags?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_item_user_tags_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "tier_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tier_item_user_tags_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tier_items: {
         Row: {
           created_at: string
