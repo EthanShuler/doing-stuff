@@ -27,6 +27,7 @@ const RecipesPage = lazy(() => import('./features/recipes/RecipesPage').then((m)
 const MusicPracticePage = lazy(() =>
   import('./features/music-practice/MusicPracticePage').then((m) => ({ default: m.MusicPracticePage })),
 )
+const SeasonsPage = lazy(() => import('./features/seasons/SeasonsPage').then((m) => ({ default: m.SeasonsPage })))
 const LittleGuysPage = lazy(() =>
   import('./features/little-guys/LittleGuysPage').then((m) => ({ default: m.LittleGuysPage })),
 )
@@ -84,6 +85,10 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <ListsPage kind={kind} spaceId={spaceId} userId={userId} configured={configured} />
   )
 
+  // Seasons: /seasons (forwards to the current season) and /seasons/:id
+  // render one component, so the store survives switching seasons.
+  const seasons = <SeasonsPage spaceId={spaceId} userId={userId} configured={configured} />
+
   const recipes = <RecipesPage spaceId={spaceId} configured={configured} />
 
   return (
@@ -132,6 +137,8 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             path="/cats"
             element={<ComingSoon title="Cat photo wall" blurb="A wall of our cats. Coming soon." />}
           />
+          <Route path="/seasons" element={seasons} />
+          <Route path="/seasons/:id" element={seasons} />
           <Route path="/music-practice" element={<MusicPracticePage spaceId={spaceId} userId={userId} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

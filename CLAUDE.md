@@ -6,7 +6,7 @@ Guidance for working in this repo. Read this before making changes.
 
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand link + feature nav +
-sign-out). The nav is **one item per feature, not per route** — eight of them,
+sign-out). The nav is **one item per feature, not per route** — nine of them,
 collapsing into the burger drawer below Mantine's `md` breakpoint; the five
 tier-list routes share a single "Tier Lists" item and are chosen in-page with
 the `ListPicker` pill row, and the Lists routes likewise share one "Lists"
@@ -19,7 +19,8 @@ free-form list) are the **Lists** feature (`/lists` redirects to
 `/lists/movies`); `/spoons` is the **Spoons**
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
 the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
-`/little-guys` is the **Little Guys** feature; `/french-toast` is a placeholder
+`/little-guys` is the **Little Guys** feature; `/seasons` (+ `/seasons/:id`)
+is the **Seasons** feature; `/french-toast` is a placeholder
 page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
@@ -209,6 +210,66 @@ adds it with poster + creator), dense ~38px rows in one bordered panel
 section below the open queue (strikethrough rows, uncheck, no dates), edits in
 `ListItemModal`, list create/rename/delete in `ListDefModal`. Deliberately no
 realtime-derived dates and no You/Partner toggle.
+
+**Seasons** (`/seasons`, `/seasons/:id`) — the seasonal bucket list, built
+to make it EASY TO PLAN a season's activities onto its remaining weekends.
+The domain model (both tables shared space data, uniform RLS):
+
+- **Season** (`seasons`) — `name` + one `emoji` (🍂 default) + an inclusive
+  `starts_on`/`ends_on` range (a check keeps end ≥ start). `/seasons` forwards
+  to `currentSeason()` — the one containing today, else the latest started,
+  else the earliest upcoming — or shows an empty state with "+ New season".
+  Creating one can **"Copy items from"** another (`cloneSeasonItems()` in
+  the seasons `derive.ts`): sections / subsections / titles / notes / urls /
+  positions and the parent structure come over with remapped ids (client-minted
+  uuids, one multi-row insert), but **all four dates are cleared**. Deleting a
+  season cascades its items (store mirror: `pruneSeason()`).
+- **Season item** (`season_items`) — free-text `section` ("Food") and
+  `subsection` ("Baked goods", '' = none; a blank section saves as
+  **Unsorted**), `title`, `note`, `url`, fractional `position`, and an
+  optional `parent_id` — ONE level of nesting: a **sub-option** ("Sweetland"
+  under "apple orchard") must sit under a top-level item of the same season
+  (`canNestUnder`), **inherits its parent's section/subsection** (the store
+  forces it, and moving a parent carries its children), and is deleted with
+  it (`on delete cascade`, mirrored by `pruneItem()`). Four dates:
+  **`fixed_on`** (an event with a set day — it sits there and **can't be
+  re-planned**; saving one **clears `planned_on`**), **`by_on`** (a "do it
+  before" deadline), **`planned_on`** (ONE planned day per item — to do
+  something twice, **Duplicate** it: a copy right after the original with no
+  planned/done date), and **`done_on`** (check-off = today). `dayOf(item)` =
+  fixed ?? planned.
+
+Two screens behind an in-page **Bucket list / Plan** SegmentedControl (page
+state, like Spoons), with a `PickerRow` of seasons + "+ New season" + a faint
+"Edit season" above it. **Bucket list**: sections as serif headings,
+subsections as panels in a two-up grid (one column on a phone), dense rows
+(check · title · faint note · ↗ link · a day/deadline chip), sub-options
+indented under their parent, done rows struck through, a borderless quick-add
+at the foot of each subsection, and two tri-state pill rows (sections, then
+Unplanned / Planned / Done — `filterItems`). The title opens `ItemModal`
+(Autocomplete section/subsection, "Sub-option of" from `parentChoices`, note,
+link, fixed / by / planned dates, Duplicate in the header, Delete via
+`useConfirm`). **Plan** — the point of the feature: "N weekends left", an
+**Unplanned** tray sorted by deadline (`unplanned()`), a **Missed** tray
+(planned days that went by undone — `missed()` **excludes fixed items**, the
+event is simply past), and one card per remaining weekend (`weekends()` —
+**Fri · Sat · Sun only**, a weekend counts while its Sunday ≥ today; three
+columns on desktop, stacked label-beside-items rows on a phone), each day
+with its items (checkbox, 📌 for fixed) and a quick-add that files a new item
+under **Unsorted** planned on that day; Mon–Thu-dated items hang off their
+week's card as an "Other days" line (`weekendPlans`). **Scheduling is
+tap-based, no drag-and-drop**: any item (tray row, day row, bucket-list chip)
+opens `SchedulePopover` — a chip per remaining weekend day
+(`weekendDayGroups`; the current day ✓-filled, days after the deadline
+dashed), Unplan, and Edit…; a fixed item's popover only explains itself.
+Deadlines are counted in weekends left (`urgency()`): ≤ 2 = urgent, past =
+overdue, and the chip says so in words and an icon (`itemTag()`:
+"⚠ by 10/18 · 2 weekends left", "⚠ by 10/1 · overdue", "📌 Sat 11/7") —
+**never color alone**, per the parks rule. All date math is local-day
+arithmetic in the seasons `derive.ts` (UTC day counts, never
+`toISOString`), DST-safe. Scope cuts (deliberate): no Doing Stuff entry on
+check-off, no weather, no links to recipes/tier items, no drag-and-drop, no
+realtime-derived "who planned it".
 
 **Spoons** (`/spoons`) — Squabby's souvenir spoon collection. A **spoon**
 (`spoons` table, shared space data, uniform RLS) has a name, an optional
@@ -519,7 +580,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
   `tier_item_completions`, `tier_item_user_tags`, `lists`, `list_items`, `spoons`, `park_visits`,
-  `recipes`, `music_practice_days`, `little_guys`.
+  `recipes`, `music_practice_days`, `little_guys`, `seasons`, `season_items`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
@@ -559,7 +620,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 ```
 src/
   App.tsx                  gate (auth → space) → BrowserRouter → AppLayout → routes
-                           (the 8 feature pages are React.lazy at module scope)
+                           (the 9 feature pages are React.lazy at module scope)
   types.ts                 domain types (mirror DB columns)
   theme.ts                 earthy palette, fonts, shared colors, swatchFor()
   mantineTheme.ts          Mantine theme override mirroring theme.ts
@@ -651,6 +712,18 @@ src/
       SpoonGrid.tsx        photo card grid + SpoonPhoto (🥄 fallback)
       SpoonMap.tsx         Leaflet map: circular photo pins, fit-bounds framing
       SpoonModal.tsx       add/edit spoon (photo upload, place, date, story)
+    seasons/               seasonal bucket list + weekend planner
+      SeasonsPage.tsx      owns the store, route redirect, picker, toggle, filters, modals
+      useSeasonStore.ts    data seam: seasons + season_items CRUD, copy, plan, check-off (or seed)
+      derive.ts            pure: current season, weekends, day layout, urgency, groups, clone
+      derive.test.ts       vitest coverage for derive.ts + the Fall 2026 seed
+      BucketList.tsx       sections → subsection panels → dense rows + quick-adds
+      PlanView.tsx         weekends-left header, Unplanned/Missed trays, weekend cards
+      SchedulePopover.tsx  tap-to-schedule: weekend-day chips, Unplan, Edit…
+      TagChip.tsx          the day / deadline chip (words + icon, never color alone)
+      QuickAdd.tsx         borderless Enter-to-add field (subsections, days)
+      ItemModal.tsx        add/edit item (section autocomplete, parent, dates, Duplicate)
+      SeasonModal.tsx      create (copy items from) / edit / delete a season
     little-guys/           the little guy (Smiski) collection — one photo grid
       LittleGuysPage.tsx   owns the store, search + owner pills, modal state
       useLittleGuyStore.ts data seam: little_guys CRUD + ordered members (or seed)
@@ -692,7 +765,8 @@ e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
                            tier-list, lists, spoons, little-guys, parks,
-                           recipes, music-practice, mobile, mobile-overflow)
+                           recipes, music-practice, seasons, mobile,
+                           mobile-overflow)
                            — see playwright.config.ts
 supabase/
   schema.sql               tables + RLS + grants (the source of truth)
@@ -734,7 +808,7 @@ and `src/lib/`.
   press). Never `window.confirm`. Keep this for anything that destroys logged
   or shared data — entries, repeats, categories, activities, wishes, tier
   items, list rows and free-form lists, spoons, little guys, recipes, park
-  visits.
+  visits, seasons and season items.
 - **Every feature page wears the same shell.** `PageFrame` (padding + the
   centered `PAGE_MAX_WIDTH` column) wraps the page; `ControlBar` is its top row
   (`left` = toggles/filters/counts, `right` = the primary action) above the

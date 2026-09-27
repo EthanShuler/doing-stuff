@@ -102,6 +102,14 @@ test('/little-guys renders the little guy collection', async ({ page }) => {
   await expect(page.getByRole('button', { name: '+ Add little guy' })).toBeVisible()
 })
 
+test('/seasons forwards to the current season', async ({ page }) => {
+  // The seed's only season, so it's "current" whatever today is.
+  await page.goto('/seasons')
+  await expect(page).toHaveURL('/seasons/fall-2026')
+  await expect(page.getByText('pumpkin bread')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Add item' })).toBeVisible()
+})
+
 test('/parks renders the park tracker map', async ({ page }) => {
   await page.goto('/parks')
   await expect(page.locator('.leaflet-container')).toBeVisible()

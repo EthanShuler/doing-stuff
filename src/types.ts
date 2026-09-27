@@ -368,6 +368,57 @@ export interface PracticeDay {
   createdAt: string
 }
 
+// --- Seasons (the seasonal bucket list) ---------------------------------------
+
+/** One season — a row in `seasons` ("Fall 2026" 🍂). Shared space data. */
+export interface Season {
+  id: string
+  /** Display name, as typed: "Fall 2026". */
+  name: string
+  /** Single emoji for the picker pill (DB default 🍂). */
+  emoji: string
+  /** ISO date the season starts (inclusive, local). */
+  startsOn: string
+  /** ISO date the season ends (inclusive, local); ≥ startsOn. */
+  endsOn: string
+  /** auth.users id of the member who created it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp. */
+  createdAt: string
+}
+
+/** One thing to do in a season — a row in `season_items`. Shared space data. */
+export interface SeasonItem {
+  id: string
+  seasonId: string
+  /** The top-level item this is a sub-option of; null = top-level. ONE level
+   *  of nesting only (a child never has children). */
+  parentId: string | null
+  /** Free-text group heading: "Food". */
+  section: string
+  /** Free-text sub-heading within the section: "Baked goods". '' = none. */
+  subsection: string
+  title: string
+  /** Faint note line. '' = none. */
+  note: string
+  /** Optional link. '' = none. */
+  url: string
+  /** Fractional order within the season (src/lib/order.ts). */
+  position: number
+  /** The event has a set day: it sits there and can't be re-planned. */
+  fixedOn: string | null
+  /** "Do it before" deadline. */
+  byOn: string | null
+  /** The day we plan to do it (one per item). */
+  plannedOn: string | null
+  /** Set = done, on this day. */
+  doneOn: string | null
+  /** auth.users id of the member who added it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp. */
+  createdAt: string
+}
+
 // --- Parks (the 63-national-parks tracker) ------------------------------------
 
 /** One trip to a national park — one row in `park_visits`. The park itself is

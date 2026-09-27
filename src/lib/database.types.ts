@@ -508,6 +508,126 @@ export type Database = {
           },
         ]
       }
+      season_items: {
+        Row: {
+          by_on: string | null
+          created_at: string
+          created_by: string | null
+          done_on: string | null
+          fixed_on: string | null
+          id: string
+          note: string
+          parent_id: string | null
+          planned_on: string | null
+          position: number
+          season_id: string
+          section: string
+          space_id: string
+          subsection: string
+          title: string
+          url: string
+        }
+        Insert: {
+          by_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          done_on?: string | null
+          fixed_on?: string | null
+          id?: string
+          note?: string
+          parent_id?: string | null
+          planned_on?: string | null
+          position: number
+          season_id: string
+          section: string
+          space_id: string
+          subsection?: string
+          title: string
+          url?: string
+        }
+        Update: {
+          by_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          done_on?: string | null
+          fixed_on?: string | null
+          id?: string
+          note?: string
+          parent_id?: string | null
+          planned_on?: string | null
+          position?: number
+          season_id?: string
+          section?: string
+          space_id?: string
+          subsection?: string
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "season_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "season_items_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "season_items_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seasons: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          emoji: string
+          ends_on: string
+          id: string
+          name: string
+          space_id: string
+          starts_on: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string
+          ends_on: string
+          id?: string
+          name: string
+          space_id: string
+          starts_on: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string
+          ends_on?: string
+          id?: string
+          name?: string
+          space_id?: string
+          starts_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasons_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       space_members: {
         Row: {
           created_at: string

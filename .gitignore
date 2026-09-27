@@ -29,3 +29,6 @@ tmp/
 # Playwright output
 test-results/
 playwright-report/
+
+# Live-DB data seeds (space-specific, paste into the SQL Editor)
+supabase/seeds/

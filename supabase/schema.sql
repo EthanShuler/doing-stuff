@@ -581,6 +581,60 @@ create table if not exists public.music_practice_days (
 create index if not exists music_practice_days_space_idx on public.music_practice_days (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Seasons: the seasonal bucket list. A `seasons` row is one season ("Fall
+-- 2026" 🍂, an inclusive date range whose weekends the planner shows);
+-- `season_items` are the things to do in it. Items group by free-text
+-- `section` › `subsection` ("Food" › "Baked goods"), may nest ONE level under
+-- a parent (a sub-option like "Sweetland" under "apple orchard" — the depth
+-- limit is app-side), and carry four optional dates: `fixed_on` (the event
+-- has a set day — not re-plannable), `by_on` (do-it-before deadline),
+-- `planned_on` (the day we plan it — one per item; duplicate to do it twice),
+-- and `done_on` (set = done). Shared space data with the uniform member
+-- policy. On an existing DB: see migrations/20260926_seasons.sql.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.seasons (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  -- Display name, as typed: "Fall 2026".
+  name        text not null,
+  -- Single emoji for the picker pill.
+  emoji       text not null default '🍂',
+  starts_on   date not null,
+  ends_on     date not null,
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at  timestamptz not null default now(),
+  check (ends_on >= starts_on)
+);
+
+create index if not exists seasons_space_idx on public.seasons (space_id);
+
+create table if not exists public.season_items (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  season_id   uuid not null references public.seasons (id) on delete cascade,
+  -- null = top-level; deleting the parent takes its sub-options.
+  parent_id   uuid references public.season_items (id) on delete cascade,
+  section     text not null,
+  subsection  text not null default '',
+  title       text not null,
+  note        text not null default '',
+  url         text not null default '',
+  -- Fractional order within the season (src/lib/order.ts).
+  position    double precision not null,
+  fixed_on    date,
+  by_on       date,
+  planned_on  date,
+  done_on     date,
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists season_items_space_idx  on public.season_items (space_id);
+create index if not exists season_items_season_idx on public.season_items (season_id);
+create index if not exists season_items_parent_idx on public.season_items (parent_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -700,6 +754,8 @@ alter table public.tier_item_user_tags enable row level security;
 alter table public.lists            enable row level security;
 alter table public.list_items       enable row level security;
 alter table public.music_practice_days enable row level security;
+alter table public.seasons          enable row level security;
+alter table public.season_items     enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -787,6 +843,16 @@ create policy "space members all" on public.recipes
 -- or re-home a guy).
 drop policy if exists "space members all" on public.little_guys;
 create policy "space members all" on public.little_guys
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+-- Seasons and their bucket-list items are shared: either member plans,
+-- checks off, or edits anything.
+drop policy if exists "space members all" on public.seasons;
+create policy "space members all" on public.seasons
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.season_items;
+create policy "space members all" on public.season_items
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -946,7 +1012,7 @@ grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_lists, public.tier_items, public.tier_placements,
   public.tier_item_completions, public.tier_item_user_tags, public.lists, public.list_items, public.spoons, public.park_visits,
-  public.recipes, public.music_practice_days, public.little_guys
+  public.recipes, public.music_practice_days, public.little_guys, public.seasons, public.season_items
   to authenticated;
 grant select, update on public.profiles to authenticated;
 -- Functions default to PUBLIC execute; only signed-in users need the helpers,
@@ -975,7 +1041,7 @@ begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
           'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'tier_item_user_tags', 'lists', 'list_items', 'spoons',
-          'park_visits', 'recipes', 'little_guys']
+          'park_visits', 'recipes', 'little_guys', 'seasons', 'season_items']
   loop
     if not exists (
       select 1 from pg_publication_tables
