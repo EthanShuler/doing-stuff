@@ -57,7 +57,11 @@ export function PhotoCard({
         borderRadius: radii.card,
         overflow: 'hidden',
         boxShadow: shadows.card,
-        display: 'block',
+        // A <button> centers its content vertically; in a stretched grid
+        // row that floated short cards' photos away from the top edge.
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
       }}
     >
       <PhotoWithFallback imageUrl={imageUrl} alt={alt} height={photoHeight} fallbackEmoji={fallbackEmoji} />
