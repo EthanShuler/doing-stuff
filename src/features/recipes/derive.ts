@@ -78,3 +78,33 @@ export function sourceHref(url: string): string {
   if (!trimmed) return ''
   return /^[a-z][a-z\d+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/+/, '')}`
 }
+
+/** Add or remove one index from a mark list (crossed ingredients / done
+ *  steps), keeping it sorted and duplicate-free. */
+export function withMark(marks: number[], index: number, marked: boolean): number[] {
+  const rest = marks.filter((i) => i !== index)
+  return marked ? [...rest, index].sort((a, b) => a - b) : rest
+}
+
+/**
+ * Carry marks across an edit of the ingredients / steps text. Marks are
+ * indices, so a line inserted above would shift them onto the wrong line —
+ * instead each mark follows its line's TEXT: the k-th occurrence of a marked
+ * line in the old list maps to the k-th occurrence of the same text in the
+ * new one (so two identical "salt" lines stay distinct). A marked line that
+ * was reworded or removed drops its mark.
+ */
+export function remapMarks(oldLines: string[], newLines: string[], marks: number[]): number[] {
+  const occurrence = (lines: string[], index: number) =>
+    lines.slice(0, index).filter((line) => line === lines[index]).length
+  const remapped: number[] = []
+  for (const index of marks) {
+    const line = oldLines[index]
+    if (line === undefined) continue
+    const k = occurrence(oldLines, index)
+    let seen = 0
+    const target = newLines.findIndex((candidate) => candidate === line && seen++ === k)
+    if (target !== -1) remapped.push(target)
+  }
+  return remapped.sort((a, b) => a - b)
+}

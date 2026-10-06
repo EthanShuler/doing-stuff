@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Anchor, Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
 import type { Profile, Recipe } from '../../types'
 import { colors, fieldLabelStyle, fonts, text } from '../../theme'
@@ -6,38 +5,37 @@ import { formatDateWithYear, localDateOf } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
 import { ingredientLines, servingsTimeLine, sourceHref, stepBlocks } from './derive'
 import { RecipePhoto } from './RecipeGrid'
+import type { MarkList } from './useRecipeStore'
 
 /**
  * The full recipe page (/recipes/:id) — built to be cooked from on a
  * counter-propped phone. Tapping an ingredient strikes it through (in the
- * bowl); tapping a step dims it (done). Both are ephemeral component state:
- * nothing is stored, and the parent keys this component by recipe id so the
- * marks reset when you open a different recipe.
+ * bowl); tapping a step dims it (done). The marks are stored on the recipe
+ * row, so they survive a reload and show up live on the partner's phone;
+ * "Uncheck all" clears them for the next batch.
  */
 export function RecipeDetail({
   recipe,
   profiles,
   onBack,
   onEdit,
+  onMark,
+  onClearMarks,
 }: {
   recipe: Recipe
   profiles: Profile[]
   onBack: () => void
   onEdit: () => void
+  onMark: (list: MarkList, index: number, marked: boolean) => void
+  onClearMarks: () => void
 }) {
   const ingredients = ingredientLines(recipe.ingredients)
   const steps = stepBlocks(recipe.steps)
   const meta = servingsTimeLine(recipe)
 
-  const [crossedIngredients, setCrossedIngredients] = useState<Set<number>>(new Set)
-  const [doneSteps, setDoneSteps] = useState<Set<number>>(new Set)
-  const toggle = (set: React.Dispatch<React.SetStateAction<Set<number>>>, index: number) =>
-    set((prev) => {
-      const next = new Set(prev)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
-      return next
-    })
+  const crossedIngredients = new Set(recipe.crossedIngredients)
+  const doneSteps = new Set(recipe.doneSteps)
+  const anyMarked = crossedIngredients.size > 0 || doneSteps.size > 0
 
   const author = displayNameFor(profiles.find((p) => p.id === recipe.createdBy))
   const byline = [author && `Added by ${author}`, formatDateWithYear(localDateOf(recipe.createdAt))]
@@ -54,9 +52,19 @@ export function RecipeDetail({
         >
           ← All recipes
         </UnstyledButton>
-        <Button variant="secondary" size="compact-sm" radius={8} onClick={onEdit}>
-          Edit recipe
-        </Button>
+        <Group gap={14}>
+          {anyMarked && (
+            <UnstyledButton
+              onClick={onClearMarks}
+              style={{ fontFamily: fonts.sans, fontSize: 13, fontWeight: 600, color: colors.muted }}
+            >
+              Uncheck all
+            </UnstyledButton>
+          )}
+          <Button variant="secondary" size="compact-sm" radius={8} onClick={onEdit}>
+            Edit recipe
+          </Button>
+        </Group>
       </Group>
 
       <Title order={2} fz={34} lh={1.15} style={{ fontFamily: fonts.serif }}>
@@ -113,7 +121,7 @@ export function RecipeDetail({
               return (
                 <UnstyledButton
                   key={index}
-                  onClick={() => toggle(setCrossedIngredients, index)}
+                  onClick={() => onMark('ingredients', index, !crossed)}
                   display="block"
                   w="100%"
                   py={5}
@@ -145,7 +153,7 @@ export function RecipeDetail({
               return (
                 <UnstyledButton
                   key={index}
-                  onClick={() => toggle(setDoneSteps, index)}
+                  onClick={() => onMark('steps', index, !done)}
                   display="block"
                   w="100%"
                   py={8}

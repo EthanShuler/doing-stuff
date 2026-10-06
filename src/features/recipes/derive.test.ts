@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../../types'
-import { distinctRecipeTags, filterRecipes, ingredientLines, servingsTimeLine, sortRecipes, sourceHref, stepBlocks } from './derive'
+import {
+  distinctRecipeTags,
+  filterRecipes,
+  ingredientLines,
+  remapMarks,
+  servingsTimeLine,
+  sortRecipes,
+  sourceHref,
+  stepBlocks,
+  withMark,
+} from './derive'
 
 const recipe = (overrides: Partial<Recipe>): Recipe => ({
   id: 'r1',
@@ -14,6 +24,8 @@ const recipe = (overrides: Partial<Recipe>): Recipe => ({
   servings: '',
   totalTime: '',
   notes: '',
+  crossedIngredients: [],
+  doneSteps: [],
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
   ...overrides,
@@ -138,5 +150,41 @@ describe('sourceHref', () => {
   })
   it('is empty for a blank URL', () => {
     expect(sourceHref('   ')).toBe('')
+  })
+})
+
+describe('withMark', () => {
+  it('adds an index once, sorted', () => {
+    expect(withMark([3], 1, true)).toEqual([1, 3])
+    expect(withMark([1, 3], 3, true)).toEqual([1, 3])
+  })
+
+  it('removes an index, and removing a missing one is a no-op', () => {
+    expect(withMark([1, 3], 1, false)).toEqual([3])
+    expect(withMark([3], 7, false)).toEqual([3])
+  })
+})
+
+describe('remapMarks', () => {
+  it('keeps marks on unchanged lines', () => {
+    expect(remapMarks(['a', 'b', 'c'], ['a', 'b', 'c'], [0, 2])).toEqual([0, 2])
+  })
+
+  it('follows a marked line when a line is inserted above it', () => {
+    expect(remapMarks(['flour', 'eggs'], ['salt', 'flour', 'eggs'], [1])).toEqual([2])
+  })
+
+  it('drops the mark of a reworded or removed line', () => {
+    expect(remapMarks(['flour', 'eggs', 'milk'], ['flour', '3 eggs'], [1, 2])).toEqual([])
+  })
+
+  it('keeps identical lines distinct by occurrence', () => {
+    // The SECOND "salt" was marked; a line inserted between them must not
+    // move the mark onto the first.
+    expect(remapMarks(['salt', 'flour', 'salt'], ['salt', 'flour', 'yeast', 'salt'], [2])).toEqual([3])
+  })
+
+  it('ignores out-of-range marks', () => {
+    expect(remapMarks(['a'], ['a'], [0, 5])).toEqual([0])
   })
 })

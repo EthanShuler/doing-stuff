@@ -512,11 +512,37 @@ create table if not exists public.recipes (
   total_time  text not null default '',
   -- Our notes — tweaks and verdicts ("double the garlic next time").
   notes       text not null default '',
+  -- The detail page's cross-offs: indices into the parsed ingredient lines /
+  -- step blocks (shared, live via realtime). Written per tap through
+  -- set_recipe_mark() below; an edit remaps them client-side.
+  crossed_ingredients int[] not null default '{}',
+  done_steps          int[] not null default '{}',
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
 
 create index if not exists recipes_space_idx on public.recipes (space_id);
+
+-- One tap = add/remove ONE index, atomically in SQL, so two people tapping
+-- at once can't clobber each other's marks the way a whole-array write
+-- would. SECURITY INVOKER: the recipes RLS still decides who may update.
+create or replace function public.set_recipe_mark(
+  target_recipe uuid, target_list text, target_index int, is_marked boolean
+) returns void
+language sql security invoker set search_path = '' as $$
+  update public.recipes set
+    crossed_ingredients = case
+      when target_list <> 'ingredients' then crossed_ingredients
+      when is_marked then array_append(array_remove(crossed_ingredients, target_index), target_index)
+      else array_remove(crossed_ingredients, target_index)
+    end,
+    done_steps = case
+      when target_list <> 'steps' then done_steps
+      when is_marked then array_append(array_remove(done_steps, target_index), target_index)
+      else array_remove(done_steps, target_index)
+    end
+  where id = target_recipe;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Little guys: the collection of little guys (Smiskis and friends). Each row
@@ -1022,9 +1048,11 @@ revoke execute on function public.shares_space_with(uuid)    from public, anon;
 revoke execute on function public.is_shared_board_item(uuid) from public, anon;
 revoke execute on function public.add_creator_as_member()    from public, anon;
 revoke execute on function public.handle_new_user()          from public, anon;
+revoke execute on function public.set_recipe_mark(uuid, text, int, boolean) from public, anon;
 grant execute on function public.is_space_member(uuid) to authenticated;
 grant execute on function public.shares_space_with(uuid) to authenticated;
 grant execute on function public.is_shared_board_item(uuid) to authenticated;
+grant execute on function public.set_recipe_mark(uuid, text, int, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime: add the space-scoped tables to the `supabase_realtime` publication

@@ -361,8 +361,13 @@ fuzzy title search (`src/lib/fuzzy.ts`, shared with the Log dashboard) and a
 to **`/recipes/:id` — the app's first full-page sub-route detail** (both
 routes render one `RecipesPage`, so the store survives; the AppLayout nav
 matches sub-paths). The detail page is built for cooking from a phone:
-tapping an ingredient strikes it through, tapping a step dims it — ephemeral
-component state keyed by recipe id, never stored — plus a faint
+tapping an ingredient strikes it through, tapping a step dims it — **stored
+and shared**: index arrays on the row (`crossed_ingredients` / `done_steps`)
+that stream to the partner over the recipes realtime channel. A tap writes
+through the `set_recipe_mark()` RPC (adds/removes ONE index in SQL, so
+simultaneous taps can't clobber each other); an edit carries marks across by
+line text (`remapMarks` in the recipes `derive.ts`) and only writes the list
+whose text changed; "Uncheck all" clears both for the next batch — plus a faint
 "Added by X · date" byline (profiles join). Add/edit stay in a `ModalShell`
 modal; delete confirms and bounces an open detail page back to the index.
 

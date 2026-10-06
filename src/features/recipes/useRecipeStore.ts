@@ -6,6 +6,7 @@ import { PROFILE_COLUMNS, SEED_PROFILES, syncTable, toProfile, useSpaceSync } fr
 import { usePhotoRows } from '../../data/usePhotoRows'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeRecipePhoto, uploadRecipePhoto } from './photos'
+import { ingredientLines, remapMarks, stepBlocks, withMark } from './derive'
 
 // Data seam for the shared cookbook, mirroring the other stores' two modes:
 //   • Supabase keys present → live: reads/writes the `recipes` table scoped to
@@ -15,6 +16,12 @@ import { removeRecipePhoto, uploadRecipePhoto } from './photos'
 // Photos ride along as public-bucket URLs (see photos.ts); the writes —
 // upload, add/edit, delete-with-photo — are the shared usePhotoRows
 // (replaced/abandoned photos are the page's call — see src/lib/photoSession.ts). Profiles are fetched for the detail page's byline.
+//
+// The detail page's cross-offs (crossed ingredients, done steps) live on the
+// row as index arrays, so they persist and stream to the partner through the
+// same realtime channel. A tap goes through the `set_recipe_mark` RPC, which
+// adds/removes ONE index in SQL — two people tapping at once can't clobber
+// each other the way a whole-array write would.
 
 interface Snapshot {
   recipes: Recipe[]
@@ -38,6 +45,8 @@ function seed(): Snapshot {
         servings: '2',
         totalTime: '25 min',
         notes: 'Grate the cheese fine or it clumps — learned the hard way.',
+        crossedIngredients: [],
+        doneSteps: [],
         createdBy: 'u1',
         createdAt: '2026-05-10T09:00:00Z',
       },
@@ -54,6 +63,8 @@ function seed(): Snapshot {
         servings: '8',
         totalTime: '1h 15min',
         notes: '',
+        crossedIngredients: [],
+        doneSteps: [],
         createdBy: 'u2',
         createdAt: '2026-04-02T09:00:00Z',
       },
@@ -70,6 +81,8 @@ function seed(): Snapshot {
         servings: '3',
         totalTime: '40 min',
         notes: 'Double the garlic. Always double the garlic.',
+        crossedIngredients: [],
+        doneSteps: [],
         createdBy: 'u1',
         createdAt: '2026-06-18T09:00:00Z',
       },
@@ -86,6 +99,8 @@ function seed(): Snapshot {
         servings: '4',
         totalTime: '15 min',
         notes: '',
+        crossedIngredients: [],
+        doneSteps: [],
         createdBy: 'u2',
         createdAt: '2026-03-22T09:00:00Z',
       },
@@ -107,6 +122,8 @@ type RecipeRow = {
   servings: string | null
   total_time: string | null
   notes: string | null
+  crossed_ingredients: number[] | null
+  done_steps: number[] | null
   created_by: string | null
   created_at: string
 }
@@ -123,12 +140,14 @@ const toRecipe = (r: RecipeRow): Recipe => ({
   servings: r.servings ?? '',
   totalTime: r.total_time ?? '',
   notes: r.notes ?? '',
+  crossedIngredients: r.crossed_ingredients ?? [],
+  doneSteps: r.done_steps ?? [],
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
 
 const RECIPE_COLUMNS =
-  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,created_by,created_at'
+  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,created_by,created_at'
 
 /** The fields the add/edit modal writes. All plain strings except tags. */
 export interface RecipeDraft {
@@ -162,7 +181,17 @@ export interface RecipeStore {
   updateRecipe: (id: string, draft: RecipeDraft) => Promise<void>
   /** Delete a recipe (and best-effort its uploaded photo). Throws on failure. */
   deleteRecipe: (id: string) => Promise<void>
+  /** Cross off / un-cross one ingredient or step (by index). Optimistic;
+   *  a failed write reverts it and records the error. */
+  setMark: (id: string, list: MarkList, index: number, marked: boolean) => Promise<void>
+  /** Uncheck every ingredient and step — "starting a fresh batch". */
+  clearMarks: (id: string) => Promise<void>
 }
+
+export type MarkList = 'ingredients' | 'steps'
+const MARK_FIELD = { ingredients: 'crossedIngredients', steps: 'doneSteps' } as const
+
+type MarkFields = Partial<Pick<Recipe, 'crossedIngredients' | 'doneSteps'>>
 
 const draftFields = (draft: RecipeDraft) => ({
   title: draft.title.trim(),
@@ -179,7 +208,10 @@ const draftFields = (draft: RecipeDraft) => ({
 })
 
 /** Cleaned-up draft → `recipes` columns (insert and update write the same set). */
-const recipeColumns = (fields: ReturnType<typeof draftFields>) => ({
+// The mark arrays are written only when present: a new recipe starts empty,
+// and an edit sends them only when the text they index into changed — so an
+// edit can't stomp on a partner's taps on an untouched list.
+const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields) => ({
   title: fields.title,
   image_url: fields.imageUrl,
   ingredients: fields.ingredients,
@@ -190,6 +222,8 @@ const recipeColumns = (fields: ReturnType<typeof draftFields>) => ({
   servings: fields.servings,
   total_time: fields.totalTime,
   notes: fields.notes,
+  ...(fields.crossedIngredients && { crossed_ingredients: fields.crossedIngredients }),
+  ...(fields.doneSteps && { done_steps: fields.doneSteps }),
 })
 
 export function useRecipeStore(spaceId: string | null): RecipeStore {
@@ -249,22 +283,81 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     setItems: setRecipes,
     setError,
   })
-  const { insert, update } = rows
+  const { insert, update, find } = rows
 
   const addRecipe = useCallback(
     async (draft: RecipeDraft) => {
       const fields = draftFields(draft)
-      if (fields.title) await insert(fields)
+      if (fields.title) await insert({ ...fields, crossedIngredients: [], doneSteps: [] })
     },
     [insert],
   )
 
   const updateRecipe = useCallback(
     async (id: string, draft: RecipeDraft) => {
-      const fields = draftFields(draft)
-      if (fields.title) await update(id, fields)
+      const fields: ReturnType<typeof draftFields> & MarkFields = draftFields(draft)
+      if (!fields.title) return
+      // Marks follow their line's text across the edit (see remapMarks).
+      const prior = find(id)
+      if (prior && prior.ingredients !== fields.ingredients) {
+        fields.crossedIngredients = remapMarks(
+          ingredientLines(prior.ingredients),
+          ingredientLines(fields.ingredients),
+          prior.crossedIngredients,
+        )
+      }
+      if (prior && prior.steps !== fields.steps) {
+        fields.doneSteps = remapMarks(stepBlocks(prior.steps), stepBlocks(fields.steps), prior.doneSteps)
+      }
+      await update(id, fields)
     },
-    [update],
+    [find, update],
+  )
+
+  // Optimistic mark write: flip it locally, then the RPC; the realtime echo
+  // (an UPDATE on the row) is idempotent. On failure, flip it back.
+  const applyMark = useCallback((id: string, list: MarkList, index: number, marked: boolean) => {
+    const field = MARK_FIELD[list]
+    setRecipes((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: withMark(r[field], index, marked) } : r)),
+    )
+  }, [])
+
+  const setMark = useCallback(
+    async (id: string, list: MarkList, index: number, marked: boolean) => {
+      setError(null)
+      applyMark(id, list, index, marked)
+      if (!supabase || !spaceId) return
+      const { error } = await supabase.rpc('set_recipe_mark', {
+        target_recipe: id,
+        target_list: list,
+        target_index: index,
+        is_marked: marked,
+      })
+      if (error) {
+        applyMark(id, list, index, !marked)
+        setError(error.message)
+      }
+    },
+    [spaceId, applyMark],
+  )
+
+  const clearMarks = useCallback(
+    async (id: string) => {
+      setError(null)
+      const prior = find(id)
+      if (!prior) return
+      const setBoth = (crossedIngredients: number[], doneSteps: number[]) =>
+        setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, crossedIngredients, doneSteps } : r)))
+      setBoth([], [])
+      if (!supabase || !spaceId) return
+      const { error } = await supabase.from('recipes').update({ crossed_ingredients: [], done_steps: [] }).eq('id', id)
+      if (error) {
+        setBoth(prior.crossedIngredients, prior.doneSteps)
+        setError(error.message)
+      }
+    },
+    [spaceId, find],
   )
 
   return {
@@ -277,5 +370,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     addRecipe,
     updateRecipe,
     deleteRecipe: rows.remove,
+    setMark,
+    clearMarks,
   }
 }

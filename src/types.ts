@@ -315,6 +315,11 @@ export interface Recipe {
   totalTime: string
   /** Our notes — tweaks and verdicts ("double the garlic next time"). */
   notes: string
+  /** Indices into ingredientLines() that are crossed off ("in the bowl").
+   *  Shared — both members see the same marks, live. */
+  crossedIngredients: number[]
+  /** Indices into stepBlocks() that are done. Shared like crossedIngredients. */
+  doneSteps: number[]
   /** auth.users id of the member who added it (shown as a faint byline). */
   createdBy: string | null
   /** ISO timestamp; the byline's "added" date and the A–Z tiebreak. */
