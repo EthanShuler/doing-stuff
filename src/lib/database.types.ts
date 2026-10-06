@@ -453,6 +453,8 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          crossed_ingredients: number[]
+          done_steps: number[]
           id: string
           image_url: string
           ingredients: string
@@ -469,6 +471,8 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          crossed_ingredients?: number[]
+          done_steps?: number[]
           id?: string
           image_url?: string
           ingredients?: string
@@ -485,6 +489,8 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          crossed_ingredients?: number[]
+          done_steps?: number[]
           id?: string
           image_url?: string
           ingredients?: string
@@ -1017,6 +1023,10 @@ export type Database = {
       is_shared_board_item: { Args: { target_item: string }; Returns: boolean }
       is_space_member: { Args: { target_space: string }; Returns: boolean }
       keepalive: { Args: never; Returns: string }
+      set_recipe_mark: {
+        Args: { is_marked: boolean; target_index: number; target_list: string; target_recipe: string }
+        Returns: undefined
+      }
       shares_space_with: { Args: { other: string }; Returns: boolean }
     }
     Enums: {

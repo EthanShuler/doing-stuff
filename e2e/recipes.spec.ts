@@ -45,10 +45,17 @@ test('a recipe page deep-loads, renders numbered steps, and crosses off ingredie
   await expect(page.getByText('Double the garlic. Always double the garlic.')).toBeVisible()
   await expect(page.getByText('Added by Avery', { exact: false })).toBeVisible()
 
-  // Tap-to-cross-off is ephemeral local state.
+  // Tap-to-cross-off is stored on the recipe: it survives leaving and
+  // reopening the page, and "Uncheck all" clears it.
   const eggLine = page.getByRole('button', { name: '5 eggs' })
   await eggLine.click()
   await expect(eggLine).toHaveCSS('text-decoration-line', 'line-through')
+  await page.getByRole('button', { name: '← All recipes' }).click()
+  await page.getByText('Weeknight shakshuka').click()
+  await expect(eggLine).toHaveCSS('text-decoration-line', 'line-through')
+  await page.getByRole('button', { name: 'Uncheck all' }).click()
+  await expect(eggLine).toHaveCSS('text-decoration-line', 'none')
+  await expect(page.getByRole('button', { name: 'Uncheck all' })).toHaveCount(0)
 
   // Deep-load works too (SPA fallback), and back returns to the index.
   await page.goto('/recipes/r2')

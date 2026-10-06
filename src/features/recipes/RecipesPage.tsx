@@ -156,13 +156,13 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
           <Splash text="Loading your space…" mih="40vh" />
         ) : openId ? (
           openRecipe ? (
-            // Keyed by id so the tap-to-cross-off marks reset per recipe.
             <RecipeDetail
-              key={openRecipe.id}
               recipe={openRecipe}
               profiles={store.profiles}
               onBack={() => navigate('/recipes')}
               onEdit={() => openEdit(openRecipe)}
+              onMark={(list, index, marked) => void store.setMark(openRecipe.id, list, index, marked)}
+              onClearMarks={() => void store.clearMarks(openRecipe.id)}
             />
           ) : (
             <EmptyCard title="Recipe not found" blurb="It may have been deleted.">
