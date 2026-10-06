@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Recipe } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { PROFILE_COLUMNS, SEED_PROFILES, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { PROFILE_COLUMNS, SEED_PROFILES, removeById, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { usePhotoRows } from '../../data/usePhotoRows'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeRecipePhoto, uploadRecipePhoto } from './photos'
@@ -146,6 +146,34 @@ const toRecipe = (r: RecipeRow): Recipe => ({
   createdAt: r.created_at,
 })
 
+/** Which Recipe field each DB column feeds (the realtime UPDATE merge needs
+ *  to know a column was omitted, which toRecipe's defaults would hide). */
+const FIELD_OF_COLUMN: Record<Exclude<keyof RecipeRow, 'id'>, Exclude<keyof Recipe, 'id'>> = {
+  title: 'title',
+  image_url: 'imageUrl',
+  ingredients: 'ingredients',
+  steps: 'steps',
+  source: 'source',
+  source_url: 'sourceUrl',
+  tags: 'tags',
+  servings: 'servings',
+  total_time: 'totalTime',
+  notes: 'notes',
+  crossed_ingredients: 'crossedIngredients',
+  done_steps: 'doneSteps',
+  created_by: 'createdBy',
+  created_at: 'createdAt',
+}
+
+/** `mapped`, with every field whose column is absent from `row` taken from `held`. */
+function omittedKept(row: Partial<RecipeRow>, mapped: Recipe, held: Recipe): Recipe {
+  const merged = { ...mapped }
+  for (const [column, field] of Object.entries(FIELD_OF_COLUMN)) {
+    if (!(column in row)) Object.assign(merged, { [field]: held[field as keyof Recipe] })
+  }
+  return merged
+}
+
 const RECIPE_COLUMNS =
   'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,created_by,created_at'
 
@@ -254,9 +282,30 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     setProfiles(snap.profiles)
   }, [])
 
+  // syncTable's handlers, except UPDATE: Postgres leaves an UPDATE's
+  // unchanged TOASTed values (long text, ~2KB+ — a written-out recipe's
+  // steps easily qualify) out of the replicated row. A mark tap touches only
+  // the mark arrays, so its echo arrives without `steps` / `ingredients`,
+  // and mapping it as-is would blank them. Keep the held value for any
+  // column the payload omits.
   const wire = useCallback(
     (channel: RealtimeChannel, spaceFilter: string) =>
-      syncTable(channel, spaceFilter, 'recipes', toRecipe, setRecipes),
+      channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'recipes', filter: spaceFilter }, (p) =>
+          upsertById(setRecipes, toRecipe(p.new as RecipeRow)),
+        )
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'recipes', filter: spaceFilter }, (p) => {
+          const row = p.new as Partial<RecipeRow> & { id: string }
+          const mapped = toRecipe(row as RecipeRow)
+          setRecipes((prev) =>
+            prev.some((r) => r.id === row.id)
+              ? prev.map((r) => (r.id === row.id ? omittedKept(row, mapped, r) : r))
+              : [...prev, mapped],
+          )
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'recipes' }, (p) =>
+          removeById(setRecipes, (p.old as { id: string }).id),
+        ),
     [],
   )
 
