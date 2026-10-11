@@ -24,6 +24,7 @@ const FEATURES = [
   { label: 'Parks', path: '/parks', matches: ['/parks'] },
   { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
   { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },
+  { label: 'Alignment', path: '/alignment', matches: ['/alignment'] },
   { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
   { label: 'Music Practice', path: '/music-practice', matches: ['/music-practice'] },
 ]
@@ -32,9 +33,9 @@ const isActive = (matches: string[], pathname: string) =>
   matches.some((m) => m === pathname || (m !== '/' && pathname.startsWith(`${m}/`)))
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.
- *  The nine nav items need ~870px (plus the brand and, live, Sign out), so
- *  the drawer holds them until `md` (992px) — checked with a screenshot at
- *  exactly 992 when Seasons made it nine. */
+ *  The ten nav items need ~950px, plus the brand and, live, Sign out — past
+ *  `md` (992px) once Alignment made it ten — so the drawer holds them until
+ *  `lg` (1200px). */
 export function AppLayout({ children }: { children: ReactNode }) {
   const [navOpened, { toggle, close }] = useDisclosure(false)
   const { pathname } = useLocation()
@@ -42,7 +43,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 220, breakpoint: 'md', collapsed: { desktop: true, mobile: !navOpened } }}
+      navbar={{ width: 220, breakpoint: 'lg', collapsed: { desktop: true, mobile: !navOpened } }}
       padding={0}
       styles={{
         header: { background: colors.pageBg, borderBottom: `1px dotted ${colors.dotted}` },
@@ -56,7 +57,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Burger
               opened={navOpened}
               onClick={toggle}
-              hiddenFrom="md"
+              hiddenFrom="lg"
               size="sm"
               color={colors.muted}
               aria-label="Toggle navigation"
@@ -78,7 +79,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             >
               cajubinile.com
             </Text>
-            <Group gap={4} visibleFrom="md" wrap="nowrap">
+            <Group gap={4} visibleFrom="lg" wrap="nowrap">
               {FEATURES.map((feature) => (
                 <FeatureLink
                   key={feature.path}

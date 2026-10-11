@@ -60,6 +60,65 @@ export type Database = {
           },
         ]
       }
+      alignment_charts: {
+        Row: {
+          chaotic_evil: string
+          chaotic_good: string
+          chaotic_neutral: string
+          created_at: string
+          created_by: string | null
+          id: string
+          lawful_evil: string
+          lawful_good: string
+          lawful_neutral: string
+          neutral_evil: string
+          neutral_good: string
+          space_id: string
+          title: string
+          true_neutral: string
+        }
+        Insert: {
+          chaotic_evil?: string
+          chaotic_good?: string
+          chaotic_neutral?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lawful_evil?: string
+          lawful_good?: string
+          lawful_neutral?: string
+          neutral_evil?: string
+          neutral_good?: string
+          space_id: string
+          title: string
+          true_neutral?: string
+        }
+        Update: {
+          chaotic_evil?: string
+          chaotic_good?: string
+          chaotic_neutral?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lawful_evil?: string
+          lawful_good?: string
+          lawful_neutral?: string
+          neutral_evil?: string
+          neutral_good?: string
+          space_id?: string
+          title?: string
+          true_neutral?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alignment_charts_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           color_index: number

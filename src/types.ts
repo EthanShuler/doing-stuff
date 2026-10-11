@@ -373,6 +373,36 @@ export interface PracticeDay {
   createdAt: string
 }
 
+// --- Alignment charts -----------------------------------------------------------
+
+/** One square of a D&D alignment chart. The nine squares are FIXED — each is a
+ *  column on `alignment_charts` of the same name, so a write to one square can
+ *  never clobber the partner's edit of another. */
+export type AlignmentKey =
+  | 'lawful_good'
+  | 'neutral_good'
+  | 'chaotic_good'
+  | 'lawful_neutral'
+  | 'true_neutral'
+  | 'chaotic_neutral'
+  | 'lawful_evil'
+  | 'neutral_evil'
+  | 'chaotic_evil'
+
+/** One alignment chart — a row in `alignment_charts` ("Sandwiches"). Shared
+ *  space data: either member can create, fill in, rename, or delete one. */
+export interface AlignmentChart {
+  id: string
+  /** Display name, as typed: "Sandwiches". */
+  title: string
+  /** The text in each square. '' = not filled in yet. */
+  cells: Record<AlignmentKey, string>
+  /** auth.users id of the member who created it (null for legacy rows). */
+  createdBy: string | null
+  /** ISO timestamp; the picker's order. */
+  createdAt: string
+}
+
 // --- Seasons (the seasonal bucket list) ---------------------------------------
 
 /** One season — a row in `seasons` ("Fall 2026" 🍂). Shared space data. */
