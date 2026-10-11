@@ -6,8 +6,8 @@ Guidance for working in this repo. Read this before making changes.
 
 **cajubinile.com** — a shared personal site for two people, split into features
 behind a persistent Mantine AppShell header (brand link + feature nav +
-sign-out). The nav is **one item per feature, not per route** — nine of them,
-collapsing into the burger drawer below Mantine's `md` breakpoint; the five
+sign-out). The nav is **one item per feature, not per route** — ten of them,
+collapsing into the burger drawer below Mantine's `lg` breakpoint; the five
 tier-list routes share a single "Tier Lists" item and are chosen in-page with
 the `ListPicker` pill row, and the Lists routes likewise share one "Lists"
 item. The three unbuilt placeholder routes are off the nav
@@ -20,7 +20,8 @@ free-form list) are the **Lists** feature (`/lists` redirects to
 feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
 the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
 `/little-guys` is the **Little Guys** feature; `/seasons` (+ `/seasons/:id`)
-is the **Seasons** feature; `/french-toast` is a placeholder
+is the **Seasons** feature; `/alignment` (+ `/alignment/:id`) is the
+**Alignment** feature; `/french-toast` is a placeholder
 page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
@@ -270,6 +271,24 @@ arithmetic in the seasons `derive.ts` (UTC day counts, never
 `toISOString`), DST-safe. Scope cuts (deliberate): no Doing Stuff entry on
 check-off, no weather, no links to recipes/tier items, no drag-and-drop, no
 realtime-derived "who planned it".
+
+**Alignment** (`/alignment`, `/alignment/:id`) — any number of D&D-style
+3×3 alignment charts. A **chart** (`alignment_charts`, shared space data,
+uniform RLS) is a `title` plus the text in each of the nine **fixed** squares
+— Lawful Good … Chaotic Evil — stored as **one column per square**
+(`lawful_good`, …, `true_neutral`, …, `chaotic_evil`; '' = blank), so filling
+in a square is a one-column UPDATE that can't clobber the partner editing
+another. App-side the squares are `cells: Record<AlignmentKey, string>`;
+`ALIGNMENT_KEYS` (reading order, Good row first) and `alignmentLabel` live in
+the alignment `derive.ts`. Both routes render one `AlignmentPage`, so the
+store survives switching charts; `/alignment` forwards to the oldest chart
+(`defaultChart`) or shows the empty state, and an unknown id bounces back
+there. A `PickerRow` of charts + "+ New chart" + a faint "Edit chart" sits
+above the control bar ("n of 9 squares filled"); `ChartModal` is title-only
+(create / rename / delete via `useConfirm`). The squares **edit in place**:
+tap one, type, Enter or blur saves just that square (optimistic, resync on
+failure), Shift+Enter is a line break, Escape backs out. The grid stays 3×3
+on a phone. Deliberately no images, colors, or per-person charts.
 
 **Spoons** (`/spoons`) — Squabby's souvenir spoon collection. A **spoon**
 (`spoons` table, shared space data, uniform RLS) has a name, an optional
@@ -585,7 +604,8 @@ schema in `supabase/schema.sql` is already applied to the current project.
 - Tables: `spaces`, `space_members`, `categories`, `activities`, `entries`,
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
   `tier_item_completions`, `tier_item_user_tags`, `lists`, `list_items`, `spoons`, `park_visits`,
-  `recipes`, `music_practice_days`, `little_guys`, `seasons`, `season_items`.
+  `recipes`, `music_practice_days`, `little_guys`, `seasons`, `season_items`,
+  `alignment_charts`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
@@ -625,7 +645,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
 ```
 src/
   App.tsx                  gate (auth → space) → BrowserRouter → AppLayout → routes
-                           (the 9 feature pages are React.lazy at module scope)
+                           (the 10 feature pages are React.lazy at module scope)
   types.ts                 domain types (mirror DB columns)
   theme.ts                 earthy palette, fonts, shared colors, swatchFor()
   mantineTheme.ts          Mantine theme override mirroring theme.ts
@@ -729,6 +749,13 @@ src/
       QuickAdd.tsx         borderless Enter-to-add field (subsections, days)
       ItemModal.tsx        add/edit item (section autocomplete, parent, dates, Duplicate)
       SeasonModal.tsx      create (copy items from) / edit / delete a season
+    alignment/             D&D-style 3×3 alignment charts (title + nine fixed squares)
+      AlignmentPage.tsx    owns the store, route redirect, picker, chart modal
+      useAlignmentStore.ts data seam: alignment_charts CRUD + per-square writes (or seed)
+      derive.ts            pure: ALIGNMENT_KEYS, labels, emptyCells, sort, filled count
+      derive.test.ts       vitest coverage for derive.ts + the seed
+      AlignmentGrid.tsx    the 3×3 grid; each square edits in place
+      ChartModal.tsx       create / rename / delete a chart (title only)
     little-guys/           the little guy (Smiski) collection — one photo grid
       LittleGuysPage.tsx   owns the store, search + owner pills, modal state
       useLittleGuyStore.ts data seam: little_guys CRUD + ordered members (or seed)
@@ -770,7 +797,7 @@ e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
                            tier-list, lists, spoons, little-guys, parks,
-                           recipes, music-practice, seasons, mobile,
+                           recipes, music-practice, seasons, alignment, mobile,
                            mobile-overflow)
                            — see playwright.config.ts
 supabase/
@@ -813,7 +840,7 @@ and `src/lib/`.
   press). Never `window.confirm`. Keep this for anything that destroys logged
   or shared data — entries, repeats, categories, activities, wishes, tier
   items, list rows and free-form lists, spoons, little guys, recipes, park
-  visits, seasons and season items.
+  visits, seasons and season items, alignment charts.
 - **Every feature page wears the same shell.** `PageFrame` (padding + the
   centered `PAGE_MAX_WIDTH` column) wraps the page; `ControlBar` is its top row
   (`left` = toggles/filters/counts, `right` = the primary action) above the

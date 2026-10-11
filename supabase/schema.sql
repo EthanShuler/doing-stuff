@@ -661,6 +661,35 @@ create index if not exists season_items_season_idx on public.season_items (seaso
 create index if not exists season_items_parent_idx on public.season_items (parent_id);
 
 -- ---------------------------------------------------------------------------
+-- Alignment charts: any number of D&D-style 3×3 charts. A row is one chart —
+-- a title plus the text in each of the nine FIXED squares, one column per
+-- square, so filling in one square is a one-column UPDATE that can't clobber
+-- the partner's edit of another. Shared space data with the uniform member
+-- policy. On an existing DB: see migrations/20261011_alignment_charts.sql.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.alignment_charts (
+  id               uuid primary key default gen_random_uuid(),
+  space_id         uuid not null references public.spaces (id) on delete cascade,
+  -- Display name, as typed: "Sandwiches".
+  title            text not null,
+  -- The nine squares. '' = not filled in yet.
+  lawful_good      text not null default '',
+  neutral_good     text not null default '',
+  chaotic_good     text not null default '',
+  lawful_neutral   text not null default '',
+  true_neutral     text not null default '',
+  chaotic_neutral  text not null default '',
+  lawful_evil      text not null default '',
+  neutral_evil     text not null default '',
+  chaotic_evil     text not null default '',
+  created_by       uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at       timestamptz not null default now()
+);
+
+create index if not exists alignment_charts_space_idx on public.alignment_charts (space_id);
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -782,6 +811,7 @@ alter table public.list_items       enable row level security;
 alter table public.music_practice_days enable row level security;
 alter table public.seasons          enable row level security;
 alter table public.season_items     enable row level security;
+alter table public.alignment_charts enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -879,6 +909,10 @@ create policy "space members all" on public.seasons
 
 drop policy if exists "space members all" on public.season_items;
 create policy "space members all" on public.season_items
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.alignment_charts;
+create policy "space members all" on public.alignment_charts
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -1038,7 +1072,8 @@ grant select, insert, update, delete on
   public.spaces, public.space_members, public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_lists, public.tier_items, public.tier_placements,
   public.tier_item_completions, public.tier_item_user_tags, public.lists, public.list_items, public.spoons, public.park_visits,
-  public.recipes, public.music_practice_days, public.little_guys, public.seasons, public.season_items
+  public.recipes, public.music_practice_days, public.little_guys, public.seasons, public.season_items,
+  public.alignment_charts
   to authenticated;
 grant select, update on public.profiles to authenticated;
 -- Functions default to PUBLIC execute; only signed-in users need the helpers,
@@ -1069,7 +1104,8 @@ begin
   foreach t in array
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
           'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'tier_item_user_tags', 'lists', 'list_items', 'spoons',
-          'park_visits', 'recipes', 'little_guys', 'seasons', 'season_items']
+          'park_visits', 'recipes', 'little_guys', 'seasons', 'season_items',
+          'alignment_charts']
   loop
     if not exists (
       select 1 from pg_publication_tables

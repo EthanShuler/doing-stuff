@@ -27,6 +27,7 @@ const ROUTES = [
   '/parks',
   '/spoons',
   '/little-guys',
+  '/alignment/ac1',
   '/recipes',
   '/music-practice',
 ]

@@ -31,6 +31,9 @@ const SeasonsPage = lazy(() => import('./features/seasons/SeasonsPage').then((m)
 const LittleGuysPage = lazy(() =>
   import('./features/little-guys/LittleGuysPage').then((m) => ({ default: m.LittleGuysPage })),
 )
+const AlignmentPage = lazy(() =>
+  import('./features/alignment/AlignmentPage').then((m) => ({ default: m.AlignmentPage })),
+)
 
 export default function App() {
   const { session, loading, configured } = useSession()
@@ -91,6 +94,10 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
 
   const recipes = <RecipesPage spaceId={spaceId} configured={configured} />
 
+  // Alignment charts: /alignment (forwards to the first chart) and
+  // /alignment/:id render one component, so the store survives switching charts.
+  const alignment = <AlignmentPage spaceId={spaceId} userId={userId} configured={configured} />
+
   return (
     <BrowserRouter>
       <AppLayout>
@@ -139,6 +146,8 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           />
           <Route path="/seasons" element={seasons} />
           <Route path="/seasons/:id" element={seasons} />
+          <Route path="/alignment" element={alignment} />
+          <Route path="/alignment/:id" element={alignment} />
           <Route path="/music-practice" element={<MusicPracticePage spaceId={spaceId} userId={userId} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
