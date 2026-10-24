@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
 import { colors } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
@@ -21,6 +21,8 @@ import { RecipeList } from './RecipeList'
 import { RecipeDetail } from './RecipeDetail'
 import { RecipeModal } from './RecipeModal'
 import { removeRecipePhoto } from './photos'
+import { useMealPlanStore } from '../meal-plan/useMealPlanStore'
+import { MealPlanScreen } from '../meal-plan/MealPlanScreen'
 
 type View = 'grid' | 'list'
 
@@ -37,15 +39,30 @@ const emptyDraft = (): RecipeDraft => ({
   notes: '',
 })
 
-/** The shared cookbook. Both /recipes (the index: grid/list toggle, search,
- *  tag pills) and /recipes/:id (the full recipe page you cook from) render
- *  this same component — the doing-stuff multi-route trick — so the store and
- *  its realtime channel survive opening and closing recipes. */
+/** The shared cookbook. /recipes (the index: grid/list toggle, search, tag
+ *  pills), /recipes/plan (the meal plan) and /recipes/:id (the full recipe
+ *  page you cook from) all render this same component — the doing-stuff
+ *  multi-route trick — so the stores and their realtime channels survive
+ *  opening and closing recipes and switching screens. */
 export function RecipesPage({ spaceId, configured }: { spaceId: string | null; configured: boolean }) {
   const store = useRecipeStore(spaceId)
   const navigate = useNavigate()
   const confirm = useConfirm()
   const { id: openId } = useParams()
+  const planning = useLocation().pathname === '/recipes/plan'
+  const mealPlan = useMealPlanStore(spaceId)
+
+  // Cookbook / Meal plan — routes, so each screen deep-links.
+  const screenToggle = (
+    <SegmentedControl
+      value={planning ? 'plan' : 'cookbook'}
+      onChange={(value) => navigate(value === 'plan' ? '/recipes/plan' : '/recipes')}
+      data={[
+        { label: 'Cookbook', value: 'cookbook' },
+        { label: 'Meal plan', value: 'plan' },
+      ]}
+    />
+  )
 
   const [view, setView] = useState<View>('grid')
   const [search, setSearch] = useState('')
@@ -142,18 +159,32 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
 
   // Both branches gate: a deep link to /recipes/:id would otherwise flash
   // "Recipe not found" for as long as the first load takes.
-  const loadingData = configured && store.loading
+  const loadingData = configured && (store.loading || (planning && mealPlan.loading))
 
   const openRecipe = openId ? store.recipes.find((r) => r.id === openId) ?? null : null
 
   return (
     <>
-      <title>{openRecipe ? `${openRecipe.title} · cajubinile.com` : 'Recipes · cajubinile.com'}</title>
+      <title>
+        {openRecipe
+          ? `${openRecipe.title} · cajubinile.com`
+          : planning
+            ? 'Meal plan · cajubinile.com'
+            : 'Recipes · cajubinile.com'}
+      </title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
+      <FloatingBanner
+        message={mealPlan.error}
+        tone="error"
+        top={store.error ? 116 : 68}
+        onDismiss={mealPlan.clearError}
+      />
 
       <PageFrame>
         {loadingData ? (
           <Splash text="Loading your space…" mih="40vh" />
+        ) : planning ? (
+          <MealPlanScreen store={mealPlan} recipes={sortRecipes(store.recipes)} screenToggle={screenToggle} />
         ) : openId ? (
           openRecipe ? (
             <RecipeDetail
@@ -176,6 +207,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
             <ControlBar
               left={
                 <>
+                  {screenToggle}
                   <SegmentedControl
                     value={view}
                     onChange={(value) => setView(value as View)}

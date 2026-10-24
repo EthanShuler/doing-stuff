@@ -17,8 +17,9 @@ and `/tiers/:id` (a space-defined board — ice cream lives here) are the **Tier
 feature; `/lists/movies`, `/lists/tv`, `/lists/books`, and `/lists/:id` (a
 free-form list) are the **Lists** feature (`/lists` redirects to
 `/lists/movies`); `/spoons` is the **Spoons**
-feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/:id`) is
-the **Recipes** feature; `/music-practice` is the **Music Practice** feature;
+feature; `/parks` is the **Parks** feature; `/recipes` (+ `/recipes/plan`,
+`/recipes/:id`) is the **Recipes** feature, meal plan included;
+`/music-practice` is the **Music Practice** feature;
 `/little-guys` is the **Little Guys** feature; `/seasons` (+ `/seasons/:id`)
 is the **Seasons** feature; `/alignment` (+ `/alignment/:id`) is the
 **Alignment** feature; `/french-toast` is a placeholder
@@ -390,6 +391,43 @@ whose text changed; "Uncheck all" clears both for the next batch — plus a fain
 "Added by X · date" byline (profiles join). Add/edit stay in a `ModalShell`
 modal; delete confirms and bounces an open detail page back to the index.
 
+**Meal plan** (`/recipes/plan`) — the Recipes feature's second screen,
+behind a **Cookbook / Meal plan** SegmentedControl in the control bar (it
+navigates, so each screen deep-links; all three recipe routes render one
+`RecipesPage`, which holds both stores). Lives in `src/features/meal-plan/`.
+The domain model (both tables shared space data, uniform RLS):
+
+- **Meal plan day** (`meal_plan_days`) — **dinner only, one row per day**
+  (`unique (space_id, day)`, so a write is an upsert on it and the realtime
+  upsert matches on the date). `kind 'recipe'|'text'|'leftovers'`:
+  `recipe_id` (→ `recipes`, `on delete set null` — the day then reads
+  "Deleted recipe"), free `text`, or `leftovers_of` (→ an earlier
+  `meal_plan_days` row, `on delete set null` → plain "Leftovers", mirrored in
+  the store's `clearDay`). Leftovers can be of any recipe day in the **7 days
+  before** (`leftoverSources`), and add nothing to groceries.
+  `groceries_sent text[]` — the recipe's ingredient lines (by text) the
+  grocery step already sent; **reset when the day's recipe changes**.
+- **Grocery staple** (`grocery_staples`) — one pantry word per row ("salt",
+  "olive oil"); an ingredient line mentioning one (**whole word, any case** —
+  `isStaple`) starts unticked.
+
+UI: weeks run **Sunday → Saturday**; a **This week / Next week** toggle (no
+further browsing), "n of 7 planned", and seven dense rows (past days faded,
+today labeled "today"). Tapping a row opens `DayPopover`: a searchable recipe
+Select, a "Something else" text field, leftovers chips, Clear day. A recipe day
+gets a ↗ to `/recipes/:id`. **🛒 Plan groceries** opens `GroceryModal`: each
+recipe day's ingredient lines as checkboxes, **ticked by default except
+staples and already-sent lines** (each untick reason shown as a word tag),
+an "Extra items" textarea (one per line), and the staples editor (a new staple
+unticks its matches). Sending writes **into the Lists feature**: the space's
+free-form list named **"Groceries"** (any case, oldest wins —
+`findGroceriesList`; created with 🛒 on first use), one `list_items` row per
+line, appended, **no merging** — the recipe title goes in the row's note
+(`creator`). Then each day's `groceries_sent` is updated, and the modal offers
+"Open Groceries list →". Seed mode only records what was sent (the Lists seed
+is a separate in-memory store). Scope cuts (deliberate): no breakfast/lunch, no
+quantity parsing, no copying weeks, no past-week browsing.
+
 **Music Practice** (`/music-practice`) — a personal practice tracker with an
 in-page **Bassoon / Piano** toggle. **Piano** is stateless: a "Randomize"
 button draws a random key + scale/chord from the reference tables in the
@@ -605,7 +643,7 @@ schema in `supabase/schema.sql` is already applied to the current project.
   `entry_repeats`, `wishlist_items`, `profiles`, `tier_lists`, `tier_items`, `tier_placements`,
   `tier_item_completions`, `tier_item_user_tags`, `lists`, `list_items`, `spoons`, `park_visits`,
   `recipes`, `music_practice_days`, `little_guys`, `seasons`, `season_items`,
-  `alignment_charts`.
+  `alignment_charts`, `meal_plan_days`, `grocery_staples`.
   Plus the `spoons`, `recipes`, and `little-guys` **storage buckets** (public
   read, member-only writes via policies on `storage.objects`).
 - Most tables use the uniform "space members all" `for all` policy. The
@@ -786,6 +824,14 @@ src/
       RecipeList.tsx       dense A–Z rows (title, source, tags, serves/time)
       RecipeDetail.tsx     full recipe page: tap-to-cross-off, notes, byline
       RecipeModal.tsx      add/edit recipe (photo upload, textareas, tags)
+    meal-plan/             the Recipes feature's weekly dinner plan + grocery step
+      MealPlanScreen.tsx   /recipes/plan: week toggle, day rows, grocery modal state
+      useMealPlanStore.ts  data seam: meal_plan_days + grocery_staples, sends to Lists (or seed)
+      derive.ts            pure: Sunday weeks, labels, leftovers, staples, grocery groups
+      derive.test.ts       vitest coverage for derive.ts
+      MealPlanView.tsx     the seven day rows (+ ↗ to a recipe)
+      DayPopover.tsx       tap-to-plan: recipe Select, free text, leftovers chips, clear
+      GroceryModal.tsx     ingredient checklist, extras, staples → the Groceries list
     music-practice/        personal practice tracker (Bassoon wheel + Piano)
       MusicPracticePage.tsx  Bassoon / Piano toggle
       Bassoon.tsx          circle-of-fifths SVG wheel: select → Log, tempo, history
@@ -797,7 +843,7 @@ e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
                            tier-list, lists, spoons, little-guys, parks,
-                           recipes, music-practice, seasons, alignment, mobile,
+                           recipes, meal-plan, music-practice, seasons, alignment, mobile,
                            mobile-overflow)
                            — see playwright.config.ts
 supabase/
@@ -840,7 +886,8 @@ and `src/lib/`.
   press). Never `window.confirm`. Keep this for anything that destroys logged
   or shared data — entries, repeats, categories, activities, wishes, tier
   items, list rows and free-form lists, spoons, little guys, recipes, park
-  visits, seasons and season items, alignment charts.
+  visits, seasons and season items, alignment charts. (Clearing a meal-plan
+  day doesn't confirm: it's one tap to re-plan.)
 - **Every feature page wears the same shell.** `PageFrame` (padding + the
   centered `PAGE_MAX_WIDTH` column) wraps the page; `ControlBar` is its top row
   (`left` = toggles/filters/counts, `right` = the primary action) above the

@@ -690,6 +690,48 @@ create table if not exists public.alignment_charts (
 create index if not exists alignment_charts_space_idx on public.alignment_charts (space_id);
 
 -- ---------------------------------------------------------------------------
+-- Meal plan: the Recipes feature's weekly dinner planner. A `meal_plan_days`
+-- row is one planned dinner, at most one per day per space — a recipe, free
+-- text, or leftovers of an earlier day. `groceries_sent` remembers which of
+-- the recipe's ingredient lines the grocery step already put on the
+-- Groceries list. `grocery_staples` is the pantry list whose matching
+-- ingredient lines start unchecked. Shared space data, uniform member policy.
+-- On an existing DB: see migrations/20261024_meal_plan.sql.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.meal_plan_days (
+  id              uuid primary key default gen_random_uuid(),
+  space_id        uuid not null references public.spaces (id) on delete cascade,
+  day             date not null,
+  kind            text not null check (kind in ('recipe', 'text', 'leftovers')),
+  -- kind = 'recipe'. ON DELETE SET NULL: a deleted recipe leaves the day
+  -- planned but unnamed rather than silently emptying it.
+  recipe_id       uuid references public.recipes (id) on delete set null,
+  -- kind = 'text': the free-text dinner ("Pizza night").
+  text            text not null default '',
+  -- kind = 'leftovers': the earlier day whose cook this eats.
+  leftovers_of    uuid references public.meal_plan_days (id) on delete set null,
+  -- Ingredient lines (by text) already sent to the Groceries list.
+  groceries_sent  text[] not null default '{}',
+  created_by      uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at      timestamptz not null default now(),
+  constraint meal_plan_days_space_day_key unique (space_id, day)
+);
+
+create index if not exists meal_plan_days_recipe_idx on public.meal_plan_days (recipe_id);
+create index if not exists meal_plan_days_leftovers_idx on public.meal_plan_days (leftovers_of);
+
+create table if not exists public.grocery_staples (
+  id          uuid primary key default gen_random_uuid(),
+  space_id    uuid not null references public.spaces (id) on delete cascade,
+  -- As typed: "olive oil". Matched as whole words, case-insensitively.
+  name        text not null,
+  created_at  timestamptz not null default now()
+);
+
+create unique index if not exists grocery_staples_space_name_key on public.grocery_staples (space_id, lower(name));
+
+-- ---------------------------------------------------------------------------
 -- Membership helper
 -- ---------------------------------------------------------------------------
 -- SECURITY DEFINER so it can read space_members without tripping RLS — this
@@ -812,6 +854,8 @@ alter table public.music_practice_days enable row level security;
 alter table public.seasons          enable row level security;
 alter table public.season_items     enable row level security;
 alter table public.alignment_charts enable row level security;
+alter table public.meal_plan_days   enable row level security;
+alter table public.grocery_staples  enable row level security;
 
 -- spaces ---------------------------------------------------------------------
 drop policy if exists "members read space" on public.spaces;
@@ -913,6 +957,14 @@ create policy "space members all" on public.season_items
 
 drop policy if exists "space members all" on public.alignment_charts;
 create policy "space members all" on public.alignment_charts
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.meal_plan_days;
+create policy "space members all" on public.meal_plan_days
+  for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
+
+drop policy if exists "space members all" on public.grocery_staples;
+create policy "space members all" on public.grocery_staples
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
 
 -- tier lists -------------------------------------------------------------------
@@ -1073,7 +1125,7 @@ grant select, insert, update, delete on
   public.wishlist_items, public.entry_repeats, public.tier_lists, public.tier_items, public.tier_placements,
   public.tier_item_completions, public.tier_item_user_tags, public.lists, public.list_items, public.spoons, public.park_visits,
   public.recipes, public.music_practice_days, public.little_guys, public.seasons, public.season_items,
-  public.alignment_charts
+  public.alignment_charts, public.meal_plan_days, public.grocery_staples
   to authenticated;
 grant select, update on public.profiles to authenticated;
 -- Functions default to PUBLIC execute; only signed-in users need the helpers,
@@ -1105,7 +1157,7 @@ begin
     array['spaces', 'categories', 'activities', 'entries', 'entry_repeats', 'wishlist_items',
           'tier_lists', 'tier_items', 'tier_placements', 'tier_item_completions', 'tier_item_user_tags', 'lists', 'list_items', 'spoons',
           'park_visits', 'recipes', 'little_guys', 'seasons', 'season_items',
-          'alignment_charts']
+          'alignment_charts', 'meal_plan_days', 'grocery_staples']
   loop
     if not exists (
       select 1 from pg_publication_tables
