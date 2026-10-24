@@ -256,6 +256,35 @@ export type Database = {
           },
         ]
       }
+      grocery_staples: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          space_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          space_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grocery_staples_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       list_items: {
         Row: {
           created_at: string
@@ -398,6 +427,67 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "little_guys_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_plan_days: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          day: string
+          groceries_sent: string[]
+          id: string
+          kind: string
+          leftovers_of: string | null
+          recipe_id: string | null
+          space_id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          day: string
+          groceries_sent?: string[]
+          id?: string
+          kind: string
+          leftovers_of?: string | null
+          recipe_id?: string | null
+          space_id: string
+          text?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          day?: string
+          groceries_sent?: string[]
+          id?: string
+          kind?: string
+          leftovers_of?: string | null
+          recipe_id?: string | null
+          space_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_days_leftovers_of_fkey"
+            columns: ["leftovers_of"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_days_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_days_space_id_fkey"
             columns: ["space_id"]
             isOneToOne: false
             referencedRelation: "spaces"

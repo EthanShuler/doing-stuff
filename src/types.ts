@@ -326,6 +326,37 @@ export interface Recipe {
   createdAt: string
 }
 
+// --- Meal plan (the Recipes feature's weekly dinner planner) -------------------
+
+export type MealKind = 'recipe' | 'text' | 'leftovers'
+
+/** One planned dinner — a row in `meal_plan_days`, at most one per day.
+ *  Shared space data. */
+export interface MealPlanDay {
+  id: string
+  /** ISO date ("YYYY-MM-DD"), local. Unique per space. */
+  day: string
+  kind: MealKind
+  /** kind 'recipe'. null on a recipe day = its recipe was deleted. */
+  recipeId: string | null
+  /** kind 'text': the free-text dinner ("Pizza night"). */
+  text: string
+  /** kind 'leftovers': the earlier day's row whose cook this eats. null =
+   *  plain leftovers (that day was cleared). */
+  leftoversOf: string | null
+  /** Ingredient lines (by text) the grocery step already sent to the
+   *  Groceries list. Reset when the day's recipe changes. */
+  groceriesSent: string[]
+  createdAt: string
+}
+
+/** A pantry staple — a row in `grocery_staples`. Ingredient lines that
+ *  mention it (whole word, any case) start unchecked in the grocery step. */
+export interface GroceryStaple {
+  id: string
+  name: string
+}
+
 // --- Little guys (the Smiski-and-friends collection) --------------------------
 
 /** One little guy — one row in `little_guys`. Shared space data (either member

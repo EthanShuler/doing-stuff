@@ -29,6 +29,7 @@ const ROUTES = [
   '/little-guys',
   '/alignment/ac1',
   '/recipes',
+  '/recipes/plan',
   '/music-practice',
 ]
 

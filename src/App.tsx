@@ -139,6 +139,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
           {/* The recipe index and the per-recipe page render one component
               (same tree position), so the store survives opening a recipe. */}
           <Route path="/recipes" element={recipes} />
+          <Route path="/recipes/plan" element={recipes} />
           <Route path="/recipes/:id" element={recipes} />
           <Route
             path="/cats"
