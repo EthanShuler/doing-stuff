@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ActionIcon, Box, Checkbox, Group, Text, UnstyledButton } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import {
   DndContext,
   DragOverlay,
@@ -83,12 +84,16 @@ function Row({
   onEdit: (item: ListItem) => void
   onDelete: (item: ListItem) => void
 }) {
+  // On a phone the title wraps instead of truncating, so the row grows.
+  const wrapTitle = useMediaQuery('(max-width: 48em)') ?? false
   return (
     <Group
       gap={8}
       align="center"
       wrap="nowrap"
-      h={ROW_HEIGHT}
+      mih={ROW_HEIGHT}
+      h={wrapTitle ? undefined : ROW_HEIGHT}
+      py={wrapTitle ? 6 : 0}
       px={10}
       bg={colors.surface}
       style={
@@ -123,9 +128,14 @@ function Row({
         onClick={done ? undefined : () => onEdit(item)}
         fz={text.body}
         c={done ? colors.faint : colors.ink}
-        lineClamp={1}
+        lineClamp={wrapTitle ? undefined : 1}
         flex={1}
-        style={{ cursor: done ? 'default' : 'text', textDecoration: done ? 'line-through' : 'none' }}
+        style={{
+          cursor: done ? 'default' : 'text',
+          textDecoration: done ? 'line-through' : 'none',
+          minWidth: 0,
+          overflowWrap: 'anywhere',
+        }}
       >
         {item.title}
         {item.creator && (
