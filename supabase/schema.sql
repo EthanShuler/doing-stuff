@@ -690,32 +690,34 @@ create table if not exists public.alignment_charts (
 create index if not exists alignment_charts_space_idx on public.alignment_charts (space_id);
 
 -- ---------------------------------------------------------------------------
--- Meal plan: the Recipes feature's weekly dinner planner. A `meal_plan_days`
--- row is one planned dinner, at most one per day per space — a recipe, free
--- text, or leftovers of an earlier day. `groceries_sent` remembers which of
+-- Meal plan: the Recipes feature's weekly lunch + dinner planner. A
+-- `meal_plan_days` row is one planned meal, at most one per day per meal per
+-- space — a recipe, free text, or leftovers of an earlier meal. `groceries_sent` remembers which of
 -- the recipe's ingredient lines the grocery step already put on the
 -- Groceries list. `grocery_staples` is the pantry list whose matching
 -- ingredient lines start unchecked. Shared space data, uniform member policy.
--- On an existing DB: see migrations/20261024_meal_plan.sql.
+-- On an existing DB: see migrations/20261024_meal_plan.sql, then
+-- migrations/20261103_meal_plan_lunch.sql.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.meal_plan_days (
   id              uuid primary key default gen_random_uuid(),
   space_id        uuid not null references public.spaces (id) on delete cascade,
   day             date not null,
+  meal            text not null default 'dinner' constraint meal_plan_days_meal_check check (meal in ('lunch', 'dinner')),
   kind            text not null check (kind in ('recipe', 'text', 'leftovers')),
   -- kind = 'recipe'. ON DELETE SET NULL: a deleted recipe leaves the day
   -- planned but unnamed rather than silently emptying it.
   recipe_id       uuid references public.recipes (id) on delete set null,
-  -- kind = 'text': the free-text dinner ("Pizza night").
+  -- kind = 'text': the free-text meal ("Pizza night").
   text            text not null default '',
-  -- kind = 'leftovers': the earlier day whose cook this eats.
+  -- kind = 'leftovers': the earlier meal whose cook this eats.
   leftovers_of    uuid references public.meal_plan_days (id) on delete set null,
   -- Ingredient lines (by text) already sent to the Groceries list.
   groceries_sent  text[] not null default '{}',
   created_by      uuid references auth.users (id) on delete set null default auth.uid(),
   created_at      timestamptz not null default now(),
-  constraint meal_plan_days_space_day_key unique (space_id, day)
+  constraint meal_plan_days_space_day_meal_key unique (space_id, day, meal)
 );
 
 create index if not exists meal_plan_days_recipe_idx on public.meal_plan_days (recipe_id);

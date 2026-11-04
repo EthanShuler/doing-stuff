@@ -9,6 +9,7 @@ import {
   groceryGroups,
   isStaple,
   leftoverSources,
+  compareSlots,
   mealLabel,
   plannedCount,
   weekDays,
@@ -38,6 +39,7 @@ const recipe = (id: string, title: string, ingredients = ''): Recipe => ({
 const day = (id: string, date: string, fields: Partial<MealPlanDay> = {}): MealPlanDay => ({
   id,
   day: date,
+  meal: 'dinner',
   kind: 'recipe',
   recipeId: null,
   text: '',
@@ -71,9 +73,24 @@ describe('week math', () => {
     expect(weekLabel('2026-10-25')).toBe('Oct 25 – Oct 31')
   })
 
-  it('counts planned days in the week only', () => {
-    const rows = [day('a', '2026-10-25'), day('b', '2026-10-31'), day('c', '2026-11-01')]
-    expect(plannedCount(rows, weekDays('2026-10-25'))).toBe(2)
+  it('counts planned meals of one kind in the week only', () => {
+    const rows = [
+      day('a', '2026-10-25'),
+      day('b', '2026-10-31'),
+      day('c', '2026-11-01'),
+      day('l', '2026-10-25', { meal: 'lunch' }),
+    ]
+    expect(plannedCount(rows, weekDays('2026-10-25'), 'dinner')).toBe(2)
+    expect(plannedCount(rows, weekDays('2026-10-25'), 'lunch')).toBe(1)
+  })
+
+  it('orders slots by date, lunch before dinner', () => {
+    const slots = [
+      { day: '2026-10-26', meal: 'lunch' as const },
+      { day: '2026-10-25', meal: 'dinner' as const },
+      { day: '2026-10-25', meal: 'lunch' as const },
+    ]
+    expect([...slots].sort(compareSlots)).toEqual([slots[2], slots[1], slots[0]])
   })
 })
 
@@ -86,22 +103,31 @@ describe('labels and leftovers', () => {
     expect(mealLabel(sun, recipes, rows)).toBe('Shakshuka')
     expect(mealLabel(day('x', '2026-10-26', { kind: 'text', text: 'Pizza night' }), recipes, rows)).toBe('Pizza night')
     expect(mealLabel(day('x', '2026-10-26', { kind: 'leftovers', leftoversOf: 'd1' }), recipes, rows)).toBe(
-      'Leftovers · Shakshuka (Sun)',
+      'Leftovers · Shakshuka (Sun dinner)',
     )
     expect(mealLabel(day('x', '2026-10-26', { kind: 'leftovers' }), recipes, rows)).toBe('Leftovers')
     expect(mealLabel(day('x', '2026-10-26', { recipeId: 'gone' }), recipes, rows)).toBe('Deleted recipe')
   })
 
-  it('offers recipe days from the previous 7 days, newest first', () => {
+  it('offers recipe meals from the previous 7 days, newest first', () => {
     const rows = [
       day('old', '2026-10-17', { recipeId: 'r2' }), // 8 days before Sun 10/25
       day('sat', '2026-10-24', { recipeId: 'r2' }),
+      day('satLunch', '2026-10-24', { meal: 'lunch', recipeId: 'r1' }),
       day('fri', '2026-10-23', { recipeId: 'r1' }),
       day('txt', '2026-10-22', { kind: 'text', text: 'Out' }),
       day('gone', '2026-10-21', { recipeId: 'deleted' }),
       day('same', '2026-10-25', { recipeId: 'r1' }),
+      day('sameLunch', '2026-10-25', { meal: 'lunch', recipeId: 'r2' }),
     ]
-    expect(leftoverSources(rows, recipes, '2026-10-25').map((d) => d.id)).toEqual(['sat', 'fri'])
+    expect(leftoverSources(rows, recipes, '2026-10-25', 'lunch').map((d) => d.id)).toEqual(['sat', 'satLunch', 'fri'])
+    // Dinner can also eat that day's lunch.
+    expect(leftoverSources(rows, recipes, '2026-10-25', 'dinner').map((d) => d.id)).toEqual([
+      'sameLunch',
+      'sat',
+      'satLunch',
+      'fri',
+    ])
   })
 })
 
@@ -135,22 +161,23 @@ describe('grocery groups', () => {
     day('mon', '2026-10-26', { kind: 'leftovers', leftoversOf: 'sun' }),
     day('wed', '2026-10-28', { kind: 'text', text: 'Out' }),
     day('thu', '2026-10-29', { recipeId: 'r3' }),
+    day('sunLunch', '2026-10-25', { meal: 'lunch', recipeId: 'r2' }),
     day('next', '2026-11-01', { recipeId: 'r2' }),
   ]
 
-  it('groups recipe days of the week in day order, skipping leftovers and text', () => {
+  it('groups recipe meals of the week in slot order, skipping leftovers and text', () => {
     const groups = groceryGroups(rows, week, recipes, [])
-    expect(groups.map((g) => g.day.id)).toEqual(['sun', 'tue', 'thu'])
-    expect(groups[0].lines.map((l) => l.text)).toEqual(['1 onion', '5 eggs', 'salt'])
-    expect(groups[2].lines).toEqual([])
+    expect(groups.map((g) => g.day.id)).toEqual(['sunLunch', 'sun', 'tue', 'thu'])
+    expect(groups[1].lines.map((l) => l.text)).toEqual(['1 onion', '5 eggs', 'salt'])
+    expect(groups[3].lines).toEqual([])
   })
 
   it('starts staples and already-sent lines unchecked', () => {
     const groups = groceryGroups(rows, week, recipes, staples('salt'))
     const checked = defaultChecked(groups)
-    expect(groups[0].lines[2]).toMatchObject({ text: 'salt', staple: true, sent: false })
-    expect(groups[1].lines[0]).toMatchObject({ text: '3 eggs', sent: true })
-    expect([...checked].sort()).toEqual(['sun:0', 'sun:1', 'tue:1'])
+    expect(groups[1].lines[2]).toMatchObject({ text: 'salt', staple: true, sent: false })
+    expect(groups[2].lines[0]).toMatchObject({ text: '3 eggs', sent: true })
+    expect([...checked].sort()).toEqual(['sun:0', 'sun:1', 'sunLunch:0', 'sunLunch:1', 'tue:1'])
   })
 })
 

@@ -443,6 +443,7 @@ export type Database = {
           id: string
           kind: string
           leftovers_of: string | null
+          meal: string
           recipe_id: string | null
           space_id: string
           text: string
@@ -455,6 +456,7 @@ export type Database = {
           id?: string
           kind: string
           leftovers_of?: string | null
+          meal?: string
           recipe_id?: string | null
           space_id: string
           text?: string
@@ -467,6 +469,7 @@ export type Database = {
           id?: string
           kind?: string
           leftovers_of?: string | null
+          meal?: string
           recipe_id?: string | null
           space_id?: string
           text?: string

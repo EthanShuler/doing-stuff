@@ -1,4 +1,4 @@
-import type { GroceryStaple, MealPlanDay, Recipe } from '../../types'
+import type { GroceryStaple, Meal, MealPlanDay, Recipe } from '../../types'
 import { formatDate, isoDate } from '../../lib/format'
 import { ingredientLines } from '../recipes/derive'
 
@@ -45,15 +45,38 @@ export function dayName(iso: string): string {
   return DAY_NAMES[toUtc(iso).getUTCDay()]
 }
 
-/** Rows keyed by their date (one row per day). */
-export function daysByDate(days: MealPlanDay[]): Map<string, MealPlanDay> {
-  return new Map(days.map((d) => [d.day, d]))
+/** The day's meals, in eating order. */
+export const MEALS: Meal[] = ['lunch', 'dinner']
+
+/** "Lunch" / "Dinner". */
+export function mealName(meal: Meal): string {
+  return meal === 'lunch' ? 'Lunch' : 'Dinner'
 }
 
-/** How many of the week's seven days have something planned. */
-export function plannedCount(days: MealPlanDay[], week: string[]): number {
-  const byDate = daysByDate(days)
-  return week.filter((d) => byDate.has(d)).length
+/** The key of one meal slot: a date plus a meal (one row per slot). */
+export function slotKey(date: string, meal: Meal): string {
+  return `${date}:${meal}`
+}
+
+/** Rows keyed by their slot (`slotKey`). */
+export function mealsBySlot(days: MealPlanDay[]): Map<string, MealPlanDay> {
+  return new Map(days.map((d) => [slotKey(d.day, d.meal), d]))
+}
+
+/** Slot order: by date, lunch before dinner. */
+export function compareSlots(a: { day: string; meal: Meal }, b: { day: string; meal: Meal }): number {
+  return a.day.localeCompare(b.day) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal)
+}
+
+/** How many of the week's seven days have `meal` planned. */
+export function plannedCount(days: MealPlanDay[], week: string[], meal: Meal): number {
+  const bySlot = mealsBySlot(days)
+  return week.filter((d) => bySlot.has(slotKey(d, meal))).length
+}
+
+/** "Sun dinner" — names an earlier cook in the leftovers labels. */
+export function slotName(day: MealPlanDay): string {
+  return `${dayName(day.day)} ${day.meal}`
 }
 
 /** The recipe a recipe day cooks, or null (not a recipe day, or the recipe
@@ -63,23 +86,25 @@ export function recipeOf(day: MealPlanDay, recipes: Recipe[]): Recipe | null {
   return recipes.find((r) => r.id === day.recipeId) ?? null
 }
 
-/** What leftovers can be of: the recipe days in the 7 days before `date`
- *  (so Sunday can eat last Saturday's cook), most recent first. */
-export function leftoverSources(days: MealPlanDay[], recipes: Recipe[], date: string): MealPlanDay[] {
+/** What leftovers can be of: the recipe meals before this slot, back to
+ *  the same day last week (so Sunday can eat last Saturday's cook, and
+ *  lunch can eat last night's dinner), most recent first. */
+export function leftoverSources(days: MealPlanDay[], recipes: Recipe[], date: string, meal: Meal): MealPlanDay[] {
   const from = addDays(date, -7)
+  const slot = { day: date, meal }
   return days
-    .filter((d) => d.day < date && d.day >= from && recipeOf(d, recipes) !== null)
-    .sort((a, b) => b.day.localeCompare(a.day))
+    .filter((d) => compareSlots(d, slot) < 0 && d.day >= from && recipeOf(d, recipes) !== null)
+    .sort((a, b) => compareSlots(b, a))
 }
 
-/** The day row's display line: the recipe title, the free text, or
- *  "Leftovers · Shakshuka (Sun)". */
+/** The meal's display line: the recipe title, the free text, or
+ *  "Leftovers · Shakshuka (Sun dinner)". */
 export function mealLabel(day: MealPlanDay, recipes: Recipe[], days: MealPlanDay[]): string {
   if (day.kind === 'text') return day.text
   if (day.kind === 'recipe') return recipeOf(day, recipes)?.title ?? 'Deleted recipe'
   const source = day.leftoversOf ? days.find((d) => d.id === day.leftoversOf) : undefined
   const recipe = source ? recipeOf(source, recipes) : null
-  return recipe && source ? `Leftovers · ${recipe.title} (${dayName(source.day)})` : 'Leftovers'
+  return recipe && source ? `Leftovers · ${recipe.title} (${slotName(source)})` : 'Leftovers'
 }
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -109,19 +134,19 @@ export interface GroceryGroup {
   lines: GroceryLine[]
 }
 
-/** The grocery step's checklist: one group per recipe day of the week, in
- *  day order, each with its recipe's ingredient lines. Leftovers and
- *  free-text days add nothing. */
+/** The grocery step's checklist: one group per recipe meal of the week, in
+ *  slot order (lunch before dinner), each with its recipe's ingredient
+ *  lines. Leftovers and free-text meals add nothing. */
 export function groceryGroups(
   days: MealPlanDay[],
   week: string[],
   recipes: Recipe[],
   staples: GroceryStaple[],
 ): GroceryGroup[] {
-  const byDate = daysByDate(days)
+  const bySlot = mealsBySlot(days)
   const groups: GroceryGroup[] = []
-  for (const date of week) {
-    const day = byDate.get(date)
+  for (const slot of week.flatMap((date) => MEALS.map((meal) => slotKey(date, meal)))) {
+    const day = bySlot.get(slot)
     const recipe = day ? recipeOf(day, recipes) : null
     if (!day || !recipe) continue
     const sent = new Set(day.groceriesSent)

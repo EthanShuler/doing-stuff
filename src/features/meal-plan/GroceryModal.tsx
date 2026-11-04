@@ -4,7 +4,7 @@ import type { GroceryStaple } from '../../types'
 import { colors, fonts, radii, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
-import { dayName, defaultChecked, extraLines, isStaple } from './derive'
+import { defaultChecked, extraLines, isStaple, slotName } from './derive'
 import type { GroceryGroup } from './derive'
 import type { GrocerySend } from './useMealPlanStore'
 
@@ -130,7 +130,7 @@ export function GroceryModal({
           {groups.map((group) => (
             <Box key={group.day.id} mb={14}>
               <Text fz={text.lead} c={colors.ink} mb={6} style={{ fontFamily: fonts.serif }}>
-                {dayName(group.day.day)} · {group.recipe.title}
+                {slotName(group.day)} · {group.recipe.title}
               </Text>
               {group.lines.length === 0 ? (
                 <Text fz={text.caption} c={colors.faint} style={{ fontStyle: 'italic' }}>
