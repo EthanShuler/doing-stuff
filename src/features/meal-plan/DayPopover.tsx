@@ -1,19 +1,20 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Box, Button, Group, Popover, Select, Text, TextInput, UnstyledButton } from '@mantine/core'
-import type { MealPlanDay, Recipe } from '../../types'
+import type { Meal, MealPlanDay, Recipe } from '../../types'
 import { ACCENT, colors, fieldLabelStyle, fonts, radii, shadows, text } from '../../theme'
 import { formatDate } from '../../lib/format'
-import { dayName, recipeOf } from './derive'
+import { dayName, mealName, recipeOf, slotName } from './derive'
 import type { MealChoice } from './useMealPlanStore'
 
 /**
- * Tap a day to plan its dinner: a searchable recipe dropdown, a free-text
+ * Tap a meal slot to plan it: a searchable recipe dropdown, a free-text
  * field, and a chip per earlier cook to eat leftovers of. Picking any of
- * them saves and closes; "Clear day" empties it.
+ * them saves and closes; "Clear" empties it.
  */
 export function DayPopover({
   date,
+  meal,
   current,
   recipes,
   sources,
@@ -22,11 +23,12 @@ export function DayPopover({
   children,
 }: {
   date: string
-  /** What the day holds now (undefined = nothing planned). */
+  meal: Meal
+  /** What the slot holds now (undefined = nothing planned). */
   current: MealPlanDay | undefined
   /** Every recipe, A–Z. */
   recipes: Recipe[]
-  /** Earlier recipe days this one can eat leftovers of (leftoverSources). */
+  /** Earlier recipe meals this one can eat leftovers of (leftoverSources). */
   sources: MealPlanDay[]
   onPick: (choice: MealChoice) => void
   onClear: () => void
@@ -50,7 +52,7 @@ export function DayPopover({
     if (draftText.trim()) pick({ kind: 'text', text: draftText })
   }
 
-  const label = `${dayName(date)} · ${formatDate(date)}`
+  const label = `${dayName(date)} · ${formatDate(date)} · ${mealName(meal)}`
 
   return (
     <Popover
@@ -141,7 +143,7 @@ export function DayPopover({
                 selected={current?.kind === 'leftovers' && current.leftoversOf === source.id}
                 onClick={() => pick({ kind: 'leftovers', leftoversOf: source.id })}
               >
-                {recipeOf(source, recipes)?.title} ({dayName(source.day)})
+                {recipeOf(source, recipes)?.title} ({slotName(source)})
               </LeftoverChip>
             ))}
             <LeftoverChip
@@ -162,7 +164,7 @@ export function DayPopover({
               onClear()
             }}
           >
-            Clear day
+            Clear {meal}
           </Button>
         )}
       </Popover.Dropdown>

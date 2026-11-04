@@ -14,7 +14,7 @@ import type { MealPlanStore } from './useMealPlanStore'
 type Week = 'this' | 'next'
 
 /** The Recipes feature's Meal plan screen (/recipes/plan): a This week /
- *  Next week toggle, the seven dinner rows, and the grocery step. The store
+ *  Next week toggle, the seven lunch + dinner rows, and the grocery step. The store
  *  lives on RecipesPage, so it survives switching to the cookbook and back. */
 export function MealPlanScreen({
   store,
@@ -56,7 +56,8 @@ export function MealPlanScreen({
               ]}
             />
             <Text fz={text.small} c={colors.muted} style={{ fontFamily: fonts.sans }}>
-              {weekLabel(start)} · {plannedCount(store.days, days)} of 7 planned
+              {weekLabel(start)} · {plannedCount(store.days, days, 'dinner')} of 7 dinners ·{' '}
+              {plannedCount(store.days, days, 'lunch')} of 7 lunches
             </Text>
           </>
         }
@@ -67,8 +68,8 @@ export function MealPlanScreen({
         week={days}
         days={store.days}
         recipes={recipes}
-        onPick={(date, choice) => void store.setDay(date, choice)}
-        onClear={(date) => void store.clearDay(date)}
+        onPick={(date, meal, choice) => void store.setDay(date, meal, choice)}
+        onClear={(date, meal) => void store.clearDay(date, meal)}
         onOpenRecipe={(id) => navigate(`/recipes/${id}`)}
       />
 

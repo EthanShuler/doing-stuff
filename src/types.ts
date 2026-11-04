@@ -326,26 +326,30 @@ export interface Recipe {
   createdAt: string
 }
 
-// --- Meal plan (the Recipes feature's weekly dinner planner) -------------------
+// --- Meal plan (the Recipes feature's weekly lunch + dinner planner) ----------
 
 export type MealKind = 'recipe' | 'text' | 'leftovers'
 
-/** One planned dinner — a row in `meal_plan_days`, at most one per day.
- *  Shared space data. */
+/** Which meal of the day a plan row is. */
+export type Meal = 'lunch' | 'dinner'
+
+/** One planned meal — a row in `meal_plan_days`, at most one per day per
+ *  meal. Shared space data. */
 export interface MealPlanDay {
   id: string
-  /** ISO date ("YYYY-MM-DD"), local. Unique per space. */
+  /** ISO date ("YYYY-MM-DD"), local. Unique per space per meal. */
   day: string
+  meal: Meal
   kind: MealKind
   /** kind 'recipe'. null on a recipe day = its recipe was deleted. */
   recipeId: string | null
-  /** kind 'text': the free-text dinner ("Pizza night"). */
+  /** kind 'text': the free-text meal ("Pizza night"). */
   text: string
-  /** kind 'leftovers': the earlier day's row whose cook this eats. null =
-   *  plain leftovers (that day was cleared). */
+  /** kind 'leftovers': the earlier meal's row whose cook this eats. null =
+   *  plain leftovers (that meal was cleared). */
   leftoversOf: string | null
   /** Ingredient lines (by text) the grocery step already sent to the
-   *  Groceries list. Reset when the day's recipe changes. */
+   *  Groceries list. Reset when the meal's recipe changes. */
   groceriesSent: string[]
   createdAt: string
 }

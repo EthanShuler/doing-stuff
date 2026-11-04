@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import type { GroceryStaple, MealKind, MealPlanDay } from '../../types'
+import type { GroceryStaple, Meal, MealKind, MealPlanDay } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { errorMessage, idFactory, removeById, syncTable, upsertById, useSpaceSync } from '../../data/spaceSync'
@@ -27,6 +27,7 @@ function seed(): Snapshot {
   const sunday = weekStart(today())
   const day = (offset: number, fields: Partial<MealPlanDay> & { id: string; kind: MealKind }): MealPlanDay => ({
     day: addDays(sunday, offset),
+    meal: 'dinner',
     recipeId: null,
     text: '',
     leftoversOf: null,
@@ -40,6 +41,8 @@ function seed(): Snapshot {
       day(1, { id: 'mp2', kind: 'leftovers', leftoversOf: 'mp1' }),
       day(2, { id: 'mp3', kind: 'text', text: 'Tacos at Sam’s' }),
       day(3, { id: 'mp4', kind: 'recipe', recipeId: 'r1' }),
+      day(1, { id: 'mp5', meal: 'lunch', kind: 'text', text: 'Sandwiches' }),
+      day(4, { id: 'mp6', meal: 'lunch', kind: 'leftovers', leftoversOf: 'mp4' }),
     ],
     staples: [
       { id: 'st1', name: 'salt' },
@@ -54,6 +57,7 @@ function seed(): Snapshot {
 type DayRow = {
   id: string
   day: string
+  meal: string
   kind: string
   recipe_id: string | null
   text: string | null
@@ -65,6 +69,7 @@ type DayRow = {
 const toDay = (r: DayRow): MealPlanDay => ({
   id: r.id,
   day: r.day,
+  meal: r.meal as Meal,
   kind: r.kind as MealKind,
   recipeId: r.recipe_id,
   text: r.text ?? '',
@@ -76,24 +81,21 @@ const toDay = (r: DayRow): MealPlanDay => ({
 type StapleRow = { id: string; name: string }
 const toStaple = (r: StapleRow): GroceryStaple => ({ id: r.id, name: r.name })
 
-const DAY_COLUMNS = 'id,day,kind,recipe_id,text,leftovers_of,groceries_sent,created_at'
+const DAY_COLUMNS = 'id,day,meal,kind,recipe_id,text,leftovers_of,groceries_sent,created_at'
 
-/** A day is unique per date, so an optimistic row (temp id) and the
- *  server's echo (real id) are the same day — match on either. */
+/** A row is unique per date + meal, so an optimistic row (temp id) and the
+ *  server's echo (real id) are the same slot — match on either. */
+const sameSlot = (a: MealPlanDay, b: MealPlanDay) => a.id === b.id || (a.day === b.day && a.meal === b.meal)
 const upsertByDay = (set: Dispatch<SetStateAction<MealPlanDay[]>>, item: MealPlanDay) =>
-  set((prev) =>
-    prev.some((d) => d.id === item.id || d.day === item.day)
-      ? prev.map((d) => (d.id === item.id || d.day === item.day ? item : d))
-      : [...prev, item],
-  )
+  set((prev) => (prev.some((d) => sameSlot(d, item)) ? prev.map((d) => (sameSlot(d, item) ? item : d)) : [...prev, item]))
 
-/** What one day should hold. */
+/** What one meal should hold. */
 export type MealChoice =
   | { kind: 'recipe'; recipeId: string }
   | { kind: 'text'; text: string }
   | { kind: 'leftovers'; leftoversOf: string | null }
 
-/** One recipe day's picked ingredient lines, for the grocery step. */
+/** One recipe meal's picked ingredient lines, for the grocery step. */
 export interface GrocerySend {
   dayId: string
   /** The recipe title — the row's note on the Groceries list. */
@@ -109,12 +111,12 @@ export interface MealPlanStore {
   error: string | null
   clearError: () => void
 
-  /** Plan a day (replacing whatever it held). Optimistic; a failure
-   *  resyncs and records the error. */
-  setDay: (date: string, choice: MealChoice) => Promise<void>
-  /** Empty a day. Leftovers of it become plain leftovers (the DB's
-   *  on delete set null, mirrored here). */
-  clearDay: (date: string) => Promise<void>
+  /** Plan one meal of a day (replacing whatever it held). Optimistic; a
+   *  failure resyncs and records the error. */
+  setDay: (date: string, meal: Meal, choice: MealChoice) => Promise<void>
+  /** Empty one meal of a day. Leftovers of it become plain leftovers (the
+   *  DB's on delete set null, mirrored here). */
+  clearDay: (date: string, meal: Meal) => Promise<void>
   /** Put the picked lines + extras on the space's "Groceries" list (created
    *  on first use) and remember them on each day. Resolves to the list's id
    *  (null in seed mode). Throws on failure (the modal stays open). */
@@ -186,15 +188,16 @@ export function useMealPlanStore(spaceId: string | null): MealPlanStore {
   )
 
   const setDay = useCallback(
-    async (date: string, choice: MealChoice) => {
+    async (date: string, meal: Meal, choice: MealChoice) => {
       setError(null)
-      const prior = daysRef.current.find((d) => d.day === date)
+      const prior = daysRef.current.find((d) => d.day === date && d.meal === meal)
       // A different recipe means a different shopping list: forget what the
       // old one sent. Same recipe again keeps it.
       const keepSent = choice.kind === 'recipe' && prior?.kind === 'recipe' && prior.recipeId === choice.recipeId
       const next: MealPlanDay = {
         id: prior?.id ?? seedId(),
         day: date,
+        meal,
         kind: choice.kind,
         recipeId: choice.kind === 'recipe' ? choice.recipeId : null,
         text: choice.kind === 'text' ? choice.text.trim() : '',
@@ -210,13 +213,14 @@ export function useMealPlanStore(spaceId: string | null): MealPlanStore {
           {
             space_id: spaceId,
             day: date,
+            meal,
             kind: next.kind,
             recipe_id: next.recipeId,
             text: next.text,
             leftovers_of: next.leftoversOf,
             groceries_sent: next.groceriesSent,
           },
-          { onConflict: 'space_id,day' },
+          { onConflict: 'space_id,day,meal' },
         )
         .select(DAY_COLUMNS)
         .single()
@@ -227,9 +231,9 @@ export function useMealPlanStore(spaceId: string | null): MealPlanStore {
   )
 
   const clearDay = useCallback(
-    async (date: string) => {
+    async (date: string, meal: Meal) => {
       setError(null)
-      const prior = daysRef.current.find((d) => d.day === date)
+      const prior = daysRef.current.find((d) => d.day === date && d.meal === meal)
       if (!prior) return
       // Mirror `leftovers_of ... on delete set null`.
       setDays((prev) =>
