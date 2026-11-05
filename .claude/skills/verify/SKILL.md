@@ -61,4 +61,4 @@ Screenshot into the scratchpad dir, not the repo.
 - **AppShell.Navbar stays in the DOM when collapsed** — `isVisible()` lies on
   mobile; use `toBeInViewport()` instead.
 - Map: wait for `.leaflet-container` + ~1.5s for tiles before screenshots.
-- `/favicon.ico` 404s in the console — pre-existing, no favicon is set.
+- Touch-only CSS (`(pointer: coarse)` — the 16px text fields) needs `hasTouch: true, isMobile: true` on the page; the suite's mobile project doesn't set it.
