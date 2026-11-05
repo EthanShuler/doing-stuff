@@ -11,7 +11,13 @@
    Anything set here !important overrides the card's inline resting styles
    (shadows.card + colors.cardBorder), which is the point.
 
-   Opt in from a component with `data-hover-card` — see src/components/PhotoCard.tsx. */
+   Opt in from a component with `data-hover-card` — see src/components/PhotoCard.tsx.
+
+   The SECOND exception is the touch-screen text-field rule at the bottom:
+   iOS Safari zooms the page in whenever a field under 16px takes focus (and
+   in the home-screen app there's no pinch-out habit to undo it), while
+   Mantine's inputs are 14px. A media query can't live in an inline style or
+   the Mantine theme's `styles`, so it lives here. */
 
 [data-hover-card] {
   transition:
@@ -29,4 +35,14 @@
 [data-hover-card]:focus-visible {
   outline: 2px solid oklch(0.62 0.13 45);
   outline-offset: 2px;
+}
+
+/* Touch screens only: every typed-into field is 16px, the size at which iOS
+   stops auto-zooming on focus. Checkboxes and radios have no text to size. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }

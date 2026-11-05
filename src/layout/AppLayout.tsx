@@ -41,18 +41,48 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
 
   return (
+    // Safe areas: index.html sets viewport-fit=cover, so on a phone (and
+    // above all as a home-screen app) the page runs under the notch, the
+    // home indicator and — in landscape — the side cutouts. The header grows
+    // by the top inset and pads it away; main and the drawer pad the rest.
+    // Every env() is 0 in a normal desktop browser, so nothing moves there.
     <AppShell
-      header={{ height: 56 }}
+      header={{ height: 'calc(3.5rem + env(safe-area-inset-top))' }}
       navbar={{ width: 220, breakpoint: 'lg', collapsed: { desktop: true, mobile: !navOpened } }}
       padding={0}
       styles={{
-        header: { background: colors.pageBg, borderBottom: `1px dotted ${colors.dotted}` },
-        navbar: { background: colors.pageBg, borderRight: `1px dotted ${colors.dotted}` },
-        main: { background: colors.pageBg },
+        header: {
+          background: colors.pageBg,
+          borderBottom: `1px dotted ${colors.dotted}`,
+          paddingTop: 'env(safe-area-inset-top)',
+        },
+        navbar: {
+          background: colors.pageBg,
+          borderRight: `1px dotted ${colors.dotted}`,
+          padding: 14,
+          paddingLeft: 'max(14px, env(safe-area-inset-left))',
+          paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+        },
+        // The navbar never offsets main (collapsed on desktop, an overlay
+        // below lg), so these side paddings don't fight Mantine's own.
+        main: {
+          background: colors.pageBg,
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        },
       }}
     >
       <AppShell.Header>
-        <Group h="100%" px={20} justify="space-between" wrap="nowrap">
+        <Group
+          h="100%"
+          justify="space-between"
+          wrap="nowrap"
+          style={{
+            paddingLeft: 'max(20px, env(safe-area-inset-left))',
+            paddingRight: 'max(20px, env(safe-area-inset-right))',
+          }}
+        >
           <Group gap={20} wrap="nowrap">
             <Burger
               opened={navOpened}
@@ -100,7 +130,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </AppShell.Header>
 
       {/* Mobile-only feature nav (hidden on desktop via collapsed above). */}
-      <AppShell.Navbar p={14}>
+      <AppShell.Navbar>
         {FEATURES.map((feature) => (
           <FeatureLink
             key={feature.path}

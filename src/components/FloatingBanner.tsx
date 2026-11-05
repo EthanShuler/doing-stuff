@@ -40,7 +40,8 @@ export function FloatingBanner({
       py={9}
       style={{
         position: 'fixed',
-        top,
+        // `top` is measured from under the notch (see AppLayout's safe areas).
+        top: `calc(${top}px + env(safe-area-inset-top))`,
         left: '50%',
         transform: 'translateX(-50%)',
         // Above Mantine's modal (200) and the confirm dialog (250): failed

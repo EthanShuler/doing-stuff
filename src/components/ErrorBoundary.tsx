@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<
   render() {
     if (!this.state.error) return this.props.children
     return (
-      <Center mih={this.props.mih ?? '100vh'} bg={colors.pageBg} p={24}>
+      <Center mih={this.props.mih ?? '100dvh'} bg={colors.pageBg} p={24}>
         <Stack align="center" gap={12} style={{ fontFamily: fonts.sans }}>
           <Text c={colors.ink} fw={600}>
             Something went wrong loading this page.

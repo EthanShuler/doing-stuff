@@ -487,10 +487,11 @@ paper), ported from the Claude Design "Compass" direction.
   (`colors.surface`, `shadows.card`, `radii.card`, `text.small`) rather than
   re-typing a literal, and don't pass `radius` to a Mantine Button — the
   theme's `defaultRadius` already is 10. **No Tailwind, no CSS files** —
-  `index.css` holds exactly one rule set, the `[data-hover-card]` hover /
-  focus-visible treatment that inline styles can't express (its values are
-  hand-copies of `warmBorder(0.3)` / `shadows.hover` / `ACCENT`); Mantine's
-  stylesheet provides the reset. Anything else belongs in the theme.
+  `index.css` holds exactly two rule sets that inline styles can't express:
+  the `[data-hover-card]` hover / focus-visible treatment (its values are
+  hand-copies of `warmBorder(0.3)` / `shadows.hover` / `ACCENT`) and a
+  `(pointer: coarse)` rule making text fields 16px so iOS doesn't zoom on
+  focus; Mantine's stylesheet provides the reset. Anything else belongs in the theme.
 - **Leaflet / react-leaflet** for the map (CARTO Voyager raster tiles, keyed by
   `VITE_CARTO_API_KEY` — a free public browser key; missing = tiles carry an
   "API key required" watermark).
@@ -519,6 +520,15 @@ paper), ported from the Claude Design "Compass" direction.
   tables must be in the `supabase_realtime` publication (see `schema.sql`).
 - **Hosting target: Cloudflare Pages** (build `npm run build`, output `dist`).
   Deliberately not Vercel.
+- **Home-screen app (PWA), no service worker.** `public/manifest.webmanifest`
+  + the icon PNGs + the `apple-*` meta tags in `index.html` make it
+  installable (Safari → Share → Add to Home Screen) and full-screen. The
+  viewport is `viewport-fit=cover`, so `AppLayout` pads the header / main /
+  drawer by `env(safe-area-inset-*)` and `FloatingBanner` offsets by the top
+  inset — anything new that is `position: fixed` needs the same. Full-height
+  boxes use `100dvh`, not `100vh`. A resident app outliving a deploy is
+  covered by the `vite:preloadError` reload in `main.tsx`. The home-screen
+  app keeps its own storage, so each person signs in once more inside it.
 - **Load budget.** The routes and the three maps are lazy chunks, and
   `vite.config.ts` splits `vendor-react` / `-mantine` / `-leaflet` / `-dnd` /
   `-supabase` out of the app code (mostly for deploy-to-deploy cache
