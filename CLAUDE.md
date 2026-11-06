@@ -10,8 +10,12 @@ sign-out). The nav is **one item per feature, not per route** — ten of them,
 collapsing into the burger drawer below Mantine's `lg` breakpoint; the five
 tier-list routes share a single "Tier Lists" item and are chosen in-page with
 the `ListPicker` pill row, and the Lists routes likewise share one "Lists"
-item. The three unbuilt placeholder routes are off the nav
-but still resolve. Routing is **react-router (library mode)**: `/`, `/wishlist`, `/map`,
+item. The nav items and the home hub both render from one list,
+`FEATURES` in `src/layout/features.ts` — a new feature goes there. The three
+unbuilt placeholder routes are off the nav but still resolve. Routing is
+**react-router (library mode)**: `/` is the **home hub** (`HomePage` — a
+static index of one ruled row per feature, so any feature is one tap from home on a
+phone; unknown paths redirect here); `/log`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
 and `/tiers/:id` (a space-defined board — ice cream lives here) are the **Tier Lists**
 feature; `/lists/movies`, `/lists/tv`, `/lists/books`, and `/lists/:id` (a
@@ -26,7 +30,7 @@ is the **Seasons** feature; `/alignment` (+ `/alignment/:id`) is the
 page for a feature not built yet (a french toast ranking). All features share the one
 space — new tables follow the same `space_id` + `is_space_member()` RLS pattern.
 
-**Doing Stuff** — the landing feature — is a shared activity tracker for logging
+**Doing Stuff** — the original feature — is a shared activity tracker for logging
 things done together in a new city. The domain model:
 
 - **Category** (e.g. Outdoor, City, Brain) — has a name and a color.
@@ -703,6 +707,8 @@ src/
   mantineTheme.ts          Mantine theme override mirroring theme.ts
   layout/
     AppLayout.tsx          Mantine AppShell: brand, feature nav, sign-out; mobile burger
+    features.ts            FEATURES — the one feature list (nav items + hub rows), isActive
+    HomePage.tsx           `/`: the hub, one row per feature
   lib/
     format.ts              date helpers (today, isoDate, YearMonth, …) + stars
     fuzzy.ts               fuzzyMatch() subsequence title search (Log + recipes)
@@ -742,7 +748,7 @@ src/
     Stars.tsx              read-only rating display
     TitleSearchInput.tsx   title field with debounced TMDB / Open Library suggestions
   features/
-    doing-stuff/           the activity tracker (landing feature)
+    doing-stuff/           the activity tracker (/log, /wishlist, /map, /calendar)
       DoingStuffPage.tsx   owns the store, modal state, derive wiring, control bar
       useActivityStore.ts  data seam: Supabase CRUD (or in-memory seed fallback)
       derive.ts            pure join / filter / sort / stats / markers / calendar

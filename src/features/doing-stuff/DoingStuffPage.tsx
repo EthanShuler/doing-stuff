@@ -40,7 +40,7 @@ type Modal = 'entry' | 'manage' | 'repeat' | null
 
 /** Each doing-stuff screen is its own route so the URL survives reloads. */
 const SCREEN_PATHS: Record<Screen, string> = {
-  log: '/',
+  log: '/log',
   wishlist: '/wishlist',
   map: '/map',
   calendar: '/calendar',

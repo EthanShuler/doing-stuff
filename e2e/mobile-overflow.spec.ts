@@ -10,6 +10,7 @@ import { pickSegment } from './helpers'
 
 const ROUTES = [
   '/',
+  '/log',
   '/wishlist',
   '/map',
   '/calendar',

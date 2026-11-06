@@ -4,7 +4,7 @@ import { pickSegment, pickSelectOption, setRating } from './helpers'
 test('search state survives Log → Map → Log', async ({ page }) => {
   // All four doing-stuff routes render one DoingStuffPage, so its store (and
   // control state) must not remount on screen switches.
-  await page.goto('/')
+  await page.goto('/log')
   const search = page.getByLabel('Search entries by title')
   await search.fill('picnic')
   await expect(page.getByText('Riverside picnic')).toBeVisible()
@@ -20,7 +20,7 @@ test('search state survives Log → Map → Log', async ({ page }) => {
 })
 
 test('new-entry modal gates Add entry on activity + rating', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/log')
   await page.getByRole('button', { name: '+ New entry' }).first().click()
 
   const modal = page.getByRole('dialog')
@@ -41,7 +41,7 @@ test('new-entry modal gates Add entry on activity + rating', async ({ page }) =>
 })
 
 test('category pills open an activity row that narrows the log; right-click excludes', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/log')
   // Seed Outdoor: Park (Riverside picnic), Swimming (Morning laps),
   // Backpacking (Pine Ridge overnight).
   await page.getByRole('button', { name: 'Outdoor', exact: true }).click()
