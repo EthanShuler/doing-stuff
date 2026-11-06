@@ -22,7 +22,7 @@ test('header feature nav and the list picker navigate; browser back works', asyn
 })
 
 test('doing-stuff screen toggle navigates between its routes', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/log')
   await pickSegment(page, 'Map')
   await expect(page).toHaveURL('/map')
   await expect(page.locator('.leaflet-container')).toBeVisible()
@@ -31,6 +31,6 @@ test('doing-stuff screen toggle navigates between its routes', async ({ page }) 
   await expect(page).toHaveURL('/calendar')
 
   await pickSegment(page, 'Log')
-  await expect(page).toHaveURL('/')
+  await expect(page).toHaveURL('/log')
   await expect(page.getByText('Riverside picnic')).toBeVisible()
 })

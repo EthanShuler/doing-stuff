@@ -4,8 +4,16 @@ import { expect, test } from '@playwright/test'
 // SPA fallback, so deep links must work with no redirect help). Content
 // assertions come from the keyless seed data.
 
-test('/ renders the Log dashboard', async ({ page }) => {
+test('/ is the feature hub; a row lands on its feature', async ({ page }) => {
   await page.goto('/')
+  const hub = page.getByRole('navigation', { name: 'Features' })
+  await expect(hub.getByRole('link')).toHaveCount(10)
+  await hub.getByRole('link', { name: /Recipes/ }).click()
+  await expect(page).toHaveURL('/recipes')
+})
+
+test('/log renders the Log dashboard', async ({ page }) => {
+  await page.goto('/log')
   await expect(page.getByText('Riverside picnic')).toBeVisible()
   await expect(page.getByRole('button', { name: '+ New entry' }).first()).toBeVisible()
 })
@@ -131,5 +139,5 @@ test('placeholder routes render ComingSoon', async ({ page }) => {
 test('unknown paths redirect to /', async ({ page }) => {
   await page.goto('/definitely-not-a-route')
   await expect(page).toHaveURL('/')
-  await expect(page.getByText('Riverside picnic')).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Features' })).toBeVisible()
 })

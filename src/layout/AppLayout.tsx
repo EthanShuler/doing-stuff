@@ -7,30 +7,7 @@ import { ACCENT, colors, fonts, radii, text } from '../theme'
 import { supabase } from '../lib/supabase'
 import { Splash } from '../components/Splash'
 import { ErrorBoundary } from '../components/ErrorBoundary'
-
-/** Top-level features behind the shell nav — one entry per feature, not one
- *  per route. Doing Stuff spans four routes, Tier Lists four boards, and Lists
- *  three built-ins plus the space's own (an in-page picker chooses between
- *  them, see PickerRow); a match also claims
- *  its sub-paths (so /recipes/:id lights up Recipes, and every /lists/* route
- *  lights up Lists — '/' is exempt or it
- *  would claim everything). The unbuilt placeholder routes (/french-toast,
- *  /board-games, /cats) still exist in App.tsx but are off the nav. */
-const FEATURES = [
-  { label: 'Doing Stuff', path: '/', matches: ['/', '/wishlist', '/map', '/calendar'] },
-  { label: 'Tier Lists', path: '/movies', matches: ['/movies', '/tv', '/books', '/tiers'] },
-  { label: 'Lists', path: '/lists/movies', matches: ['/lists'] },
-  { label: 'Seasons', path: '/seasons', matches: ['/seasons'] },
-  { label: 'Parks', path: '/parks', matches: ['/parks'] },
-  { label: 'Spoons', path: '/spoons', matches: ['/spoons'] },
-  { label: 'Little Guys', path: '/little-guys', matches: ['/little-guys'] },
-  { label: 'Alignment', path: '/alignment', matches: ['/alignment'] },
-  { label: 'Recipes', path: '/recipes', matches: ['/recipes'] },
-  { label: 'Music Practice', path: '/music-practice', matches: ['/music-practice'] },
-]
-
-const isActive = (matches: string[], pathname: string) =>
-  matches.some((m) => m === pathname || (m !== '/' && pathname.startsWith(`${m}/`)))
+import { FEATURES, isActive } from './features'
 
 /** The persistent chrome: header with the site name, feature nav, and sign-out.
  *  The ten nav items need ~950px, plus the brand and, live, Sign out — past

@@ -5,6 +5,7 @@ import type { Screen, TierKind } from './types'
 import { useSession } from './data/useSession'
 import { useSpace } from './data/useSpace'
 import { AppLayout } from './layout/AppLayout'
+import { HomePage } from './layout/HomePage'
 import { AuthScreen } from './components/AuthScreen'
 import { ComingSoon } from './components/ComingSoon'
 import { Splash } from './components/Splash'
@@ -102,7 +103,9 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
     <BrowserRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={doingStuff('log')} />
+          {/* The hub: one tile per feature. Static and tiny, so not lazy. */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/log" element={doingStuff('log')} />
           <Route path="/wishlist" element={doingStuff('wishlist')} />
           <Route path="/map" element={doingStuff('map')} />
           <Route path="/calendar" element={doingStuff('calendar')} />
