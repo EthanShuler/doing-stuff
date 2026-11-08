@@ -78,27 +78,31 @@ test('the grocery step starts staples unticked and remembers what it added', asy
   await expect(modal.getByText('Sun dinner · Weeknight shakshuka')).toBeVisible()
   await expect(modal.getByText('Wed dinner · Cacio e pepe')).toBeVisible()
 
-  // Seed staples: salt, black pepper, olive oil.
-  await expect(modal.getByRole('checkbox', { name: '5 eggs' })).toBeChecked()
+  // Shakshuka has a grocery list (cumin + paprika flagged staples on the
+  // recipe); cacio e pepe has none, so its ingredient lines are used, with
+  // the seed pantry staples (salt, black pepper, olive oil) unticked.
+  await expect(modal.getByRole('checkbox', { name: 'eggs', exact: true })).toBeChecked()
+  await expect(modal.getByRole('checkbox', { name: 'cumin' })).not.toBeChecked()
+  await expect(modal.getByRole('checkbox', { name: 'paprika' })).not.toBeChecked()
   await expect(modal.getByRole('checkbox', { name: 'salt for the pasta water' })).not.toBeChecked()
   await expect(modal.getByRole('checkbox', { name: '2 tsp black pepper, coarsely ground' })).not.toBeChecked()
 
-  // A new staple unticks the lines it matches.
-  await modal.getByRole('combobox', { name: 'Pantry staples' }).fill('cumin')
+  // A new pantry staple unticks the lines it matches.
+  await modal.getByRole('combobox', { name: 'Pantry staples' }).fill('garlic')
   await modal.getByRole('combobox', { name: 'Pantry staples' }).press('Enter')
-  await expect(modal.getByRole('checkbox', { name: '1 tsp cumin' })).not.toBeChecked()
+  await expect(modal.getByRole('checkbox', { name: 'garlic' })).not.toBeChecked()
 
-  await modal.getByRole('checkbox', { name: '5 eggs' }).uncheck()
+  await modal.getByRole('checkbox', { name: 'eggs', exact: true }).uncheck()
   await modal.getByLabel('Extra items').fill('Paper towels\nCoffee')
-  // Shakshuka 8 lines − cumin − eggs = 6, cacio 4 − pepper − salt = 2, + 2 extras.
-  await modal.getByRole('button', { name: 'Add 10 to Groceries' }).click()
-  await expect(page.getByText('Added 10 items to the Groceries list.')).toBeVisible()
+  // Shakshuka 9 items − cumin − paprika − garlic − eggs = 5, cacio 4 − pepper − salt = 2, + 2 extras.
+  await modal.getByRole('button', { name: 'Add 9 to Groceries' }).click()
+  await expect(page.getByText('Added 9 items to the Groceries list.')).toBeVisible()
   await page.getByRole('button', { name: 'Done' }).click()
 
   // Re-running: what was added starts unticked and says so.
   await page.getByRole('button', { name: '🛒 Plan groceries' }).click()
-  await expect(modal.getByRole('checkbox', { name: '1 onion, sliced' })).not.toBeChecked()
+  await expect(modal.getByRole('checkbox', { name: 'onion', exact: true })).not.toBeChecked()
   await expect(modal.getByText('already added').first()).toBeVisible()
-  await expect(modal.getByRole('checkbox', { name: '5 eggs' })).toBeChecked()
+  await expect(modal.getByRole('checkbox', { name: 'eggs', exact: true })).toBeChecked()
   await expect(modal.getByRole('button', { name: 'Add 1 to Groceries' })).toBeVisible()
 })

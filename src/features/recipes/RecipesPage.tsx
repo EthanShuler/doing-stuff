@@ -37,6 +37,8 @@ const emptyDraft = (): RecipeDraft => ({
   servings: '',
   totalTime: '',
   notes: '',
+  groceryList: '',
+  stapleItems: [],
 })
 
 /** The shared cookbook. /recipes (the index: grid/list toggle, search, tag
@@ -107,6 +109,8 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
       servings: recipe.servings,
       totalTime: recipe.totalTime,
       notes: recipe.notes,
+      groceryList: recipe.groceryList,
+      stapleItems: recipe.stapleItems,
     })
     setModalOpen(true)
   }

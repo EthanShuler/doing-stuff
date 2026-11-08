@@ -89,3 +89,31 @@ test('an unknown recipe id shows the not-found state', async ({ page }) => {
   await page.getByRole('button', { name: '← All recipes' }).click()
   await expect(page.getByText('Cacio e pepe')).toBeVisible()
 })
+
+test('the grocery list lives only in the edit modal, with tap-to-flag staples', async ({ page }) => {
+  await page.goto('/recipes/r3')
+  await expect(page.getByText('Weeknight shakshuka')).toBeVisible()
+  // Not on the recipe page itself.
+  await expect(page.getByText('Grocery list')).toHaveCount(0)
+  await expect(page.getByText('crushed tomatoes (28 oz can)')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Edit recipe' }).click()
+  await expect(page.getByLabel('Grocery list')).toHaveValue(/crushed tomatoes \(28 oz can\)/)
+  const cumin = page.getByRole('button', { name: '★ cumin · staple' })
+  await expect(cumin).toHaveAttribute('aria-pressed', 'true')
+
+  // Flag feta, unflag cumin, save, and reopen: the flags stuck.
+  await page.getByRole('button', { name: '☆ feta' }).click()
+  await cumin.click()
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await page.getByRole('button', { name: 'Edit recipe' }).click()
+  await expect(page.getByRole('button', { name: '★ feta · staple' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '☆ cumin' })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+
+  // A recipe with no list offers to start one from its ingredients.
+  await page.goto('/recipes/r2')
+  await page.getByRole('button', { name: 'Edit recipe' }).click()
+  await page.getByRole('button', { name: 'Start from the ingredients' }).click()
+  await expect(page.getByLabel('Grocery list')).toHaveValue(/^8 oz wide egg noodles\n3 eggs/)
+})

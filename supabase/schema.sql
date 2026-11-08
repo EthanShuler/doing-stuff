@@ -517,6 +517,13 @@ create table if not exists public.recipes (
   -- set_recipe_mark() below; an edit remaps them client-side.
   crossed_ingredients int[] not null default '{}',
   done_steps          int[] not null default '{}',
+  -- The shopping-list version of the ingredients: one item per line, no prep
+  -- ("onion", not "1 onion, diced"). '' = none — the meal plan's grocery step
+  -- then falls back to the ingredient lines. Shown only in the edit modal.
+  grocery_list text not null default '',
+  -- Which grocery_list lines (by text) are pantry staples: the grocery step
+  -- starts them unticked.
+  staple_items text[] not null default '{}',
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );

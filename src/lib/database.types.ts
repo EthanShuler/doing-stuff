@@ -607,6 +607,7 @@ export type Database = {
           created_by: string | null
           crossed_ingredients: number[]
           done_steps: number[]
+          grocery_list: string
           id: string
           image_url: string
           ingredients: string
@@ -615,6 +616,7 @@ export type Database = {
           source: string
           source_url: string
           space_id: string
+          staple_items: string[]
           steps: string
           tags: string[]
           title: string
@@ -625,6 +627,7 @@ export type Database = {
           created_by?: string | null
           crossed_ingredients?: number[]
           done_steps?: number[]
+          grocery_list?: string
           id?: string
           image_url?: string
           ingredients?: string
@@ -633,6 +636,7 @@ export type Database = {
           source?: string
           source_url?: string
           space_id: string
+          staple_items?: string[]
           steps?: string
           tags?: string[]
           title: string
@@ -643,6 +647,7 @@ export type Database = {
           created_by?: string | null
           crossed_ingredients?: number[]
           done_steps?: number[]
+          grocery_list?: string
           id?: string
           image_url?: string
           ingredients?: string
@@ -651,6 +656,7 @@ export type Database = {
           source?: string
           source_url?: string
           space_id?: string
+          staple_items?: string[]
           steps?: string
           tags?: string[]
           title?: string

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, FileButton, Flex, Group, TagsInput, Textarea, TextInput, UnstyledButton } from '@mantine/core'
+import { Box, Button, FileButton, Flex, Group, TagsInput, Text, Textarea, TextInput, UnstyledButton } from '@mantine/core'
 import { colors, fonts, radii, text } from '../../theme'
 import { ModalFooter } from '../../components/ModalFooter'
 import { ModalShell } from '../../components/ModalShell'
 import type { RecipeDraft } from './useRecipeStore'
 import { RecipePhoto } from './RecipeGrid'
+import { groceryLines, ingredientLines, isStapleItem, toggleStapleItem } from './derive'
 
 /** Add/edit a recipe. Only the title gates saving — everything else is
  *  optional, so a half-remembered recipe can be captured and finished later. */
@@ -138,6 +139,12 @@ export function RecipeModal({
         mt={14}
         mb={18}
       />
+      <GroceryListField
+        groceryList={draft.groceryList}
+        stapleItems={draft.stapleItems}
+        ingredients={draft.ingredients}
+        onChange={onChange}
+      />
       <Textarea
         label="Steps"
         value={draft.steps}
@@ -184,5 +191,82 @@ export function RecipeModal({
         deleteLabel="Delete recipe"
       />
     </ModalShell>
+  )
+}
+
+/**
+ * The recipe's shopping-list version of its ingredients — only ever shown
+ * here, never on the recipe page. One item per line in a textarea (paste-
+ * friendly), then a chip per line to flag pantry staples: a flagged chip is
+ * a filled ★ with the word "staple", an unflagged one a hollow ☆ — shape and
+ * words, never color alone.
+ */
+function GroceryListField({
+  groceryList,
+  stapleItems,
+  ingredients,
+  onChange,
+}: {
+  groceryList: string
+  stapleItems: string[]
+  ingredients: string
+  onChange: (patch: Partial<RecipeDraft>) => void
+}) {
+  const lines = [...new Set(groceryLines(groceryList))]
+  const canStart = lines.length === 0 && ingredientLines(ingredients).length > 0
+  return (
+    <Box mb={18}>
+      <Textarea
+        label="Grocery list"
+        description="The ingredients as they go on a shopping list — one per line, no prep (“onion”, not “1 onion, diced”). The meal plan uses this instead of the ingredients."
+        value={groceryList}
+        onChange={(e) => onChange({ groceryList: e.currentTarget.value })}
+        placeholder={'onion\ncanned crushed tomatoes\neggs'}
+        autosize
+        minRows={3}
+        maxRows={12}
+      />
+      {canStart && (
+        <UnstyledButton
+          onClick={() => onChange({ groceryList: ingredientLines(ingredients).join('\n') })}
+          mt={6}
+          style={{ fontFamily: fonts.sans, fontSize: text.caption, fontWeight: 600, color: colors.muted }}
+        >
+          Start from the ingredients
+        </UnstyledButton>
+      )}
+      {lines.length > 0 && (
+        <>
+          <Text fz={text.caption} c={colors.muted} mt={10} mb={6}>
+            Tap the pantry staples — they start unticked when planning groceries.
+          </Text>
+          <Group gap={6}>
+            {lines.map((line) => {
+              const staple = isStapleItem(line, stapleItems)
+              return (
+                <UnstyledButton
+                  key={line}
+                  onClick={() => onChange({ stapleItems: toggleStapleItem(stapleItems, line) })}
+                  aria-pressed={staple}
+                  title={staple ? 'Staple — tap to unflag' : 'Tap to flag as a staple'}
+                  style={{
+                    fontFamily: fonts.sans,
+                    fontSize: text.caption,
+                    fontWeight: staple ? 700 : 500,
+                    padding: '4px 10px',
+                    borderRadius: 20,
+                    background: staple ? colors.surface : colors.chip,
+                    color: staple ? colors.ink : colors.inkFaded,
+                    border: staple ? `1.5px solid ${colors.ink}` : `1px dashed ${colors.borderFaint}`,
+                  }}
+                >
+                  {staple ? `★ ${line} · staple` : `☆ ${line}`}
+                </UnstyledButton>
+              )
+            })}
+          </Group>
+        </>
+      )}
+    </Box>
   )
 }

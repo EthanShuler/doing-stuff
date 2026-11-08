@@ -108,3 +108,26 @@ export function remapMarks(oldLines: string[], newLines: string[], marks: number
   }
   return remapped.sort((a, b) => a - b)
 }
+
+/** The grocery list is one item per line, like the ingredients. */
+export const groceryLines = ingredientLines
+
+/** Is `line` flagged as a staple? Matched by text, ignoring case and the
+ *  ends' whitespace — so retyping "Salt" as "salt" keeps its flag. */
+export function isStapleItem(line: string, stapleItems: string[]): boolean {
+  const key = line.trim().toLowerCase()
+  return stapleItems.some((item) => item.trim().toLowerCase() === key)
+}
+
+/** Flip one line's staple flag. */
+export function toggleStapleItem(stapleItems: string[], line: string): string[] {
+  return isStapleItem(line, stapleItems)
+    ? stapleItems.filter((item) => item.trim().toLowerCase() !== line.trim().toLowerCase())
+    : [...stapleItems, line.trim()]
+}
+
+/** The staple flags worth saving: those whose line is still on the list,
+ *  spelled as the list now spells it, without repeats. */
+export function keptStaples(lines: string[], stapleItems: string[]): string[] {
+  return [...new Set(lines.filter((line) => isStapleItem(line, stapleItems)))]
+}

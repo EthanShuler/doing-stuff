@@ -377,7 +377,11 @@ newlines survive inside a step — parsing lives in the recipes feature's
 `derive.ts`), a **source** (free text + optional URL, shown as the attribution
 line), free-text **tags** (`text[]`, tri-state include/exclude filter pills
 like the tier boards), plain-text **servings** and **total time** (display
-only, no scaling math), **notes**, and ONE hero **photo** uploaded to the
+only, no scaling math), **notes**, a **grocery list** (`grocery_list` — the
+ingredients as they go on a shopping list, one per line with no prep, plus
+`staple_items text[]` naming the lines, by text, flagged as pantry staples;
+**shown only in the edit modal**, never on the recipe page — its staples are
+tap-to-flag ★/☆ chips, shape + words; helpers in the recipes `derive.ts`), and ONE hero **photo** uploaded to the
 public `recipes` Storage bucket (same design as spoons; shared helpers in
 `src/lib/photos.ts`). The index (`/recipes`) is A–Z (no sort control) with
 fuzzy title search (`src/lib/fuzzy.ts`, shared with the Log dashboard) and a
@@ -424,8 +428,9 @@ rows (past days faded, today labeled "today"), each with a Lunch and a Dinner
 line. Tapping a meal opens `DayPopover`: a searchable recipe Select, a
 "Something else" text field, leftovers chips ("Shakshuka (Sun dinner)"),
 Clear. A recipe meal gets a ↗ to `/recipes/:id`. **🛒 Plan groceries** opens
-`GroceryModal`: each recipe meal's ingredient lines as checkboxes, **ticked by default except
-staples and already-sent lines** (each untick reason shown as a word tag),
+`GroceryModal`: each recipe meal's lines as checkboxes — its **grocery list** when
+written, else its ingredient lines (`recipeGroceryLines`) — **ticked by default except
+staples (flagged on the recipe, or matching a pantry staple) and already-sent lines** (each untick reason shown as a word tag),
 an "Extra items" textarea (one per line), and the staples editor (a new staple
 unticks its matches). Sending writes **into the Lists feature**: the space's
 free-form list named **"Groceries"** (any case, oldest wins —
