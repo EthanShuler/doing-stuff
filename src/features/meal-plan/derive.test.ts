@@ -9,6 +9,7 @@ import {
   groceryGroups,
   isStaple,
   leftoverSources,
+  recipeGroceryLines,
   compareSlots,
   mealLabel,
   plannedCount,
@@ -32,6 +33,8 @@ const recipe = (id: string, title: string, ingredients = ''): Recipe => ({
   notes: '',
   crossedIngredients: [],
   doneSteps: [],
+  groceryList: '',
+  stapleItems: [],
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
 })
@@ -198,5 +201,26 @@ describe('grocery helpers', () => {
     ]
     expect(findGroceriesList(lists)?.id).toBe('a')
     expect(findGroceriesList(lists.slice(0, 1))).toBeNull()
+  })
+})
+
+describe('recipe grocery lines', () => {
+  const pantry = [{ id: 's', name: 'olive oil' }]
+
+  it('uses the grocery list when written, staple by flag or pantry match', () => {
+    const r = { ...recipe('r', 'Shakshuka', '1 onion, diced\n2 tbsp olive oil'), groceryList: 'onion\n\ncumin\nolive oil', stapleItems: ['Cumin'] }
+    expect(recipeGroceryLines(r, pantry)).toEqual([
+      { text: 'onion', staple: false },
+      { text: 'cumin', staple: true },
+      { text: 'olive oil', staple: true },
+    ])
+  })
+
+  it('falls back to the ingredient lines when the list is blank', () => {
+    const r = { ...recipe('r', 'Shakshuka', '1 onion, diced\n2 tbsp olive oil'), stapleItems: ['1 onion, diced'] }
+    expect(recipeGroceryLines(r, pantry)).toEqual([
+      { text: '1 onion, diced', staple: false },
+      { text: '2 tbsp olive oil', staple: true },
+    ])
   })
 })

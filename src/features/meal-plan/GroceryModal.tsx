@@ -9,7 +9,8 @@ import type { GroceryGroup } from './derive'
 import type { GrocerySend } from './useMealPlanStore'
 
 /**
- * The grocery step: every recipe day's ingredient lines as a checklist —
+ * The grocery step: every recipe day's grocery lines (its grocery list, else
+ * its ingredients — see recipeGroceryLines) as a checklist —
  * checked by default, except pantry staples and lines this week already sent
  * — plus free-text extras, all added to the space's "Groceries" list.
  *
@@ -134,7 +135,7 @@ export function GroceryModal({
               </Text>
               {group.lines.length === 0 ? (
                 <Text fz={text.caption} c={colors.faint} style={{ fontStyle: 'italic' }}>
-                  No ingredients written out for this recipe.
+                  No grocery list or ingredients written out for this recipe.
                 </Text>
               ) : (
                 <Box
@@ -182,7 +183,7 @@ export function GroceryModal({
 
       <TagsInput
         label="Pantry staples"
-        description="Ingredients that mention these start unticked."
+        description="Items that mention these start unticked, along with each recipe’s own flagged staples."
         placeholder="Add a staple, press Enter"
         value={staples.map((s) => s.name)}
         onChange={changeStaples}

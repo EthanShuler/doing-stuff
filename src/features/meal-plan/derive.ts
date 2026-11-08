@@ -1,6 +1,6 @@
 import type { GroceryStaple, Meal, MealPlanDay, Recipe } from '../../types'
 import { formatDate, isoDate } from '../../lib/format'
-import { ingredientLines } from '../recipes/derive'
+import { groceryLines, ingredientLines, isStapleItem } from '../recipes/derive'
 
 // Pure data-shaping for the meal plan: week math, day labels, the leftovers
 // picker, and the grocery step's per-recipe ingredient checklist. No React in
@@ -118,11 +118,26 @@ export function isStaple(line: string, staples: GroceryStaple[]): boolean {
   })
 }
 
+/** What a recipe puts on the grocery checklist: its grocery list when one is
+ *  written (each line a staple if the recipe flags it OR it mentions a pantry
+ *  staple), otherwise its ingredient lines (staple by pantry match alone). */
+export function recipeGroceryLines(
+  recipe: Recipe,
+  staples: GroceryStaple[],
+): { text: string; staple: boolean }[] {
+  const list = groceryLines(recipe.groceryList)
+  if (list.length > 0) {
+    return list.map((text) => ({ text, staple: isStapleItem(text, recipe.stapleItems) || isStaple(text, staples) }))
+  }
+  return ingredientLines(recipe.ingredients).map((text) => ({ text, staple: isStaple(text, staples) }))
+}
+
 export interface GroceryLine {
   /** Stable within the step: `${dayId}:${index}`. */
   key: string
   text: string
-  /** Mentions a pantry staple → starts unchecked. */
+  /** Flagged a staple on the recipe, or mentions a pantry staple → starts
+   *  unchecked. */
   staple: boolean
   /** Already sent to the Groceries list from this day → starts unchecked. */
   sent: boolean
@@ -135,8 +150,8 @@ export interface GroceryGroup {
 }
 
 /** The grocery step's checklist: one group per recipe meal of the week, in
- *  slot order (lunch before dinner), each with its recipe's ingredient
- *  lines. Leftovers and free-text meals add nothing. */
+ *  slot order (lunch before dinner), each with its recipe's grocery lines
+ *  (`recipeGroceryLines`). Leftovers and free-text meals add nothing. */
 export function groceryGroups(
   days: MealPlanDay[],
   week: string[],
@@ -153,10 +168,10 @@ export function groceryGroups(
     groups.push({
       day,
       recipe,
-      lines: ingredientLines(recipe.ingredients).map((text, index) => ({
+      lines: recipeGroceryLines(recipe, staples).map(({ text, staple }, index) => ({
         key: `${day.id}:${index}`,
         text,
-        staple: isStaple(text, staples),
+        staple,
         sent: sent.has(text),
       })),
     })

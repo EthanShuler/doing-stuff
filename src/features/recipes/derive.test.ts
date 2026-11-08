@@ -4,11 +4,14 @@ import {
   distinctRecipeTags,
   filterRecipes,
   ingredientLines,
+  isStapleItem,
+  keptStaples,
   remapMarks,
   servingsTimeLine,
   sortRecipes,
   sourceHref,
   stepBlocks,
+  toggleStapleItem,
   withMark,
 } from './derive'
 
@@ -26,6 +29,8 @@ const recipe = (overrides: Partial<Recipe>): Recipe => ({
   notes: '',
   crossedIngredients: [],
   doneSteps: [],
+  groceryList: '',
+  stapleItems: [],
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
   ...overrides,
@@ -186,5 +191,22 @@ describe('remapMarks', () => {
 
   it('ignores out-of-range marks', () => {
     expect(remapMarks(['a'], ['a'], [0, 5])).toEqual([0])
+  })
+})
+
+describe('grocery list staples', () => {
+  it('matches staple flags by text, ignoring case and whitespace', () => {
+    expect(isStapleItem(' Salt ', ['salt'])).toBe(true)
+    expect(isStapleItem('salted butter', ['salt'])).toBe(false)
+  })
+
+  it('toggles a flag on and off', () => {
+    expect(toggleStapleItem(['salt'], 'olive oil')).toEqual(['salt', 'olive oil'])
+    expect(toggleStapleItem(['salt', 'olive oil'], 'Salt')).toEqual(['olive oil'])
+  })
+
+  it('keeps only flags whose line survives, spelled as the list spells it', () => {
+    expect(keptStaples(['Salt', 'onion', 'salt'], ['salt', 'cumin'])).toEqual(['Salt', 'salt'])
+    expect(keptStaples(['onion'], ['salt'])).toEqual([])
   })
 })

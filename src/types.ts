@@ -320,6 +320,13 @@ export interface Recipe {
   crossedIngredients: number[]
   /** Indices into stepBlocks() that are done. Shared like crossedIngredients. */
   doneSteps: number[]
+  /** The shopping-list version of the ingredients, one item per line with no
+   *  prep ("onion"). '' = none — the meal plan falls back to the ingredient
+   *  lines. Edited (and shown) only in the recipe modal. */
+  groceryList: string
+  /** groceryList lines (by text) flagged as pantry staples — the grocery step
+   *  starts them unticked. */
+  stapleItems: string[]
   /** auth.users id of the member who added it (shown as a faint byline). */
   createdBy: string | null
   /** ISO timestamp; the byline's "added" date and the A–Z tiebreak. */

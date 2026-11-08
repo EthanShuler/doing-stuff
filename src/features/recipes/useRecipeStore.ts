@@ -6,7 +6,7 @@ import { PROFILE_COLUMNS, SEED_PROFILES, removeById, toProfile, upsertById, useS
 import { usePhotoRows } from '../../data/usePhotoRows'
 import type { ProfileRow } from '../../data/spaceSync'
 import { removeRecipePhoto, uploadRecipePhoto } from './photos'
-import { ingredientLines, remapMarks, stepBlocks, withMark } from './derive'
+import { groceryLines, ingredientLines, keptStaples, remapMarks, stepBlocks, withMark } from './derive'
 
 // Data seam for the shared cookbook, mirroring the other stores' two modes:
 //   • Supabase keys present → live: reads/writes the `recipes` table scoped to
@@ -47,6 +47,9 @@ function seed(): Snapshot {
         notes: 'Grate the cheese fine or it clumps — learned the hard way.',
         crossedIngredients: [],
         doneSteps: [],
+        // No grocery list: the meal plan falls back to the ingredient lines.
+        groceryList: '',
+        stapleItems: [],
         createdBy: 'u1',
         createdAt: '2026-05-10T09:00:00Z',
       },
@@ -65,6 +68,8 @@ function seed(): Snapshot {
         notes: '',
         crossedIngredients: [],
         doneSteps: [],
+        groceryList: '',
+        stapleItems: [],
         createdBy: 'u2',
         createdAt: '2026-04-02T09:00:00Z',
       },
@@ -83,6 +88,8 @@ function seed(): Snapshot {
         notes: 'Double the garlic. Always double the garlic.',
         crossedIngredients: [],
         doneSteps: [],
+        groceryList: 'onion\nred pepper\ngarlic\ncumin\npaprika\ncrushed tomatoes (28 oz can)\neggs\nfeta\ncilantro',
+        stapleItems: ['cumin', 'paprika'],
         createdBy: 'u1',
         createdAt: '2026-06-18T09:00:00Z',
       },
@@ -101,6 +108,8 @@ function seed(): Snapshot {
         notes: '',
         crossedIngredients: [],
         doneSteps: [],
+        groceryList: '',
+        stapleItems: [],
         createdBy: 'u2',
         createdAt: '2026-03-22T09:00:00Z',
       },
@@ -124,6 +133,8 @@ type RecipeRow = {
   notes: string | null
   crossed_ingredients: number[] | null
   done_steps: number[] | null
+  grocery_list: string | null
+  staple_items: string[] | null
   created_by: string | null
   created_at: string
 }
@@ -142,6 +153,8 @@ const toRecipe = (r: RecipeRow): Recipe => ({
   notes: r.notes ?? '',
   crossedIngredients: r.crossed_ingredients ?? [],
   doneSteps: r.done_steps ?? [],
+  groceryList: r.grocery_list ?? '',
+  stapleItems: r.staple_items ?? [],
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -161,6 +174,8 @@ const FIELD_OF_COLUMN: Record<Exclude<keyof RecipeRow, 'id'>, Exclude<keyof Reci
   notes: 'notes',
   crossed_ingredients: 'crossedIngredients',
   done_steps: 'doneSteps',
+  grocery_list: 'groceryList',
+  staple_items: 'stapleItems',
   created_by: 'createdBy',
   created_at: 'createdAt',
 }
@@ -175,7 +190,7 @@ function omittedKept(row: Partial<RecipeRow>, mapped: Recipe, held: Recipe): Rec
 }
 
 const RECIPE_COLUMNS =
-  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,created_by,created_at'
+  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,grocery_list,staple_items,created_by,created_at'
 
 /** The fields the add/edit modal writes. All plain strings except tags. */
 export interface RecipeDraft {
@@ -189,6 +204,8 @@ export interface RecipeDraft {
   servings: string
   totalTime: string
   notes: string
+  groceryList: string
+  stapleItems: string[]
 }
 
 export interface RecipeStore {
@@ -233,6 +250,9 @@ const draftFields = (draft: RecipeDraft) => ({
   servings: draft.servings.trim(),
   totalTime: draft.totalTime.trim(),
   notes: draft.notes.trim(),
+  groceryList: groceryLines(draft.groceryList).join('\n'),
+  // Only flags for lines still on the list survive the save.
+  stapleItems: keptStaples(groceryLines(draft.groceryList), draft.stapleItems),
 })
 
 /** Cleaned-up draft → `recipes` columns (insert and update write the same set). */
@@ -250,6 +270,8 @@ const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields) => (
   servings: fields.servings,
   total_time: fields.totalTime,
   notes: fields.notes,
+  grocery_list: fields.groceryList,
+  staple_items: fields.stapleItems,
   ...(fields.crossedIngredients && { crossed_ingredients: fields.crossedIngredients }),
   ...(fields.doneSteps && { done_steps: fields.doneSteps }),
 })
