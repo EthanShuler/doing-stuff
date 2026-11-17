@@ -2,8 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { ParkVisit } from '../../types'
 import { PARKS, PARK_REGIONS, parkByCode } from './parks'
 import {
+  EVERYONE,
   MEMBER_COLORS,
   buildMembers,
+  filterGroupParks,
+  groupParkKeys,
+  groupStatusLine,
+  groupVisited,
+  isGroupSpace,
+  visitorNames,
   filterParks,
   groupByRegion,
   memberColor,
@@ -12,7 +19,8 @@ import {
   parkStatuses,
   sortVisits,
 } from './derive'
-import { pinVariant, separateVariant, togetherVariant } from './StatusDot'
+import { ACCENT_BLUE } from '../../theme'
+import { groupVariant, pinVariant, separateVariant, togetherVariant } from './StatusDot'
 
 const MEMBERS = ['u1', 'u2']
 
@@ -222,5 +230,72 @@ describe('pins and members', () => {
     expect(pinVariant('together', members)).toEqual(togetherVariant(members))
     expect(togetherVariant(members)).toEqual({ kind: 'ring', outer: MEMBER_COLORS[0], inner: MEMBER_COLORS[1] })
     expect(separateVariant(members)).toEqual({ kind: 'split', left: MEMBER_COLORS[0], right: MEMBER_COLORS[1] })
+  })
+})
+
+describe('group mode (three or more members)', () => {
+  const GROUP = ['u1', 'u2', 'u3']
+  const members = buildMembers(GROUP, [
+    { id: 'u1', email: null, displayName: 'Avery' },
+    { id: 'u2', email: null, displayName: 'Jordan' },
+    { id: 'u3', email: null, displayName: 'Sam' },
+  ])
+  const statuses = parkStatuses(
+    [
+      // Logged in a different order than join order — names still follow it.
+      visit({ id: 'a', parkCode: 'yose', attendeeIds: ['u3', 'u1'] }),
+      visit({ id: 'b', parkCode: 'zion', attendeeIds: ['u2'] }),
+      // Only a former member went: unvisited for everyone still here.
+      visit({ id: 'c', parkCode: 'acad', attendeeIds: ['ghost'] }),
+    ],
+    GROUP,
+  )
+
+  it('starts at three members', () => {
+    expect(isGroupSpace([])).toBe(false)
+    expect(isGroupSpace(['u1'])).toBe(false)
+    expect(isGroupSpace(['u1', 'u2'])).toBe(false)
+    expect(isGroupSpace(GROUP)).toBe(true)
+  })
+
+  it('reads visited as anyone for Everyone, and that person for a member', () => {
+    expect(groupVisited(statuses.get('yose'), EVERYONE)).toBe(true)
+    expect(groupVisited(statuses.get('zion'), EVERYONE)).toBe(true)
+    expect(groupVisited(statuses.get('acad'), EVERYONE)).toBe(false)
+    expect(groupVisited(statuses.get('arch'), EVERYONE)).toBe(false)
+    expect(groupVisited(statuses.get('yose'), 'u1')).toBe(true)
+    expect(groupVisited(statuses.get('yose'), 'u2')).toBe(false)
+    expect(groupVisited(statuses.get('zion'), 'u2')).toBe(true)
+    expect(groupVisited(undefined, 'u3')).toBe(false)
+  })
+
+  it('keys each park visited or unvisited for the viewer', () => {
+    expect(groupParkKeys(statuses.get('yose'), EVERYONE)).toEqual(['visited'])
+    expect(groupParkKeys(statuses.get('yose'), 'u2')).toEqual(['unvisited'])
+    expect(groupParkKeys(undefined, EVERYONE)).toEqual(['unvisited'])
+  })
+
+  it('filters by the viewer, tri-state', () => {
+    const codes = (viewer: string, filter: Record<string, 'include' | 'exclude'>) =>
+      filterGroupParks(PARKS, statuses, viewer, filter).map((p) => p.code).sort()
+    expect(codes(EVERYONE, {})).toHaveLength(63)
+    expect(codes(EVERYONE, { visited: 'include' })).toEqual(['yose', 'zion'])
+    expect(codes('u3', { visited: 'include' })).toEqual(['yose'])
+    expect(codes('u2', { visited: 'include' })).toEqual(['zion'])
+    expect(codes('u2', { unvisited: 'include' })).toHaveLength(62)
+    expect(codes('u1', { visited: 'exclude' })).toHaveLength(62)
+  })
+
+  it('names everyone who has been, in join order, whoever is viewing', () => {
+    expect(visitorNames(statuses.get('yose'), members)).toEqual(['Avery', 'Sam'])
+    expect(visitorNames(statuses.get('acad'), members)).toEqual([])
+    expect(visitorNames(undefined, members)).toEqual([])
+    expect(groupStatusLine(statuses.get('yose'), members)).toBe('Visited by Avery, Sam')
+    expect(groupStatusLine(statuses.get('arch'), members)).toBe('Not visited yet')
+  })
+
+  it('draws two states only: solid blue or faint', () => {
+    expect(groupVariant(true)).toEqual({ kind: 'solid', color: ACCENT_BLUE })
+    expect(groupVariant(false)).toEqual({ kind: 'faint' })
   })
 })

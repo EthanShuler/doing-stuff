@@ -1,5 +1,5 @@
 import { Box } from '@mantine/core'
-import { colors } from '../../theme'
+import { ACCENT_BLUE, colors } from '../../theme'
 import type { Member, ParkPin } from './derive'
 import { memberColor } from './derive'
 
@@ -34,6 +34,12 @@ export const separateVariant = (members: Member[]): DotVariant => ({
   left: members[0]?.color ?? colors.faint,
   right: members[1]?.color ?? colors.faint,
 })
+
+/** Group mode (3+ members) has two states only, reusing the variants above:
+ *  visited = the full-size solid blue dot, not yet = the small faint one —
+ *  size and opacity differ as well as hue. No ring, split or member colors. */
+export const groupVariant = (visited: boolean): DotVariant =>
+  visited ? { kind: 'solid', color: ACCENT_BLUE } : { kind: 'faint' }
 
 export function StatusDot({
   variant,

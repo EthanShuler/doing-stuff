@@ -1,5 +1,5 @@
 import { SEED_PROFILES } from '../../data/spaceSync'
-import { SEED_MEMBERS, SEED_SPACES } from '../../data/seedSpaces'
+import { SEED_FRIEND_PROFILE, SEED_MEMBERS, SEED_SPACES } from '../../data/seedSpaces'
 import type { AdminSpace, AdminUser } from './derive'
 
 // Keyless seed mode's admin data. Module-level and edited in place, like
@@ -12,7 +12,8 @@ type SeedAccount = Omit<AdminUser, 'spaceIds'>
 const [avery, jordan] = SEED_PROFILES
 
 /** The feature seeds' two members, plus one account that's in no space and
- *  has never set a password (what a freshly created account looks like). */
+ *  has never set a password (what a freshly created account looks like), and
+ *  Friends' third member (who makes Parks a group there). */
 export const SEED_ACCOUNTS: SeedAccount[] = [
   {
     id: avery.id,
@@ -31,6 +32,14 @@ export const SEED_ACCOUNTS: SeedAccount[] = [
     isAdmin: false,
   },
   { id: 'u3', email: 'sam@example.com', displayName: 'Sam', lastSignInAt: null, hasPassword: false, isAdmin: false },
+  {
+    id: SEED_FRIEND_PROFILE.id,
+    email: SEED_FRIEND_PROFILE.email ?? 'riley@example.com',
+    displayName: SEED_FRIEND_PROFILE.displayName,
+    lastSignInAt: '2026-11-02T20:15:00Z',
+    hasPassword: true,
+    isAdmin: false,
+  },
 ]
 
 /** Fresh copies of the seed's users and spaces, shaped like the RPCs'. */

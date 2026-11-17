@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 // Keyless seed mode ships two spaces (src/data/seedSpaces.ts):
 // "Our city, together" (null = every feature) and "Friends" (Tier Lists,
-// Lists, Recipes, Seasons). The seed viewer is the admin.
+// Lists, Recipes, Parks, Seasons). The seed viewer is the admin.
 
 const accountMenu = (page: import('@playwright/test').Page) => page.getByRole('button', { name: 'Account menu' })
 
@@ -23,9 +23,9 @@ test('switching spaces swaps the nav and keeps the same feature', async ({ page 
   await expect(header.getByText('Spoons', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '+ Add recipe' })).toBeVisible()
 
-  // The hub lists only Friends' four features.
+  // The hub lists only Friends' five features.
   await header.getByText('cajubinile.com').click()
-  await expect(page.getByRole('navigation', { name: 'Features' }).getByRole('link')).toHaveCount(4)
+  await expect(page.getByRole('navigation', { name: 'Features' }).getByRole('link')).toHaveCount(5)
 })
 
 test('switching drops an id-bearing sub-path for the feature root', async ({ page }) => {
