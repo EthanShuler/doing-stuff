@@ -20,13 +20,18 @@ npx playwright test --project=desktop        # skip the mobile project
 The config (`playwright.config.ts`) launches Vite on **port 5199** with the
 Supabase keys blanked, so tests always run against **keyless seed mode** —
 deterministic data, no login, no real backend. It never reuses your normal
-:5173 dev server. Uses system Chrome (`channel: 'chrome'`) — no browser
-download.
+:5173 dev server. `E2E_PORT=5299 npm run test:e2e` moves it to another port,
+so two suites (e.g. agents in separate worktrees) can run side by side — each
+worktree with its own `npm ci`, never a shared `node_modules` (a shared Vite
+dep cache loaded two copies of React). Uses system Chrome
+(`channel: 'chrome'`) — no browser download.
 
 Spec map: `routes` (every route hard-loads), `navigation` (header nav, screen
 toggle, back button), `doing-stuff` (store survives screen switches, entry
-modal gating), `tier-list` (board derivation, You/Partner, per-person book
-reads, tag filter, watchlist), `mobile` (390×844 burger drawer). Shared
+modal gating), `tier-list` (board derivation, the member picker, per-person
+book reads, tag filter, watchlist), `spaces` (switching, feature gating),
+`admin`, `password`, `tier-pull`, `recipe-pull`, `mobile` (390×844 burger
+drawer). Shared
 Mantine helpers live in `e2e/helpers.ts` — use them instead of re-deriving
 selectors.
 
