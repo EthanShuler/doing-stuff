@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
+import { Button, Group, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
 import { colors } from '../../theme'
@@ -12,6 +12,7 @@ import { ControlBar } from '../../components/ControlBar'
 import { EmptyCard } from '../../components/EmptyCard'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
+import { PullButton } from '../../components/PullModal'
 import { Splash } from '../../components/Splash'
 import { useRecipeStore } from './useRecipeStore'
 import type { RecipeDraft } from './useRecipeStore'
@@ -20,6 +21,7 @@ import { RecipeGrid } from './RecipeGrid'
 import { RecipeList } from './RecipeList'
 import { RecipeDetail } from './RecipeDetail'
 import { RecipeModal } from './RecipeModal'
+import { RecipePullModal } from './RecipePullBody'
 import { removeRecipePhoto } from './photos'
 import { useMealPlanStore } from '../meal-plan/useMealPlanStore'
 import { MealPlanScreen } from '../meal-plan/MealPlanScreen'
@@ -82,6 +84,13 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
   )
 
   const [modalOpen, setModalOpen] = useState(false)
+  // "Pull from…": a fresh modal (new key) per opening, so it starts clean.
+  const [pullOpen, setPullOpen] = useState(false)
+  const [pullSession, setPullSession] = useState(0)
+  const openPull = () => {
+    setPullSession((n) => n + 1)
+    setPullOpen(true)
+  }
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<RecipeDraft>(emptyDraft)
 
@@ -183,6 +192,12 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
         top={store.error ? 116 : 68}
         onDismiss={mealPlan.clearError}
       />
+      <FloatingBanner
+        message={store.notice}
+        tone="notice"
+        top={68 + 48 * [store.error, mealPlan.error].filter(Boolean).length}
+        onDismiss={store.clearNotice}
+      />
 
       <PageFrame>
         {loadingData ? (
@@ -240,7 +255,12 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
                   />
                 </>
               }
-              right={<Button onClick={openAdd}>+ Add recipe</Button>}
+              right={
+                <Group gap={6} wrap="nowrap">
+                  <PullButton featureKey="recipes" onClick={openPull} />
+                  <Button onClick={openAdd}>+ Add recipe</Button>
+                </Group>
+              }
             />
 
             <TagFilterPills
@@ -282,6 +302,8 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
         onDelete={() => void deleteEditingRecipe()}
         onClose={requestClose}
       />
+
+      <RecipePullModal key={pullSession} opened={pullOpen} onClose={() => setPullOpen(false)} store={store} />
     </>
   )
 }

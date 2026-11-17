@@ -1,12 +1,14 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Recipe } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { PROFILE_COLUMNS, SEED_PROFILES, removeById, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { PROFILE_COLUMNS, SEED_PROFILES, errorMessage, removeById, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { usePhotoRows } from '../../data/usePhotoRows'
 import type { ProfileRow } from '../../data/spaceSync'
-import { removeRecipePhoto, uploadRecipePhoto } from './photos'
-import { groceryLines, ingredientLines, keptStaples, remapMarks, stepBlocks, withMark } from './derive'
+import { seedPullFetch } from '../../data/seedPullSource'
+import { originOf } from '../../lib/lineage'
+import { copyRecipePhoto, removeRecipePhoto, uploadRecipePhoto } from './photos'
+import { cloneRecipe, groceryLines, ingredientLines, keptStaples, remapMarks, stepBlocks, withMark } from './derive'
 
 // Data seam for the shared cookbook, mirroring the other stores' two modes:
 //   • Supabase keys present → live: reads/writes the `recipes` table scoped to
@@ -119,6 +121,91 @@ function seed(): Snapshot {
       },
     ],
   }
+}
+
+/** Keyless seed mode's "other space" for a recipe pull (see
+ *  src/data/seedPullSource.ts): the same few recipes whichever seed space is
+ *  picked. Ids start `src-`; "Miso soup" shares a title with the store seed
+ *  (the "Same title here" path); the cake carries a plain https photo
+ *  (copyRecipePhoto hands it back unchanged); the tacos bring tags and a
+ *  grocery list with staple flags. */
+export function seedRecipePullSource(): Recipe[] {
+  const base = {
+    crossedIngredients: [],
+    doneSteps: [],
+    copiedFrom: null,
+    createdBy: 'u2',
+  }
+  return [
+    {
+      ...base,
+      id: 'src-r1',
+      title: 'Miso soup',
+      imageUrl: '',
+      ingredients: '4 cups water\n1 strip kombu\n3 tbsp red miso\nfirm tofu, cubed',
+      steps: 'Steep the kombu in barely simmering water for 10 minutes, then lift it out.\n\nWhisk in the miso off the heat and add the tofu.',
+      source: "Kenji's video",
+      sourceUrl: '',
+      tags: ['soup'],
+      servings: '2',
+      totalTime: '20 min',
+      notes: 'Red miso — saltier than ours.',
+      groceryList: '',
+      stapleItems: [],
+      createdAt: '2026-02-01T09:00:00Z',
+    },
+    {
+      ...base,
+      id: 'src-r2',
+      title: 'Lemon olive oil cake',
+      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Good_Food_Display_-_NCI_Visuals_Online.jpg',
+      ingredients: '1 1/2 cups flour\n1 cup sugar\n3 eggs\n2/3 cup olive oil\n2 lemons, zested and juiced',
+      steps: 'Whisk the eggs and sugar until pale, then stream in the oil.\n\nFold in the flour, zest and juice.\n\nBake at 350°F for 45 minutes.',
+      source: 'Aunt Dee',
+      sourceUrl: '',
+      tags: ['dessert'],
+      servings: '10',
+      totalTime: '1h',
+      notes: '',
+      groceryList: '',
+      stapleItems: [],
+      createdAt: '2026-03-04T09:00:00Z',
+    },
+    {
+      ...base,
+      id: 'src-r3',
+      title: 'Black bean tacos',
+      imageUrl: '',
+      ingredients: '2 cans black beans, drained\n1 tsp cumin\n8 corn tortillas\n1 avocado\npickled onions\nsalt',
+      steps: 'Warm the beans with the cumin and a splash of water; mash half.\n\nChar the tortillas and fill them.',
+      source: 'Budget Bytes',
+      sourceUrl: 'https://www.budgetbytes.com',
+      tags: ['dinner', 'vegetarian', 'quick'],
+      servings: '4',
+      totalTime: '20 min',
+      notes: 'Pickled onions make it.',
+      groceryList: 'black beans (2 cans)\ncumin\ncorn tortillas\navocado\nred onion\nsalt',
+      stapleItems: ['cumin', 'salt'],
+      createdAt: '2026-04-11T09:00:00Z',
+    },
+    {
+      ...base,
+      id: 'src-r4',
+      title: 'Overnight oats',
+      imageUrl: '',
+      ingredients: '1/2 cup oats\n1/2 cup milk\n1 tbsp chia\nberries',
+      steps: 'Stir it all together in a jar and leave it in the fridge overnight.',
+      source: '',
+      sourceUrl: '',
+      tags: ['breakfast'],
+      servings: '1',
+      totalTime: '5 min',
+      notes: '',
+      groceryList: '',
+      stapleItems: [],
+      createdAt: '2026-05-20T09:00:00Z',
+    },
+  ]
 }
 
 // --- Row → app-type mapper (DB is snake_case) ---
@@ -238,6 +325,21 @@ export interface RecipeStore {
   setMark: (id: string, list: MarkList, index: number, marked: boolean) => Promise<void>
   /** Uncheck every ingredient and step — "starting a fresh batch". */
   clearMarks: (id: string) => Promise<void>
+
+  /** Non-fatal warning (a pulled recipe came over without its photo). */
+  notice: string | null
+  clearNotice: () => void
+  /** Read another space's cookbook for a pull (RLS lets a member read any
+   *  space they belong to). Throws on failure. Seed mode: the fixed
+   *  seedRecipePullSource. */
+  fetchPullSource: (sourceSpaceId: string) => Promise<Recipe[]>
+  /** Copy recipes from another space into this one, one at a time: copy the
+   *  photo, then insert with `copiedFrom` = root origin. A recipe whose
+   *  origin is already here is skipped. A failed photo copy pulls the recipe
+   *  without it (and sets `notice`); a failed insert stops the pull (and
+   *  sets `error`). `onProgress(n, total)` fires as recipe n starts. Returns
+   *  how many were pulled. */
+  pullRecipes: (recipes: Recipe[], onProgress?: (done: number, total: number) => void) => Promise<number>
 }
 
 export type MarkList = 'ingredients' | 'steps'
@@ -297,6 +399,15 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
+  const [notice, setNotice] = useState<string | null>(null)
+  const clearNotice = useCallback(() => setNotice(null), [])
+
+  // Latest recipes, so a pull can skip what's already here without
+  // re-creating its callback (synced after commit, as the compiler requires).
+  const recipesRef = useRef(recipes)
+  useLayoutEffect(() => {
+    recipesRef.current = recipes
+  }, [recipes])
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
@@ -444,6 +555,56 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     [spaceId, find],
   )
 
+  const fetchPullSource = useCallback(async (sourceSpaceId: string): Promise<Recipe[]> => {
+    if (!supabase) return seedPullFetch(seedRecipePullSource)
+    const { data, error } = await supabase
+      .from('recipes')
+      .select(RECIPE_COLUMNS)
+      .eq('space_id', sourceSpaceId)
+      .order('created_at')
+    if (error) throw error
+    return (data as RecipeRow[]).map(toRecipe)
+  }, [])
+
+  const pullRecipes = useCallback(
+    async (picked: Recipe[], onProgress?: (done: number, total: number) => void): Promise<number> => {
+      setError(null)
+      setNotice(null)
+      // Lineage already here — including what this pull just added.
+      const here = new Set(recipesRef.current.map(originOf))
+      let pulled = 0
+      let photoless = 0
+      for (const [index, source] of picked.entries()) {
+        onProgress?.(index + 1, picked.length)
+        if (here.has(originOf(source))) continue
+        let imageUrl = ''
+        try {
+          imageUrl = await copyRecipePhoto(source.imageUrl, spaceId)
+        } catch {
+          // The recipe is the point; it comes over without its photo.
+          photoless += 1
+        }
+        try {
+          await insert(cloneRecipe(source, imageUrl))
+        } catch (err) {
+          // insert already recorded the error. Don't strand the copy.
+          if (imageUrl && imageUrl !== source.imageUrl) removeRecipePhoto(imageUrl)
+          setError((prev) => prev ?? errorMessage(err))
+          break
+        }
+        here.add(originOf(source))
+        pulled += 1
+      }
+      if (photoless > 0) {
+        setNotice(
+          photoless === 1 ? '1 recipe came over without its photo.' : `${photoless} recipes came over without their photo.`,
+        )
+      }
+      return pulled
+    },
+    [spaceId, insert],
+  )
+
   return {
     recipes,
     profiles,
@@ -456,5 +617,9 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     deleteRecipe: rows.remove,
     setMark,
     clearMarks,
+    notice,
+    clearNotice,
+    fetchPullSource,
+    pullRecipes,
   }
 }
