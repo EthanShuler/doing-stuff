@@ -1,100 +1,173 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { enabledFeatures, type Feature } from '../layout/features'
+import { SEED_IS_ADMIN, SEED_SPACES } from './seedSpaces'
 
-const DEFAULT_SPACE_NAME = 'Our city, together'
+/** One space the signed-in user belongs to. */
+export interface SpaceInfo {
+  id: string
+  name: string
+  /** Feature keys (see layout/features.ts) this space shows. null = every
+   *  feature, including ones added later (the home space). */
+  enabledFeatures: string[] | null
+}
 
-// Dedupe concurrent space creation for the same user. React 18 StrictMode mounts
-// effects twice in dev; without this guard both runs see an empty membership and
-// each insert a space, producing duplicate spaces. The map memoizes the in-flight
-// creation so the second run reuses the first's promise instead of inserting again.
-const creatingSpace = new Map<string, Promise<string>>()
+interface Snapshot {
+  /** In membership join order (earliest first). */
+  spaces: SpaceInfo[]
+  isAdmin: boolean
+}
 
-async function resolveSpace(userId: string): Promise<string> {
+export interface SpaceState {
+  spaces: SpaceInfo[]
+  /** The space on screen. null while loading, on error, or for a user (only
+   *  ever the admin — anyone else gets NoSpaceScreen) who's in no space. */
+  current: SpaceInfo | null
+  /** The id to hand the feature stores: the live space id, or null in keyless
+   *  seed mode (null is what tells a store to use its seed). */
+  dataSpaceId: string | null
+  /** The current space's features, in nav order (empty without a space). */
+  features: Feature[]
+  isAdmin: boolean
+  /** True only for the first load; `reload()` refreshes in place. */
+  loading: boolean
+  error: string | null
+  switchTo: (spaceId: string) => void
+  /** Re-reads memberships, names and features (e.g. after an admin edit)
+   *  without flipping `loading`, so the app stays mounted. Rejects on
+   *  failure and leaves the previous state in place. */
+  reload: () => Promise<void>
+}
+
+// Remembers which space this user last picked on this device. A per-viewer
+// convenience only, so every access tolerates storage being unavailable.
+const storageKey = (userId: string | null) => `cajubinile.space.${userId ?? 'seed'}`
+function readStoredSpace(userId: string | null): string | null {
+  try {
+    return localStorage.getItem(storageKey(userId))
+  } catch {
+    return null
+  }
+}
+function storeSpace(userId: string | null, spaceId: string) {
+  try {
+    localStorage.setItem(storageKey(userId), spaceId)
+  } catch {
+    // ignore — the choice just won't survive a reload
+  }
+}
+
+const messageOf = (err: unknown): string =>
+  err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+    ? err.message
+    : 'Could not load your spaces.'
+
+// A fresh copy each time, so an in-memory admin seed that edits SEED_SPACES
+// in place shows up on reload() (a new array → a re-render).
+const seedSnapshot = (): Snapshot => ({
+  spaces: SEED_SPACES.map((s) => ({ ...s, enabledFeatures: s.enabledFeatures && [...s.enabledFeatures] })),
+  isAdmin: SEED_IS_ADMIN,
+})
+
+/** Every space the user belongs to (RLS scopes both sides to their own
+ *  memberships), in join order, plus whether they're the admin. */
+async function fetchSnapshot(userId: string): Promise<Snapshot> {
   const client = supabase
   if (!client) throw new Error('Supabase not configured.')
-
-  // RLS scopes this to spaces the user already belongs to. Pinned to our own
-  // earliest membership so a user in two spaces always lands in the same one
-  // (an unordered limit(1) could flip between them from load to load).
-  const { data: members, error: mErr } = await client
-    .from('space_members')
-    .select('space_id')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-  if (mErr) throw mErr
-  if (members && members.length > 0) return members[0].space_id
-
-  // No space yet → create one, but only once per user. The get/set below has no
-  // `await` between them, so the second StrictMode run reliably observes the
-  // in-flight promise rather than starting its own insert.
-  const existing = creatingSpace.get(userId)
-  if (existing) return existing
-
-  // We generate the id client-side and do NOT read the row back: the
-  // `on_space_created` AFTER trigger that adds us as a member fires at statement
-  // end, *after* a RETURNING select's RLS check would run — so `.select()` here
-  // would spuriously return 0 rows. By the time this insert resolves the
-  // membership is committed, so later space-scoped fetches pass RLS fine.
-  const pending = (async () => {
-    const id = crypto.randomUUID()
-    const { error } = await client.from('spaces').insert({ id, name: DEFAULT_SPACE_NAME })
-    if (error) throw error
-    return id
-  })()
-  creatingSpace.set(userId, pending)
-  // Swallow the rejection on this derived promise — the caller awaits
-  // `pending` itself and handles the error; without the catch, every failed
-  // insert also fired an unhandled-rejection from the .finally() chain.
-  pending.catch(() => {}).finally(() => creatingSpace.delete(userId))
-  return pending
+  const [members, admin] = await Promise.all([
+    client
+      .from('space_members')
+      .select('created_at, spaces(id, name, enabled_features)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true }),
+    client.rpc('is_admin'),
+  ])
+  if (members.error) throw members.error
+  if (admin.error) throw admin.error
+  const spaces = (members.data ?? []).flatMap(({ spaces: s }) =>
+    s ? [{ id: s.id, name: s.name, enabledFeatures: s.enabled_features }] : [],
+  )
+  return { spaces, isAdmin: admin.data === true }
 }
 
 /**
- * Resolves the active space for the logged-in user.
+ * Resolves the spaces the signed-in user belongs to and which one is on
+ * screen. Spaces and memberships are admin-managed (the admin page / RPCs);
+ * nothing here creates one, so a login with no membership simply gets
+ * `spaces: []` (App shows NoSpaceScreen unless they're the admin).
  *
- * Sharing model (see CLAUDE.md): "Manual / SQL for now". On first login a user
- * has no membership, so we auto-create a space — the `on_space_created` trigger
- * adds them as its first member. To share one space between two logins, add the
- * second user to the first user's space by hand in the SQL editor:
- *
- *   insert into space_members (space_id, user_id) values ('<space>', '<uid>');
- *
- * After that, both logins resolve to the same `space_id` here.
+ * The current space is the one last picked on this device, else the earliest
+ * membership. App keys this hook's caller by user id, so `userId` is fixed for
+ * the hook's lifetime.
  */
-export function useSpace(session: Session | null) {
+export function useSpace(session: Session | null, configured: boolean): SpaceState {
   const userId = session?.user.id ?? null
-  const [spaceId, setSpaceId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(Boolean(supabase))
+  const live = configured && Boolean(supabase)
+  const [snapshot, setSnapshot] = useState<Snapshot>(() => (live ? { spaces: [], isAdmin: false } : seedSnapshot()))
+  const [currentId, setCurrentId] = useState<string | null>(() => readStoredSpace(userId))
+  const [loading, setLoading] = useState(live && userId !== null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!supabase || !userId) {
-      setLoading(false)
-      return
-    }
+    if (!live || !userId) return
     let cancelled = false
-
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const id = await resolveSpace(userId)
-        if (!cancelled) setSpaceId(id)
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Could not load your space.')
-        }
-      } finally {
+    fetchSnapshot(userId)
+      .then(
+        (next) => {
+          if (!cancelled) setSnapshot(next)
+        },
+        (err: unknown) => {
+          if (!cancelled) setError(messageOf(err))
+        },
+      )
+      .finally(() => {
         if (!cancelled) setLoading(false)
-      }
-    })()
-
+      })
     return () => {
       cancelled = true
     }
-  }, [userId])
+  }, [live, userId])
 
-  return { spaceId, loading, error }
+  const { spaces, isAdmin } = snapshot
+  // A remembered id that's no longer ours (removed from the space, another
+  // account on this device) falls back to the earliest membership.
+  const current = spaces.find((s) => s.id === currentId) ?? spaces[0] ?? null
+
+  const switchTo = (spaceId: string) => {
+    setCurrentId(spaceId)
+    storeSpace(userId, spaceId)
+  }
+
+  const reload = async () => {
+    const next = live && userId ? await fetchSnapshot(userId) : seedSnapshot()
+    setSnapshot(next)
+  }
+
+  return {
+    spaces,
+    current,
+    dataSpaceId: live ? (current?.id ?? null) : null,
+    features: current ? enabledFeatures(current.enabledFeatures) : [],
+    isAdmin,
+    loading,
+    error,
+    switchTo,
+    reload,
+  }
+}
+
+export const SpaceContext = createContext<SpaceState | null>(null)
+
+/** The current space, its features, the user's other spaces, and the
+ *  switch / reload actions. Provided by App.tsx around the router. */
+export function useSpaceContext(): SpaceState {
+  const ctx = useContext(SpaceContext)
+  if (!ctx) throw new Error('useSpaceContext used outside SpaceContext')
+  return ctx
+}
+
+/** Is this feature (a `key` from layout/features.ts) on in the current space? */
+export function useFeatureEnabled(key: string): boolean {
+  return useSpaceContext().features.some((f) => f.key === key)
 }

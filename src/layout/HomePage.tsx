@@ -1,14 +1,39 @@
-import { Box, Text, UnstyledButton } from '@mantine/core'
+import { Box, Button, Text, UnstyledButton } from '@mantine/core'
 import { Link } from 'react-router'
+import { EmptyCard } from '../components/EmptyCard'
 import { PageFrame } from '../components/PageFrame'
+import { useSpaceContext } from '../data/useSpace'
 import { colors, fonts, text } from '../theme'
-import { FEATURES } from './features'
 
-/** The landing page (`/`): an index of the features, so any of them is a
- *  single tap from home — on a phone the header nav is otherwise behind the
- *  burger. Static: no store, no data, nothing to load. Two columns of ruled
- *  rows on a wide screen, one on a phone. */
+/** The landing page (`/`): an index of the current space's features, so any
+ *  of them is a single tap from home — on a phone the header nav is otherwise
+ *  behind the burger. No store, nothing to load. Two columns of ruled rows on
+ *  a wide screen, one on a phone. A space with no features (or the admin in
+ *  no space) gets an empty state instead. */
 export function HomePage() {
+  const { current, features, isAdmin } = useSpaceContext()
+
+  if (features.length === 0) {
+    const title = current ? 'Nothing here yet' : 'You’re not in a space yet'
+    const blurb = current
+      ? isAdmin
+        ? 'This space has no features turned on. Pick some on the Admin page.'
+        : 'This space has no features turned on yet. Ask Ethan to add some.'
+      : 'Add yourself to a space on the Admin page.'
+    return (
+      <PageFrame maw={900}>
+        <title>cajubinile.com</title>
+        <EmptyCard mt={0} title={title} blurb={blurb}>
+          {isAdmin && (
+            <Button component={Link} to="/admin" variant="secondary">
+              Open Admin
+            </Button>
+          )}
+        </EmptyCard>
+      </PageFrame>
+    )
+  }
+
   return (
     <PageFrame maw={900}>
       <title>cajubinile.com</title>
@@ -21,7 +46,7 @@ export function HomePage() {
           columnGap: 48,
         }}
       >
-        {FEATURES.map((f) => (
+        {features.map((f) => (
           <UnstyledButton
             key={f.path}
             component={Link}

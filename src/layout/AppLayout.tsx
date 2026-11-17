@@ -1,21 +1,25 @@
 import { Suspense } from 'react'
 import type { ReactNode } from 'react'
-import { AppShell, Burger, Button, Group, Text, UnstyledButton } from '@mantine/core'
+import { AppShell, Burger, Group, Text, UnstyledButton } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { Link, useLocation } from 'react-router'
 import { ACCENT, colors, fonts, radii, text } from '../theme'
-import { supabase } from '../lib/supabase'
 import { Splash } from '../components/Splash'
 import { ErrorBoundary } from '../components/ErrorBoundary'
-import { FEATURES, isActive } from './features'
+import { useSpaceContext } from '../data/useSpace'
+import { isActive } from './features'
+import { AccountMenu } from './AccountMenu'
 
-/** The persistent chrome: header with the site name, feature nav, and sign-out.
- *  The ten nav items need ~950px, plus the brand and, live, Sign out — past
+/** The persistent chrome: header with the site name, the current space's
+ *  feature nav (FEATURES minus what the space hasn't turned on), and the
+ *  account menu (switch space / Admin / sign out).
+ *  All ten nav items need ~950px, plus the brand and the account menu — past
  *  `md` (992px) once Alignment made it ten — so the drawer holds them until
  *  `lg` (1200px). */
 export function AppLayout({ children }: { children: ReactNode }) {
   const [navOpened, { toggle, close }] = useDisclosure(false)
   const { pathname } = useLocation()
+  const { current, features } = useSpaceContext()
 
   return (
     // Safe areas: index.html sets viewport-fit=cover, so on a phone (and
@@ -60,7 +64,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             paddingRight: 'max(20px, env(safe-area-inset-right))',
           }}
         >
-          <Group gap={20} wrap="nowrap">
+          <Group gap={20} wrap="nowrap" style={{ minWidth: 0 }}>
             <Burger
               opened={navOpened}
               onClick={toggle}
@@ -87,7 +91,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               cajubinile.com
             </Text>
             <Group gap={4} visibleFrom="lg" wrap="nowrap">
-              {FEATURES.map((feature) => (
+              {features.map((feature) => (
                 <FeatureLink
                   key={feature.path}
                   label={feature.label}
@@ -98,17 +102,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
               ))}
             </Group>
           </Group>
-          {supabase && (
-            <Button variant="secondary" size="compact-sm" onClick={() => supabase!.auth.signOut()}>
-              Sign out
-            </Button>
-          )}
+          <AccountMenu onNavigate={close} />
         </Group>
       </AppShell.Header>
 
       {/* Mobile-only feature nav (hidden on desktop via collapsed above). */}
       <AppShell.Navbar>
-        {FEATURES.map((feature) => (
+        {features.map((feature) => (
           <FeatureLink
             key={feature.path}
             label={feature.label}
@@ -125,9 +125,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
           in-app navigations in a transition, so this fallback is really only
           seen on a hard load of a route. The error boundary sits outside it
           for the same reason: a page that throws (or a chunk that fails to
-          load) keeps the shell, and navigating away resets it. */}
+          load) keeps the shell, and navigating away — or switching spaces —
+          resets it. */}
       <AppShell.Main>
-        <ErrorBoundary resetKey={pathname} mih="60vh">
+        <ErrorBoundary resetKey={`${current?.id}:${pathname}`} mih="60vh">
           <Suspense fallback={<Splash text="Loading…" mih="60vh" />}>{children}</Suspense>
         </ErrorBoundary>
       </AppShell.Main>
