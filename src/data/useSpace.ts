@@ -171,3 +171,22 @@ export function useSpaceContext(): SpaceState {
 export function useFeatureEnabled(key: string): boolean {
   return useSpaceContext().features.some((f) => f.key === key)
 }
+
+/**
+ * The spaces a cross-space pull can read from: the user's other spaces (never
+ * the current one), in join order. Pass a feature key to keep only spaces
+ * that show that feature — a space without Recipes has nothing to offer the
+ * recipe pull. Empty = no pull to offer (PullButton renders nothing).
+ *
+ * In keyless seed mode this is the other seed space (seedSpaces.ts); the
+ * source DATA there comes from the feature's seed pull source — see
+ * seedPullSource.ts.
+ */
+export function usePullSources(featureKey?: string): SpaceInfo[] {
+  const { spaces, current } = useSpaceContext()
+  return spaces.filter(
+    (s) =>
+      s.id !== current?.id &&
+      (featureKey === undefined || s.enabledFeatures === null || s.enabledFeatures.includes(featureKey)),
+  )
+}

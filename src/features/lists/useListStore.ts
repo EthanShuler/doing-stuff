@@ -3,7 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { ListDef, ListItem, ListRef } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
-import { firstGrapheme } from '../../lib/text'
+import { firstGrapheme, titleKey } from '../../lib/text'
 import { renormalizedPositions } from '../../lib/order'
 import { datesArePersonal } from '../tier-list/derive'
 import { kindColumn, listIdOf, nextPosition, pruneListDef, refOf } from './derive'
@@ -446,8 +446,10 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
           // 1. Find or create the tier item in the shared pool. Unchecking a
           //    row leaves its tier item on the board, and a check-off whose
           //    link write failed has already inserted one — so a same-kind,
-          //    same-title (trimmed, case-insensitive) built-in item is reused
-          //    rather than duplicated.
+          //    same-title (titleKey: trimmed, any case) built-in item is
+          //    reused rather than duplicated. The ilike prefilter matches the
+          //    trimmed text exactly, so titleKey's space-collapsing never
+          //    widens what's reused here.
           const title = item.title.trim()
           const { data: found, error: findErr } = await supabase
             .from('tier_items')
@@ -461,7 +463,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
             setError(findErr.message)
             return
           }
-          const existing = found.find((row) => row.title.trim().toLowerCase() === title.toLowerCase())
+          const existing = found.find((row) => titleKey(row.title) === titleKey(title))
           let tierItemId: string
           if (existing) {
             tierItemId = existing.id

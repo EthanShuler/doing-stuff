@@ -56,46 +56,46 @@ function seed(): Snapshot {
     lists: [
       // Ice cream is a space-defined list like any other (it used to be a
       // built-in kind — the 2026-09-13 migration converted it).
-      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', shared: false, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
-      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
+      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
       // A SHARED list too: one board both members rank (null-owner placements).
-      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', shared: true, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
+      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', shared: true, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
-      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', doneOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
-      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', doneOn: '2026-06-02', tags: ['fantasy'], creator: '', createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: '', createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
-      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', doneOn: '2026-06-14', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
-      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', doneOn: '2026-06-20', tags: ['sci-fi'], creator: '', createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
-      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', doneOn: '2026-06-08', tags: ['sci-fi'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
-      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
-      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', doneOn: '2026-06-15', tags: ['fantasy'], creator: '', createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
-      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', doneOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
+      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', doneOn: '2026-06-02', tags: ['fantasy'], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
+      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', doneOn: '2026-06-14', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
+      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', doneOn: '2026-06-20', tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
+      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', doneOn: '2026-06-08', tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
+      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
+      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', doneOn: '2026-06-15', tags: ['fantasy'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
+      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
       // Books keep the shared doneOn null — read state is per person, in
       // `completions` below.
-      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', doneOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
-      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: 'Andy Weir', createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
-      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
-      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
-      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
+      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', doneOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
+      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: 'Andy Weir', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
+      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
+      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
+      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
       // Ice cream (custom list l0): a custom board tracks no date, so doneOn is
       // ignored there — an item is ranked, or it's on the unranked shelf.
-      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
-      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
-      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
-      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
+      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
+      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
+      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
+      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
       // The custom "Fruits" list — same shape as Ice Cream (no dates, one
       // shelf), keyed by `list:<id>` instead of a kind.
-      { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
-      { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
-      { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
+      { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
+      { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
+      { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
       // The shared Board games list: Catan ranked; Wingspan and Twilight
       // Imperium unranked.
-      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
-      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
+      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few built-in items stay unranked — and some undated → unwatched — to
@@ -153,6 +153,7 @@ type TierListRow = {
   emoji: string | null
   noun: string
   shared: boolean
+  copied_from: string | null
   created_by: string | null
   created_at: string
 }
@@ -165,6 +166,7 @@ type TierItemRow = {
   done_on: string | null
   tags: string[] | null
   creator: string | null
+  copied_from: string | null
   created_by: string | null
   created_at: string
 }
@@ -195,6 +197,7 @@ const toTierList = (r: TierListRow): TierList => ({
   emoji: r.emoji ?? '',
   noun: r.noun,
   shared: r.shared,
+  copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -207,6 +210,7 @@ const toTierItem = (r: TierItemRow): TierItem => ({
   doneOn: r.done_on,
   tags: r.tags ?? [],
   creator: r.creator ?? '',
+  copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -230,8 +234,8 @@ const toTierUserTags = (r: TierUserTagsRow): TierUserTags => ({
   tags: r.tags ?? [],
 })
 
-const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,created_by,created_at'
-const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,created_by,created_at'
+const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,copied_from,created_by,created_at'
+const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,copied_from,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
 const TIER_USER_TAGS_COLUMNS = 'id,item_id,user_id,tags'
@@ -553,6 +557,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         doneOn: personal ? null : dateOn,
         tags: cleanTags,
         creator: maker,
+        copiedFrom: null,
         createdBy: selfId,
         createdAt: new Date().toISOString(),
       }
@@ -744,7 +749,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         upsertById(setLists, created)
         return created
       }
-      const created: TierList = { id: nextId(), ...clean, createdBy: selfId, createdAt: new Date().toISOString() }
+      const created: TierList = { id: nextId(), ...clean, copiedFrom: null, createdBy: selfId, createdAt: new Date().toISOString() }
       setLists((prev) => [...prev, created])
       return created
     },

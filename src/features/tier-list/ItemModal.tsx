@@ -83,6 +83,7 @@ export function ItemModal({
     doneOn: null,
     tags: [],
     creator: draft.creator.trim(),
+    copiedFrom: null,
     createdBy: null,
     createdAt: '',
   }

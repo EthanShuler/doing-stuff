@@ -43,6 +43,7 @@ function item(over: Partial<TierItem> = {}): TierItem {
     doneOn: '2026-06-15',
     tags: [],
     creator: '',
+    copiedFrom: null,
     createdBy: 'u1',
     createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
     ...over,
@@ -60,7 +61,7 @@ function completion(over: Partial<TierCompletion> = {}): TierCompletion {
 }
 
 function list(over: Partial<TierList> = {}): TierList {
-  return { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z', ...over }
+  return { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z', ...over }
 }
 
 // --- deriveBoard ---------------------------------------------------------------

@@ -50,6 +50,7 @@ function seed(): Snapshot {
         // No grocery list: the meal plan falls back to the ingredient lines.
         groceryList: '',
         stapleItems: [],
+        copiedFrom: null,
         createdBy: 'u1',
         createdAt: '2026-05-10T09:00:00Z',
       },
@@ -70,6 +71,7 @@ function seed(): Snapshot {
         doneSteps: [],
         groceryList: '',
         stapleItems: [],
+        copiedFrom: null,
         createdBy: 'u2',
         createdAt: '2026-04-02T09:00:00Z',
       },
@@ -90,6 +92,7 @@ function seed(): Snapshot {
         doneSteps: [],
         groceryList: 'onion\nred pepper\ngarlic\ncumin\npaprika\ncrushed tomatoes (28 oz can)\neggs\nfeta\ncilantro',
         stapleItems: ['cumin', 'paprika'],
+        copiedFrom: null,
         createdBy: 'u1',
         createdAt: '2026-06-18T09:00:00Z',
       },
@@ -110,6 +113,7 @@ function seed(): Snapshot {
         doneSteps: [],
         groceryList: '',
         stapleItems: [],
+        copiedFrom: null,
         createdBy: 'u2',
         createdAt: '2026-03-22T09:00:00Z',
       },
@@ -135,6 +139,7 @@ type RecipeRow = {
   done_steps: number[] | null
   grocery_list: string | null
   staple_items: string[] | null
+  copied_from: string | null
   created_by: string | null
   created_at: string
 }
@@ -155,6 +160,7 @@ const toRecipe = (r: RecipeRow): Recipe => ({
   doneSteps: r.done_steps ?? [],
   groceryList: r.grocery_list ?? '',
   stapleItems: r.staple_items ?? [],
+  copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -176,6 +182,7 @@ const FIELD_OF_COLUMN: Record<Exclude<keyof RecipeRow, 'id'>, Exclude<keyof Reci
   done_steps: 'doneSteps',
   grocery_list: 'groceryList',
   staple_items: 'stapleItems',
+  copied_from: 'copiedFrom',
   created_by: 'createdBy',
   created_at: 'createdAt',
 }
@@ -190,7 +197,7 @@ function omittedKept(row: Partial<RecipeRow>, mapped: Recipe, held: Recipe): Rec
 }
 
 const RECIPE_COLUMNS =
-  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,grocery_list,staple_items,created_by,created_at'
+  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,grocery_list,staple_items,copied_from,created_by,created_at'
 
 /** The fields the add/edit modal writes. All plain strings except tags. */
 export interface RecipeDraft {
@@ -237,6 +244,9 @@ export type MarkList = 'ingredients' | 'steps'
 const MARK_FIELD = { ingredients: 'crossedIngredients', steps: 'doneSteps' } as const
 
 type MarkFields = Partial<Pick<Recipe, 'crossedIngredients' | 'doneSteps'>>
+/** Lineage rides along only on a create: null for a recipe made here, the
+ *  root origin's id for one pulled from another space. Edits never send it. */
+type LineageField = Partial<Pick<Recipe, 'copiedFrom'>>
 
 const draftFields = (draft: RecipeDraft) => ({
   title: draft.title.trim(),
@@ -258,8 +268,9 @@ const draftFields = (draft: RecipeDraft) => ({
 /** Cleaned-up draft → `recipes` columns (insert and update write the same set). */
 // The mark arrays are written only when present: a new recipe starts empty,
 // and an edit sends them only when the text they index into changed — so an
-// edit can't stomp on a partner's taps on an untouched list.
-const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields) => ({
+// edit can't stomp on a partner's taps on an untouched list. `copied_from`
+// is written only when set (a pull); seed mode keeps the null on the row.
+const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields & LineageField) => ({
   title: fields.title,
   image_url: fields.imageUrl,
   ingredients: fields.ingredients,
@@ -274,6 +285,8 @@ const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields) => (
   staple_items: fields.stapleItems,
   ...(fields.crossedIngredients && { crossed_ingredients: fields.crossedIngredients }),
   ...(fields.doneSteps && { done_steps: fields.doneSteps }),
+  // Only a pull sets lineage; everything else leaves the DB default (null).
+  ...(fields.copiedFrom && { copied_from: fields.copiedFrom }),
 })
 
 export function useRecipeStore(spaceId: string | null): RecipeStore {
@@ -359,7 +372,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
   const addRecipe = useCallback(
     async (draft: RecipeDraft) => {
       const fields = draftFields(draft)
-      if (fields.title) await insert({ ...fields, crossedIngredients: [], doneSteps: [] })
+      if (fields.title) await insert({ ...fields, crossedIngredients: [], doneSteps: [], copiedFrom: null })
     },
     [insert],
   )
