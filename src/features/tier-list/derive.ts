@@ -3,6 +3,8 @@ import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
 import { displayNameFor } from '../../lib/profile'
+import { originOf } from '../../lib/lineage'
+import { titleKey } from '../../lib/text'
 
 /** The fixed ladder, best first — drives row order and drop-target ids. */
 export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
@@ -340,4 +342,404 @@ export function pruneList<
     placements: dropItemRows(state.placements, gone),
     completions: dropItemRows(state.completions, gone),
   }
+}
+
+// --- Pulling boards from another space ------------------------------------------
+// A pull copies one person's boards from another space they belong to into
+// this one (see "Why copy-with-origin" in the plan): the source's pool items
+// are DUPLICATED here with `copiedFrom` = their root origin (lib/lineage.ts),
+// never linked. Pulling again is an idempotent merge — lineage (then title)
+// finds what's already here, and only what's new is written. Pull never edits
+// an existing item here (its title, shared tags, or date); it only adds items
+// and the puller's OWN rankings, read dates and personal tags.
+
+/** What the pull reads from the other space — the shape of the store's
+ *  fetchPullSource: its lists and pool, plus only the PULLER's own personal
+ *  rows (placements, completions, tags) and the null-owner placements of its
+ *  shared lists. Never anyone else's opinions. */
+export interface TierPullData {
+  lists: TierList[]
+  items: TierItem[]
+  placements: TierPlacement[]
+  completions: TierCompletion[]
+  userTags: TierUserTags[]
+}
+
+/** One source board, ready to plan: its items, and the puller's rows on it —
+ *  placements chosen by the SOURCE list's mode (the puller's own, or the
+ *  null-owner rows when that list is shared). */
+export interface TierPullSource {
+  key: ListKey
+  /** The source's list row for a custom board; null for a built-in. */
+  list: TierList | null
+  items: TierItem[]
+  placements: TierPlacement[]
+  completions: TierCompletion[]
+  userTags: TierUserTags[]
+}
+
+/** The space being pulled INTO — the store's slices. */
+export type TierPullTarget = TierPullData
+
+export interface TierPullOptions {
+  /** Also bring items the puller hasn't ranked there (as items only).
+   *  Default: ranked items only. */
+  includeUnranked?: boolean
+}
+
+export interface TierPullSummary {
+  /** Custom lists created here (no match by lineage or name). */
+  listsAdded: number
+  /** Pool items copied in. */
+  itemsAdded: number
+  /** Source items that were already here (by lineage, else title). */
+  itemsMatched: number
+  /** Rankings written. */
+  rankingsAdded: number
+  /** Rankings skipped because the item is already ranked here (for that
+   *  owner) — a pull never moves a card you've placed. */
+  rankingsKept: number
+  /** Items whose personal tags gained something. */
+  tagsMerged: number
+  /** Book read dates (the puller's own completions) added. */
+  datesAdded: number
+}
+
+export interface TierPullPlan {
+  /** The board here the source maps onto; null only when a custom list would
+   *  have to be created but nothing would land on it. */
+  targetKey: ListKey | null
+  newList: TierList | null
+  newItems: TierItem[]
+  newPlacements: TierPlacement[]
+  newCompletions: TierCompletion[]
+  /** Personal tag rows to write: an existing row's id with the union, or a
+   *  new id. Upserted on (itemId, userId). */
+  userTagUpserts: TierUserTags[]
+  summary: TierPullSummary
+}
+
+export const EMPTY_PULL_SUMMARY: TierPullSummary = {
+  listsAdded: 0,
+  itemsAdded: 0,
+  itemsMatched: 0,
+  rankingsAdded: 0,
+  rankingsKept: 0,
+  tagsMerged: 0,
+  datesAdded: 0,
+}
+
+const byCreated = <R extends { id: string; createdAt: string }>(a: R, b: R) =>
+  a.createdAt !== b.createdAt ? (a.createdAt < b.createdAt ? -1 : 1) : a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+
+/** Slice one board out of a fetched source. Placements are picked by the
+ *  source list's mode: on a shared list the null-owner rows, else the
+ *  puller's own (the fetch already left everyone else's out; this re-checks). */
+export function tierPullSource(data: TierPullData, key: ListKey, selfId: string): TierPullSource {
+  const listId = listIdOf(key)
+  const list = listId ? (data.lists.find((l) => l.id === listId) ?? null) : null
+  const items = data.items.filter((item) => item.kind === key)
+  const ids = new Set(items.map((item) => item.id))
+  const owner = placementOwner(list?.shared ?? false, selfId)
+  return {
+    key,
+    list,
+    items,
+    placements: data.placements.filter((p) => ids.has(p.itemId) && p.userId === owner),
+    completions: data.completions.filter((r) => ids.has(r.itemId) && r.userId === selfId),
+    userTags: data.userTags.filter((r) => ids.has(r.itemId) && r.userId === selfId),
+  }
+}
+
+/** One board in the pull checklist: how many items it has there, and how
+ *  many of them the puller has ranked (what a default pull brings). */
+export interface TierPullChoice {
+  key: ListKey
+  list: TierList | null
+  total: number
+  ranked: number
+}
+
+/** The source's boards for the checklist: the three built-ins, then its own
+ *  lists in creation order. */
+export function tierPullChoices(data: TierPullData, selfId: string): TierPullChoice[] {
+  const keys: ListKey[] = ['movie', 'tv', 'book', ...[...data.lists].sort(byCreated).map((l) => listKeyFor(l.id))]
+  return keys.map((key) => {
+    const source = tierPullSource(data, key, selfId)
+    return { key, list: source.list, total: source.items.length, ranked: source.placements.length }
+  })
+}
+
+/** The source board matching the board on screen here, to pre-tick: the same
+ *  built-in, or the source list this custom list matches (lineage, else
+ *  name). Empty when the source has no counterpart. */
+export function defaultPullKeys(data: TierPullData, currentKey: ListKey, targetLists: TierList[]): ListKey[] {
+  const listId = listIdOf(currentKey)
+  if (!listId) return [currentKey]
+  const here = targetLists.find((l) => l.id === listId)
+  if (!here) return []
+  const lists = [...data.lists].sort(byCreated)
+  const match =
+    lists.find((l) => originOf(l) === originOf(here)) ?? lists.find((l) => titleKey(l.name) === titleKey(here.name))
+  return match ? [listKeyFor(match.id)] : []
+}
+
+/**
+ * Plan pulling ONE source board into this space. Pure: `newId` mints row ids
+ * and `now` (ISO) stamps new rows. The rules:
+ *
+ * - **Which items:** the ones the puller ranked there; with `includeUnranked`
+ *   every item on the board (unranked ones come over as items only).
+ * - **List:** a custom board maps onto the list here with the same origin,
+ *   else the same name (any case, oldest first), else a new list (name,
+ *   emoji, noun, `shared`, `copiedFrom`). Copied items carry the TARGET
+ *   list's id — never the source's, or deleting the source list would
+ *   cascade into this space.
+ * - **Item mapping is injective:** lineage first (equal origins), then title
+ *   (titleKey) on the same board, each target item claimed at most once,
+ *   source items taken in `createdAt` order. Leftovers become new copies —
+ *   title, image, creator, shared tags, `copiedFrom` = root origin, and NO
+ *   `doneOn` (the source's shared date means "that group finished it"). Their
+ *   `createdAt` steps by 1 ms in source order so the Unranked shelf keeps it.
+ * - **Rankings:** owner = placementOwner(target list's mode, selfId). An item
+ *   already ranked here for that owner keeps its spot (rankingsKept); the rest
+ *   append after that tier's last card for that owner on this board, in
+ *   source order within each tier.
+ * - **Books:** the puller's own read date, only where they have none here.
+ *   Never an item's shared `doneOn`.
+ * - **Personal tags:** the union with the puller's tags here.
+ * - Existing items here are never edited.
+ */
+export function planTierPull(
+  source: TierPullSource,
+  target: TierPullTarget,
+  selfId: string,
+  newId: () => string,
+  now: string,
+  opts: TierPullOptions = {},
+): TierPullPlan {
+  const summary: TierPullSummary = { ...EMPTY_PULL_SUMMARY }
+  const empty = (targetKey: ListKey | null): TierPullPlan => ({
+    targetKey,
+    newList: null,
+    newItems: [],
+    newPlacements: [],
+    newCompletions: [],
+    userTagUpserts: [],
+    summary,
+  })
+
+  const sourcePlacement = new Map(source.placements.map((p) => [p.itemId, p]))
+  const considered = source.items
+    .filter((item) => item.kind === source.key && (opts.includeUnranked || sourcePlacement.has(item.id)))
+    .sort(byCreated)
+
+  // --- The board here ---
+  let targetList: TierList | null = null
+  let newList: TierList | null = null
+  if (listIdOf(source.key)) {
+    if (!source.list) throw new Error('planTierPull: a custom board needs its list row')
+    const from = source.list
+    const lists = [...target.lists].sort(byCreated)
+    targetList =
+      lists.find((l) => originOf(l) === originOf(from)) ??
+      lists.find((l) => titleKey(l.name) === titleKey(from.name)) ??
+      null
+    if (!targetList) {
+      // Nothing would land on it — don't create an empty list.
+      if (considered.length === 0) return empty(null)
+      newList = {
+        id: newId(),
+        name: from.name,
+        emoji: from.emoji,
+        noun: from.noun,
+        shared: from.shared,
+        copiedFrom: originOf(from),
+        createdBy: selfId,
+        createdAt: now,
+      }
+      targetList = newList
+      summary.listsAdded = 1
+    }
+  }
+  const targetKey: ListKey = targetList ? listKeyFor(targetList.id) : source.key
+  if (considered.length === 0) return empty(targetKey)
+
+  // --- Item mapping: lineage, then title; each target item claimed once ---
+  const candidates = target.items.filter((item) => item.kind === targetKey).sort(byCreated)
+  const claimed = new Set<string>()
+  const mapped = new Map<string, TierItem>()
+  const claim = (matches: (candidate: TierItem, sourceItem: TierItem) => boolean) => {
+    for (const s of considered) {
+      if (mapped.has(s.id)) continue
+      const hit = candidates.find((c) => !claimed.has(c.id) && matches(c, s))
+      if (!hit) continue
+      claimed.add(hit.id)
+      mapped.set(s.id, hit)
+    }
+  }
+  claim((c, s) => originOf(c) === originOf(s))
+  claim((c, s) => titleKey(c.title) === titleKey(s.title))
+  summary.itemsMatched = mapped.size
+
+  const base = Date.parse(now)
+  const newItems: TierItem[] = []
+  for (const s of considered) {
+    if (mapped.has(s.id)) continue
+    const copy: TierItem = {
+      id: newId(),
+      kind: targetKey,
+      title: s.title,
+      imageUrl: s.imageUrl,
+      doneOn: null,
+      tags: normalizeTags(s.tags),
+      creator: s.creator,
+      copiedFrom: originOf(s),
+      createdBy: selfId,
+      createdAt: new Date(base + newItems.length).toISOString(),
+    }
+    newItems.push(copy)
+    mapped.set(s.id, copy)
+  }
+  summary.itemsAdded = newItems.length
+
+  // --- Rankings ---
+  const owner = placementOwner(targetList?.shared ?? false, selfId)
+  const onBoard = new Set(candidates.map((c) => c.id))
+  const placedHere = new Set<string>()
+  const lastPosition: Record<Tier, number> = { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 }
+  for (const p of target.placements) {
+    if (p.userId !== owner || !onBoard.has(p.itemId)) continue
+    placedHere.add(p.itemId)
+    lastPosition[p.tier] = Math.max(lastPosition[p.tier], p.position)
+  }
+  const ranked = considered
+    .filter((s) => sourcePlacement.has(s.id))
+    .map((s) => ({ s, p: sourcePlacement.get(s.id)! }))
+    .sort((a, b) => {
+      const tierOrder = TIERS.indexOf(a.p.tier) - TIERS.indexOf(b.p.tier)
+      if (tierOrder !== 0) return tierOrder
+      if (a.p.position !== b.p.position) return a.p.position - b.p.position
+      return byCreated(a.s, b.s)
+    })
+  const newPlacements: TierPlacement[] = []
+  for (const { s, p } of ranked) {
+    const here = mapped.get(s.id)!
+    if (placedHere.has(here.id)) {
+      summary.rankingsKept += 1
+      continue
+    }
+    lastPosition[p.tier] += 1
+    newPlacements.push({ id: newId(), itemId: here.id, userId: owner, tier: p.tier, position: lastPosition[p.tier] })
+  }
+  summary.rankingsAdded = newPlacements.length
+
+  // --- Books: the puller's own read date, insert-if-absent ---
+  const newCompletions: TierCompletion[] = []
+  if (datesArePersonal(targetKey)) {
+    for (const s of considered) {
+      const mine = source.completions.find((r) => r.itemId === s.id && r.userId === selfId)
+      if (!mine) continue
+      const here = mapped.get(s.id)!
+      if (target.completions.some((r) => r.itemId === here.id && r.userId === selfId)) continue
+      newCompletions.push({ id: newId(), itemId: here.id, userId: selfId, doneOn: mine.doneOn })
+    }
+  }
+  summary.datesAdded = newCompletions.length
+
+  // --- Personal tags: union ---
+  const userTagUpserts: TierUserTags[] = []
+  for (const s of considered) {
+    const mine = source.userTags.find((r) => r.itemId === s.id && r.userId === selfId)
+    if (!mine || mine.tags.length === 0) continue
+    const here = mapped.get(s.id)!
+    const existing = target.userTags.find((r) => r.itemId === here.id && r.userId === selfId)
+    const before = normalizeTags(existing?.tags ?? [])
+    const merged = normalizeTags([...before, ...mine.tags])
+    if (merged.length === before.length) continue
+    userTagUpserts.push({ id: existing?.id ?? newId(), itemId: here.id, userId: selfId, tags: merged })
+  }
+  summary.tagsMerged = userTagUpserts.length
+
+  return { targetKey, newList, newItems, newPlacements, newCompletions, userTagUpserts, summary }
+}
+
+/** True when a plan writes nothing (matches alone don't count). */
+export const isEmptyTierPullPlan = (plan: TierPullPlan): boolean =>
+  plan.newList === null &&
+  plan.newItems.length === 0 &&
+  plan.newPlacements.length === 0 &&
+  plan.newCompletions.length === 0 &&
+  plan.userTagUpserts.length === 0
+
+/** Fold a plan into the target, the way the writes land: lists and items
+ *  appended, placements and completions insert-if-absent on (itemId, userId),
+ *  personal tags replaced on (itemId, userId). Seed mode applies plans with
+ *  this, and the multi-board planner chains through it. */
+export function applyTierPullPlan<T extends TierPullTarget>(target: T, plan: TierPullPlan): T {
+  const has = (rows: { itemId: string; userId: string | null }[], r: { itemId: string; userId: string | null }) =>
+    rows.some((x) => x.itemId === r.itemId && x.userId === r.userId)
+  return {
+    ...target,
+    lists: plan.newList ? [...target.lists, plan.newList] : target.lists,
+    items: [...target.items, ...plan.newItems],
+    placements: [...target.placements, ...plan.newPlacements.filter((p) => !has(target.placements, p))],
+    completions: [...target.completions, ...plan.newCompletions.filter((r) => !has(target.completions, r))],
+    userTags: [
+      ...target.userTags.filter((r) => !has(plan.userTagUpserts, r)),
+      ...plan.userTagUpserts,
+    ],
+  }
+}
+
+/** Plan several source boards in order, each against the target as the
+ *  earlier plans leave it — so two source lists folding into one list here
+ *  (or a re-ticked board) can't double up. New items' timestamps keep
+ *  stepping across boards. */
+export function planTierPulls(
+  data: TierPullData,
+  keys: ListKey[],
+  target: TierPullTarget,
+  selfId: string,
+  newId: () => string,
+  now: string,
+  opts: TierPullOptions = {},
+): TierPullPlan[] {
+  const plans: TierPullPlan[] = []
+  let state = target
+  let added = 0
+  const base = Date.parse(now)
+  for (const key of keys) {
+    const plan = planTierPull(tierPullSource(data, key, selfId), state, selfId, newId, new Date(base + added).toISOString(), opts)
+    added += plan.newItems.length
+    state = applyTierPullPlan(state, plan)
+    plans.push(plan)
+  }
+  return plans
+}
+
+/** Add up several boards' summaries. */
+export function sumTierPullSummaries(plans: TierPullPlan[]): TierPullSummary {
+  const total = { ...EMPTY_PULL_SUMMARY }
+  for (const { summary } of plans) {
+    for (const k of Object.keys(total) as (keyof TierPullSummary)[]) total[k] += summary[k]
+  }
+  return total
+}
+
+const counted = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/** "42 rankings · 30 new items · 12 already here · 5 you've ranked here left
+ *  alone" — the non-zero parts only; '' when nothing would be written. */
+export function tierPullSummaryLine(s: TierPullSummary): string {
+  if (s.listsAdded + s.itemsAdded + s.rankingsAdded + s.datesAdded + s.tagsMerged === 0) return ''
+  const parts: string[] = []
+  if (s.listsAdded) parts.push(counted(s.listsAdded, 'new list'))
+  if (s.rankingsAdded) parts.push(counted(s.rankingsAdded, 'ranking'))
+  if (s.itemsAdded) parts.push(counted(s.itemsAdded, 'new item'))
+  if (s.itemsMatched) parts.push(`${s.itemsMatched} already here`)
+  if (s.rankingsKept) parts.push(`${s.rankingsKept} you've ranked here left alone`)
+  if (s.datesAdded) parts.push(counted(s.datesAdded, 'read date'))
+  if (s.tagsMerged) parts.push(`your tags on ${counted(s.tagsMerged, 'item')}`)
+  return parts.join(' · ')
 }
