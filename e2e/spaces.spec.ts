@@ -71,7 +71,7 @@ test('the Admin menu item opens /admin', async ({ page }) => {
   await accountMenu(page).click()
   await page.getByRole('menuitem', { name: 'Admin' }).click()
   await expect(page).toHaveURL('/admin')
-  await expect(page.getByText('Accounts, spaces and features will be managed here.')).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ New account' })).toBeVisible()
 })
 
 test('seed mode has no Sign out (nothing to sign out of)', async ({ page }) => {

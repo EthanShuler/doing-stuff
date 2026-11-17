@@ -32,6 +32,7 @@ const ROUTES = [
   '/recipes',
   '/recipes/plan',
   '/music-practice',
+  '/admin',
 ]
 
 /** How far the document overflows the viewport, in CSS px (0 = it doesn't).

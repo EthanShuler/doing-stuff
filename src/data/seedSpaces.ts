@@ -21,3 +21,12 @@ export const SEED_SPACES: SpaceInfo[] = [
 /** The keyless viewer is an admin, so the Admin menu item and page are
  *  reachable in seed mode. */
 export const SEED_IS_ADMIN = true
+
+/** Who belongs to each seed space (user ids, join order) — the admin page's
+ *  in-memory membership, edited in place like SEED_SPACES. Only the admin
+ *  page reads it: the seed viewer is shown every seed space regardless, and
+ *  the feature seeds keep their own two members (spaceSync's SEED_PROFILES). */
+export const SEED_MEMBERS: Record<string, string[]> = {
+  'seed-home': ['u1', 'u2'],
+  'seed-friends': ['u1', 'u2'],
+}
