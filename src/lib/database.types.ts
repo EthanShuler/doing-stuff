@@ -603,6 +603,7 @@ export type Database = {
       }
       recipes: {
         Row: {
+          copied_from: string | null
           created_at: string
           created_by: string | null
           crossed_ingredients: number[]
@@ -623,6 +624,7 @@ export type Database = {
           total_time: string
         }
         Insert: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           crossed_ingredients?: number[]
@@ -643,6 +645,7 @@ export type Database = {
           total_time?: string
         }
         Update: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           crossed_ingredients?: number[]
@@ -821,6 +824,7 @@ export type Database = {
       spaces: {
         Row: {
           created_at: string
+          enabled_features: string[] | null
           home_address: string | null
           home_lat: number | null
           home_lng: number | null
@@ -829,6 +833,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          enabled_features?: string[] | null
           home_address?: string | null
           home_lat?: number | null
           home_lng?: number | null
@@ -837,6 +842,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          enabled_features?: string[] | null
           home_address?: string | null
           home_lat?: number | null
           home_lng?: number | null
@@ -981,6 +987,7 @@ export type Database = {
       }
       tier_items: {
         Row: {
+          copied_from: string | null
           created_at: string
           created_by: string | null
           creator: string
@@ -994,6 +1001,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           creator?: string
@@ -1007,6 +1015,7 @@ export type Database = {
           title: string
         }
         Update: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           creator?: string
@@ -1038,6 +1047,7 @@ export type Database = {
       }
       tier_lists: {
         Row: {
+          copied_from: string | null
           created_at: string
           created_by: string | null
           emoji: string
@@ -1048,6 +1058,7 @@ export type Database = {
           space_id: string
         }
         Insert: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           emoji?: string
@@ -1058,6 +1069,7 @@ export type Database = {
           space_id: string
         }
         Update: {
+          copied_from?: string | null
           created_at?: string
           created_by?: string | null
           emoji?: string
@@ -1178,6 +1190,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_spaces: {
+        Args: never
+        Returns: {
+          created_at: string
+          enabled_features: string[] | null
+          id: string
+          member_ids: string[]
+          name: string
+        }[]
+      }
+      admin_list_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string | null
+          email: string
+          has_password: boolean
+          id: string
+          is_admin_user: boolean
+          last_sign_in_at: string | null
+          space_ids: string[]
+        }[]
+      }
+      admin_save_space: {
+        Args: { features: string[] | null; member_ids: string[]; space_name: string; target_space: string | null }
+        Returns: string
+      }
+      admin_set_display_name: {
+        Args: { new_name: string; target_user: string }
+        Returns: undefined
+      }
+      admin_set_user_spaces: {
+        Args: { space_ids: string[]; target_user: string }
+        Returns: undefined
+      }
+      is_admin: { Args: never; Returns: boolean }
       is_shared_board_item: { Args: { target_item: string }; Returns: boolean }
       is_space_member: { Args: { target_space: string }; Returns: boolean }
       keepalive: { Args: never; Returns: string }
