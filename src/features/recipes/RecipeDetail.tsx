@@ -202,7 +202,7 @@ export function RecipeDetail({
       {recipe.notes && (
         <Box mt={28} maw={640} p="14px 18px" bg={colors.surface} style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 12 }}>
           <Text component="span" style={fieldLabelStyle}>
-            Our notes
+            Notes
           </Text>
           <Text fz={14} c={colors.inkFaded} lh={1.55} style={{ fontFamily: fonts.sans, whiteSpace: 'pre-line' }}>
             {recipe.notes}

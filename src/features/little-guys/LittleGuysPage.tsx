@@ -217,7 +217,7 @@ export function LittleGuysPage({
               ) : (
                 <EmptyCard
                   title="No little guys yet"
-                  blurb="Add the first one — a name is all it takes; his photo and personality can come later."
+                  blurb="Only a name is required."
                 />
               )
             ) : (

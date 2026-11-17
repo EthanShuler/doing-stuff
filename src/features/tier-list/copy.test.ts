@@ -40,10 +40,10 @@ describe('customCopy', () => {
   })
 
   it('a shared list has one board, so its hint names one shelf', () => {
-    expect(customCopy(list()).boardHint).toContain('both of your unranked shelves')
+    expect(customCopy(list()).boardHint).toContain('everyone’s unranked shelf')
     const copy = customCopy(list({ shared: true }))
     expect(copy.boardHint).toContain('land on the unranked shelf')
-    expect(copy.boardHint).not.toContain('both')
+    expect(copy.boardHint).not.toContain('everyone')
   })
 
   it('falls back to a generic emoji when the row leaves it blank', () => {
@@ -63,7 +63,7 @@ describe('copyFor', () => {
   })
 
   it('yields safe placeholder copy for a list whose row is gone', () => {
-    // The partner deleted the list a moment ago and the realtime DELETE landed
+    // Someone else deleted the list a moment ago and the realtime DELETE landed
     // before the page redirected — this render must not throw.
     const copy = copyFor('list:deleted', [list()])
     expect(copy.pageTitle).toBe('List')

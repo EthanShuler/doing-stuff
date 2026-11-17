@@ -97,7 +97,7 @@ export function Wishlist({
       {items.length === 0 ? (
         <EmptyCard
           title="No wishes yet"
-          blurb="Add something you'd like to do together. Check it off and it becomes a logged entry."
+          blurb="Things you want to do. Checking one off logs it as an outing."
         />
       ) : (
         <Box mt={20} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

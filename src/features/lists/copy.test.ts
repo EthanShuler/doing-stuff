@@ -63,12 +63,28 @@ describe('copyFor', () => {
     expect(copyFor('book', [def()])).toBe(LIST_COPY.book)
   })
 
+  it('drops the board promises when the space has Tier Lists off', () => {
+    for (const ref of ['movie', 'tv', 'book'] as const) {
+      const copy = copyFor(ref, [], { boards: false })
+      expect(copy.linksToBoard).toBe(false)
+      expect(copy.onBoardNote).toBe('')
+      for (const words of [copy.hint, copy.emptyBlurb]) {
+        expect(words).not.toMatch(/board|shelf|rank/i)
+      }
+      // The rest of the wording is unchanged.
+      expect(copy.label).toBe(LIST_COPY[ref].label)
+      expect(copy.past).toBe(LIST_COPY[ref].past)
+    }
+    // A free-form list never promised a board, so it reads the same either way.
+    expect(copyFor('custom:g1', [def()], { boards: false })).toEqual(copyFor('custom:g1', [def()]))
+  })
+
   it('templates a free-form ref from its row', () => {
     expect(copyFor('custom:g1', [def()]).label).toBe('Groceries')
   })
 
   it('yields safe placeholder copy for a list whose row is gone', () => {
-    // The partner deleted the list a moment ago and the realtime DELETE landed
+    // Someone else deleted the list a moment ago and the realtime DELETE landed
     // before the page redirected — this render must not throw.
     const copy = copyFor('custom:deleted', [def()])
     expect(copy.label).toBe('List')

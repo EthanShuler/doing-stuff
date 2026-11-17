@@ -102,7 +102,7 @@ export function DayPopover({
 
         <Select
           label="Recipe"
-          placeholder="Search our recipes…"
+          placeholder="Search recipes…"
           searchable
           nothingFoundMessage="No recipe by that name"
           data={recipes.map((r) => ({ value: r.id, label: r.title }))}

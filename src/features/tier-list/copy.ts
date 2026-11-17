@@ -53,7 +53,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     imageLabel: 'Poster image URL',
     creatorLabel: 'Director',
     dates: { shelfLabel: 'Unwatched', past: 'watched', fieldLabel: 'Watched on' },
-    boardHint: 'New movies land on both of your unranked shelves — or unwatched, with no watched date.',
+    boardHint: 'New movies start on Unranked, or Unwatched if they have no watched date.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
   },
   tv: {
@@ -64,7 +64,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     imageLabel: 'Poster image URL',
     creatorLabel: 'Creator',
     dates: { shelfLabel: 'Unwatched', past: 'watched', fieldLabel: 'Watched on' },
-    boardHint: 'New shows land on both of your unranked shelves — or unwatched, with no watched date.',
+    boardHint: 'New shows start on Unranked, or Unwatched if they have no watched date.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
   },
   book: {
@@ -76,7 +76,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     creatorLabel: 'Author',
     dates: { shelfLabel: 'Unread', past: 'read', fieldLabel: 'Read on' },
     boardHint:
-      'New books land on your unranked shelf — or Unread with no date. Read dates are per person; your partner marks their own.',
+      'New books land on your unranked shelf — or Unread with no date. Read dates are per person; everyone marks their own.',
     attribution: 'Book search by Open Library.',
   },
 }
@@ -108,14 +108,14 @@ export function customCopy(list: TierList): KindCopy {
     // A shared list has one board, so there's only one shelf to land on.
     boardHint: shared
       ? `New ${noun}s land on the unranked shelf — drag one into a tier to rank it.`
-      : `New ${noun}s land on both of your unranked shelves — drag one into a tier to rank it.`,
+      : `New ${noun}s land on everyone’s unranked shelf — drag one into a tier to rank it.`,
     attribution: '',
   }
 }
 
 /**
  * The wording for whichever board is showing. Built-in keys read KIND_COPY;
- * a `list:<id>` key templates its row. A key whose row is missing — a partner
+ * a `list:<id>` key templates its row. A key whose row is missing — someone
  * deleted the list a moment ago, and the realtime DELETE landed before the
  * page redirected — yields neutral placeholder copy instead of throwing, so
  * that render survives until the <Navigate> fires.

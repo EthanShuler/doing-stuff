@@ -149,7 +149,7 @@ export function RecipeModal({
         label="Steps"
         value={draft.steps}
         onChange={(e) => onChange({ steps: e.currentTarget.value })}
-        placeholder={'Write it out naturally — a blank line starts a new step:\n\nSoften the onion in olive oil.\n\nAdd the tomatoes and simmer.'}
+        placeholder={'A blank line starts a new step:\n\nSoften the onion in olive oil.\n\nAdd the tomatoes and simmer.'}
         autosize
         minRows={5}
         maxRows={16}
@@ -172,7 +172,7 @@ export function RecipeModal({
         />
       </Group>
       <Textarea
-        label="Our notes"
+        label="Notes"
         value={draft.notes}
         onChange={(e) => onChange({ notes: e.currentTarget.value })}
         placeholder="e.g. double the garlic next time (optional)"

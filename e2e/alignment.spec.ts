@@ -61,7 +61,7 @@ test('create, rename, and delete a chart', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Edit chart' }).click()
   await page.getByRole('button', { name: 'Delete chart' }).click()
-  await expect(page.getByText('Delete "Dishwashers" for both of you?')).toBeVisible()
+  await expect(page.getByText('Delete "Dishwashers" for everyone?')).toBeVisible()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page).toHaveURL('/alignment/ac1')
   await expect(page.getByRole('button', { name: 'Dishwashers' })).toHaveCount(0)

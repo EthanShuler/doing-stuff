@@ -32,7 +32,7 @@ test('the reading list is just yours', async ({ page }) => {
   await expect(page.getByText('The Priory of the Orange Tree')).toBeVisible()
   // Jordan's row never renders on Avery's reading list.
   await expect(page.getByText('Babel')).toHaveCount(0)
-  await expect(page.getByText('Just yours — your partner keeps their own.')).toBeVisible()
+  await expect(page.getByText('Just yours — everyone keeps their own.')).toBeVisible()
 })
 
 test('quick-add puts a row on the list and clears the field', async ({ page }) => {
@@ -96,7 +96,7 @@ test('create, rename, and delete a free-form list', async ({ page }) => {
   // Delete → the themed confirm modal, then a bounce back to the movie list.
   await page.getByRole('button', { name: 'Edit list' }).click()
   await page.getByRole('button', { name: 'Delete list' }).click()
-  await expect(page.getByText('Delete "Chores" for both of you?')).toBeVisible()
+  await expect(page.getByText('Delete "Chores" for everyone?')).toBeVisible()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
 
   await expect(page).toHaveURL('/lists/movies')

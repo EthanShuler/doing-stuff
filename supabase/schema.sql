@@ -3,8 +3,10 @@
 -- ----------------------------------------------------------------------------
 --  Auth model: SHARED DATA, SEPARATE LOGINS.
 --  Each person has their own auth account. Data belongs to a "space" (a shared
---  log). Both partners are members of the same space and see/edit the same
---  categories, activities, and entries.
+--  log). Every member of a space sees/edits the same categories, activities,
+--  and entries; a person may belong to several spaces. Accounts, spaces and
+--  memberships are managed by the one admin (`app_admins`) through the
+--  admin_* RPCs below and the `admin` Edge Function — there is no sign-up.
 --
 --  Run this in the Supabase SQL Editor (or via `supabase db push`). It is
 --  idempotent enough to re-run during development.
@@ -25,6 +27,11 @@ create table if not exists public.spaces (
   home_address  text,
   home_lat      double precision,
   home_lng      double precision,
+  -- Which features this space shows (FEATURES keys in src/layout/features.ts).
+  -- NULL = every feature, future ones included (the home space); an array is
+  -- an allow-list. Presentation only — RLS doesn't enforce it. New spaces
+  -- default to none; admin_save_space always sets it explicitly.
+  enabled_features text[] default '{}',
   created_at    timestamptz not null default now()
 );
 
@@ -90,6 +97,12 @@ alter table public.entries    add column if not exists lat double precision;
 alter table public.entries    add column if not exists lng double precision;
 alter table public.entries    add column if not exists hide_from_map boolean not null default false;
 
+-- Feature allow-list (2026-11-17, migrations/20261117_admin_spaces.sql). Added
+-- WITHOUT a default so spaces that already exist stay NULL (= everything);
+-- the default set afterwards only applies to rows created from then on.
+alter table public.spaces add column if not exists enabled_features text[];
+alter table public.spaces alter column enabled_features set default '{}';
+
 -- ---------------------------------------------------------------------------
 -- Wishlist: free-text "things we want to try". Checking one off in the UI opens
 -- a prefilled entry; saving links the item to that entry via `entry_id`
@@ -112,7 +125,7 @@ create table if not exists public.wishlist_items (
 
 -- ---------------------------------------------------------------------------
 -- Profiles: a readable mirror of each auth.users row (which the client can't
--- query). One row per user, kept in sync by a trigger on sign-up. Lets the UI
+-- query). One row per user, kept in sync by a trigger on account creation. Lets the UI
 -- show "who logged this" by joining entries.created_by → profiles.
 -- ---------------------------------------------------------------------------
 
@@ -137,6 +150,22 @@ create table if not exists public.profiles (
   email        text,
   display_name text,
   created_at   timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- Admins: who may create accounts and spaces, set memberships and pick each
+-- space's features (through the admin_* RPCs and the `admin` Edge Function).
+-- Seeded by hand in the SQL Editor:
+--   insert into public.app_admins (user_id)
+--   select id from auth.users where email = '<owner email>'
+--   on conflict do nothing;
+-- RLS on, no policies, no grants: the Data API can't see it; only is_admin()
+-- and the SQL Editor can.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.app_admins (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
 );
 
 -- Helpful indexes for the space-scoped queries the app runs.
@@ -197,6 +226,11 @@ create table if not exists public.tier_lists (
   -- the other mode's rows stay put and show again if it's flipped back.
   -- On an existing DB: see migrations/20260912_shared_tier_lists.sql.
   shared      boolean not null default false,
+  -- Pull lineage: the ROOT row this one was copied from, in whichever space
+  -- (null = an original). No FK on purpose: the origin may be deleted or live
+  -- in a space this row's readers can't see. A matching hint for re-pulls,
+  -- never authorization. Same column on tier_items and recipes.
+  copied_from uuid,
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
@@ -236,6 +270,9 @@ create table if not exists public.tier_items (
   -- text, shared like the title ('' = unknown/not entered). On an existing DB:
   --   alter table public.tier_items add column creator text not null default '';
   creator     text not null default '',
+  -- Pull lineage (see tier_lists.copied_from): the root item this was copied
+  -- from, null = an original. No FK on purpose.
+  copied_from uuid,
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now(),
   -- kind and list_id always travel together: 'custom' means a list, every
@@ -305,6 +342,10 @@ create index if not exists tier_item_completions_space_idx on public.tier_item_c
 create index if not exists tier_item_completions_item_idx  on public.tier_item_completions (item_id);
 create index if not exists tier_item_user_tags_space_idx on public.tier_item_user_tags (space_id);
 create index if not exists tier_item_user_tags_item_idx  on public.tier_item_user_tags (item_id);
+
+-- Pull lineage on an existing DB (2026-11-17, migrations/20261117_admin_spaces.sql):
+alter table public.tier_lists add column if not exists copied_from uuid;
+alter table public.tier_items add column if not exists copied_from uuid;
 
 -- Whether an item sits on a custom list flagged `shared` — the gate for
 -- writing a null-owner placement of it. SECURITY DEFINER like
@@ -524,11 +565,17 @@ create table if not exists public.recipes (
   -- Which grocery_list lines (by text) are pantry staples: the grocery step
   -- starts them unticked.
   staple_items text[] not null default '{}',
+  -- Pull lineage (see tier_lists.copied_from): the root recipe this was
+  -- copied from, null = an original. No FK on purpose.
+  copied_from uuid,
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   created_at  timestamptz not null default now()
 );
 
 create index if not exists recipes_space_idx on public.recipes (space_id);
+
+-- Pull lineage on an existing DB (2026-11-17, migrations/20261117_admin_spaces.sql):
+alter table public.recipes add column if not exists copied_from uuid;
 
 -- One tap = add/remove ONE index, atomically in SQL, so two people tapping
 -- at once can't clobber each other's marks the way a whole-array write
@@ -762,44 +809,54 @@ as $$
   );
 $$;
 
--- ---------------------------------------------------------------------------
--- Bootstrap: when a user creates a space, make them its first member.
--- SECURITY DEFINER so the insert bypasses the space_members RLS policy.
--- ---------------------------------------------------------------------------
-
-create or replace function public.add_creator_as_member()
-returns trigger
-language plpgsql
+-- True when the caller is in `app_admins`. SECURITY DEFINER because the table
+-- has no grants at all; every admin_* RPC below opens with this check, and the
+-- `admin` Edge Function asks it as the caller before using the service role.
+create or replace function public.is_admin()
+returns boolean
+language sql
 security definer
-set search_path = public
+set search_path = ''
+stable
 as $$
-begin
-  insert into public.space_members (space_id, user_id)
-  values (new.id, auth.uid())
-  on conflict do nothing;
-  return new;
-end;
+  select exists (
+    select 1 from public.app_admins a where a.user_id = (select auth.uid())
+  );
 $$;
 
+-- ---------------------------------------------------------------------------
+-- Spaces are admin-made: admin_save_space creates a space and its memberships
+-- in one call, so there's no "creator becomes the first member" trigger any
+-- more. These drops retire the old one on a DB that still has it.
+-- ---------------------------------------------------------------------------
+
 drop trigger if exists on_space_created on public.spaces;
-create trigger on_space_created
-  after insert on public.spaces
-  for each row execute function public.add_creator_as_member();
+drop function if exists public.add_creator_as_member();
 
 -- ---------------------------------------------------------------------------
 -- Bootstrap: mirror every new auth.users row into public.profiles so the app
 -- can resolve a display name for it. SECURITY DEFINER to write across schemas.
+-- A display name passed as user_metadata at creation (the admin's "New
+-- account" form) wins over the email's local part. (Display only — never use
+-- user_metadata for authorization.)
 -- ---------------------------------------------------------------------------
 
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.profiles (id, email, display_name)
-  values (new.id, new.email, split_part(coalesce(new.email, ''), '@', 1))
+  values (
+    new.id,
+    new.email,
+    coalesce(
+      nullif(btrim(new.raw_user_meta_data ->> 'display_name'), ''),
+      split_part(coalesce(new.email, ''), '@', 1)
+    )
+  )
   on conflict (id) do update set email = excluded.email;
   return new;
 end;
@@ -810,7 +867,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Backfill profiles for any users that signed up before this trigger existed.
+-- Backfill profiles for any users created before this trigger existed.
 insert into public.profiles (id, email, display_name)
 select id, email, split_part(coalesce(email, ''), '@', 1) from auth.users
 on conflict (id) do nothing;
@@ -837,11 +894,164 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Admin RPCs: the only way spaces, memberships and other people's display
+-- names change from the app. SECURITY DEFINER, each opens with an is_admin()
+-- check. RPCs rather than `or is_admin()` in RLS, so the admin's own feature
+-- pages never see other spaces' people or data. Account creation and
+-- set-password links need the service role, so they live in the `admin` Edge
+-- Function (supabase/functions/admin/index.ts) instead.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.admin_list_users()
+returns table (
+  id uuid, email text, display_name text, created_at timestamptz,
+  last_sign_in_at timestamptz, has_password boolean, is_admin_user boolean,
+  space_ids uuid[]
+)
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  return query
+    select
+      u.id,
+      u.email::text,
+      p.display_name,
+      u.created_at,
+      u.last_sign_in_at,
+      coalesce(u.encrypted_password, '') <> '',
+      exists (select 1 from public.app_admins a where a.user_id = u.id),
+      coalesce(
+        (select array_agg(m.space_id order by m.created_at)
+           from public.space_members m where m.user_id = u.id),
+        '{}'::uuid[])
+    from auth.users u
+    left join public.profiles p on p.id = u.id
+    order by u.created_at;
+end;
+$$;
+
+create or replace function public.admin_list_spaces()
+returns table (
+  id uuid, name text, enabled_features text[], created_at timestamptz, member_ids uuid[]
+)
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  return query
+    select
+      s.id, s.name, s.enabled_features, s.created_at,
+      coalesce(
+        (select array_agg(m.user_id order by m.created_at)
+           from public.space_members m where m.space_id = s.id),
+        '{}'::uuid[])
+    from public.spaces s
+    order by s.created_at;
+end;
+$$;
+
+-- Create (target_space null) or update a space, and set its membership to
+-- EXACTLY member_ids. features: null = all features, array = allow-list.
+create or replace function public.admin_save_space(
+  target_space uuid, space_name text, features text[], member_ids uuid[]
+) returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  sid uuid := target_space;
+  ids uuid[] := coalesce(member_ids, '{}'::uuid[]);
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  if nullif(btrim(space_name), '') is null then
+    raise exception 'A space needs a name.' using errcode = '22023';
+  end if;
+
+  if sid is null then
+    sid := gen_random_uuid();
+    insert into public.spaces (id, name, enabled_features)
+    values (sid, btrim(space_name), features);
+  else
+    update public.spaces s
+       set name = btrim(space_name), enabled_features = features
+     where s.id = sid;
+    if not found then
+      raise exception 'No such space.' using errcode = 'P0002';
+    end if;
+  end if;
+
+  delete from public.space_members m
+   where m.space_id = sid and not (m.user_id = any (ids));
+  insert into public.space_members (space_id, user_id)
+  select sid, u from unnest(ids) as u
+  on conflict do nothing;
+
+  return sid;
+end;
+$$;
+
+-- Set one user's memberships to EXACTLY space_ids (People tab, and step two
+-- of creating an account).
+create or replace function public.admin_set_user_spaces(target_user uuid, space_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ids uuid[] := coalesce(space_ids, '{}'::uuid[]);
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  delete from public.space_members m
+   where m.user_id = target_user and not (m.space_id = any (ids));
+  insert into public.space_members (space_id, user_id)
+  select s, target_user from unnest(ids) as s
+  on conflict do nothing;
+end;
+$$;
+
+create or replace function public.admin_set_display_name(target_user uuid, new_name text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  update public.profiles p
+     set display_name = nullif(btrim(new_name), '')
+   where p.id = target_user;
+  if not found then
+    raise exception 'No such user.' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 
 alter table public.spaces        enable row level security;
 alter table public.space_members enable row level security;
+alter table public.app_admins    enable row level security;
 alter table public.categories    enable row level security;
 alter table public.activities    enable row level security;
 alter table public.entries       enable row level security;
@@ -871,40 +1081,43 @@ drop policy if exists "members read space" on public.spaces;
 create policy "members read space" on public.spaces
   for select using (public.is_space_member(id));
 
--- Any logged-in user may create a space; the trigger adds them as a member.
+-- Deliberately no INSERT policy (and no INSERT grant): spaces are created only
+-- by the admin, through admin_save_space. The drop retires the old open
+-- "any logged-in user may create a space" policy on a DB that still has it.
 drop policy if exists "authenticated create space" on public.spaces;
-create policy "authenticated create space" on public.spaces
-  for insert with check (auth.uid() is not null);
 
+-- Members may update their space, but the grants below expose only the three
+-- home_* columns — the name and enabled_features are admin_save_space's.
 drop policy if exists "members update space" on public.spaces;
 create policy "members update space" on public.spaces
   for update using (public.is_space_member(id)) with check (public.is_space_member(id));
 
 -- Deliberately no DELETE policy: the app never deletes a space, and one call
--- from either member would cascade away everything. Do it in the SQL Editor.
+-- from any member would cascade away everything. Do it in the SQL Editor.
 drop policy if exists "members delete space" on public.spaces;
 
 -- space_members --------------------------------------------------------------
--- Members can see co-members. Deliberately no INSERT policy: sign-up is open,
--- so "any member may add a member" let a stranger pull anyone into their own
--- space. Sharing is SQL-Editor-only (which bypasses RLS), and the creator's
--- own first row comes from the SECURITY DEFINER on_space_created trigger.
+-- Members can see co-members, and that's all: no INSERT, UPDATE or DELETE
+-- policy (or grant). Membership changes only through the admin RPCs
+-- (admin_save_space / admin_set_user_spaces, SECURITY DEFINER) or the SQL
+-- Editor, both of which bypass RLS. The drops retire the old "members add
+-- members" and "leave space" policies on a DB that still has them.
 drop policy if exists "members read membership" on public.space_members;
 create policy "members read membership" on public.space_members
   for select using (public.is_space_member(space_id));
 
 drop policy if exists "members add members" on public.space_members;
-
--- A user can remove only their OWN membership (leave a space) — not kick a
--- co-member.
 drop policy if exists "leave space" on public.space_members;
-create policy "leave space" on public.space_members
-  for delete using (user_id = auth.uid());
+
+-- app_admins -----------------------------------------------------------------
+-- Deliberately no policies at all (and no grants): only is_admin() and the SQL
+-- Editor read it.
 
 -- profiles -------------------------------------------------------------------
 -- You can read your own profile and the profiles of anyone you share a space
 -- with (so the dashboard can name who logged each entry). You can edit only
--- your own (e.g. to set a display name).
+-- your own, and the grants below expose only `display_name` to that edit;
+-- the admin renames anyone through admin_set_display_name.
 drop policy if exists "read self or co-members" on public.profiles;
 create policy "read self or co-members" on public.profiles
   for select using (id = auth.uid() or public.shares_space_with(id));
@@ -1104,10 +1317,12 @@ create policy "delete shared or own list items" on public.list_items
 
 -- music practice ---------------------------------------------------------------
 -- Per-person daily key, same split as tier_placements: members read everyone's
--- rows, but each user writes only rows carrying their own user_id.
+-- rows, but each user writes only rows carrying their own user_id. Practice
+-- follows the PERSON, not the space: you also read your own rows from any
+-- space you logged them in, so switching spaces keeps your history.
 drop policy if exists "members read practice days" on public.music_practice_days;
 create policy "members read practice days" on public.music_practice_days
-  for select using (public.is_space_member(space_id));
+  for select using (public.is_space_member(space_id) or user_id = (select auth.uid()));
 
 drop policy if exists "insert own practice days" on public.music_practice_days;
 create policy "insert own practice days" on public.music_practice_days
@@ -1130,25 +1345,48 @@ create policy "delete own practice days" on public.music_practice_days
 
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on
-  public.spaces, public.space_members, public.categories, public.activities, public.entries,
+  public.categories, public.activities, public.entries,
   public.wishlist_items, public.entry_repeats, public.tier_lists, public.tier_items, public.tier_placements,
   public.tier_item_completions, public.tier_item_user_tags, public.lists, public.list_items, public.spoons, public.park_visits,
   public.recipes, public.music_practice_days, public.little_guys, public.seasons, public.season_items,
   public.alignment_charts, public.meal_plan_days, public.grocery_staples
   to authenticated;
-grant select, update on public.profiles to authenticated;
+-- Spaces, membership and profiles are admin-managed: members read them and
+-- may edit only the home_* columns of their space and their own display_name.
+-- Everything else goes through the admin_* RPCs. The revokes make a re-run on
+-- an older DB converge (revoking a table-level UPDATE also drops its column
+-- grants, so each column grant comes after its revoke).
+revoke insert, update, delete on public.spaces, public.space_members from authenticated;
+revoke update on public.profiles from authenticated;
+grant select on public.spaces, public.space_members, public.profiles to authenticated;
+grant update (home_address, home_lat, home_lng) on public.spaces to authenticated;
+grant update (display_name) on public.profiles to authenticated;
+-- No grants at all on app_admins.
+revoke all on public.app_admins from public, anon, authenticated;
 -- Functions default to PUBLIC execute; only signed-in users need the helpers,
--- and nobody needs to call the trigger functions directly.
+-- and nobody needs to call the trigger functions directly. The admin_* RPCs
+-- are executable by any signed-in user but refuse anyone not in app_admins.
 revoke execute on function public.is_space_member(uuid)      from public, anon;
 revoke execute on function public.shares_space_with(uuid)    from public, anon;
 revoke execute on function public.is_shared_board_item(uuid) from public, anon;
-revoke execute on function public.add_creator_as_member()    from public, anon;
 revoke execute on function public.handle_new_user()          from public, anon;
 revoke execute on function public.set_recipe_mark(uuid, text, int, boolean) from public, anon;
+revoke execute on function public.is_admin()                                   from public, anon;
+revoke execute on function public.admin_list_users()                           from public, anon;
+revoke execute on function public.admin_list_spaces()                          from public, anon;
+revoke execute on function public.admin_save_space(uuid, text, text[], uuid[]) from public, anon;
+revoke execute on function public.admin_set_user_spaces(uuid, uuid[])          from public, anon;
+revoke execute on function public.admin_set_display_name(uuid, text)           from public, anon;
 grant execute on function public.is_space_member(uuid) to authenticated;
 grant execute on function public.shares_space_with(uuid) to authenticated;
 grant execute on function public.is_shared_board_item(uuid) to authenticated;
 grant execute on function public.set_recipe_mark(uuid, text, int, boolean) to authenticated;
+grant execute on function public.is_admin()                                    to authenticated;
+grant execute on function public.admin_list_users()                            to authenticated;
+grant execute on function public.admin_list_spaces()                           to authenticated;
+grant execute on function public.admin_save_space(uuid, text, text[], uuid[])  to authenticated;
+grant execute on function public.admin_set_user_spaces(uuid, uuid[])           to authenticated;
+grant execute on function public.admin_set_display_name(uuid, text)            to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime: add the space-scoped tables to the `supabase_realtime` publication
@@ -1295,13 +1533,21 @@ create policy "members delete little guy photos" on storage.objects
   );
 
 -- ============================================================================
--- Optional: seed your own space with the design's starter data. Run this AFTER
--- you've signed up once, replacing nothing — it uses your current auth.uid().
+-- Optional: on a fresh install, bootstrap the first space with the design's
+-- starter data. Create your account in the dashboard (Authentication → Add
+-- user), seed it into app_admins (see the Admins section above), then run this
+-- in the SQL Editor with your email filled in. enabled_features null = every
+-- feature. Later spaces and members come from the app's admin page.
 -- ----------------------------------------------------------------------------
--- with new_space as (
---   insert into public.spaces (name) values ('Our city, together') returning id
+-- with me as (
+--   select id from auth.users where email = '<owner email>'
+-- ), new_space as (
+--   insert into public.spaces (name, enabled_features)
+--   values ('Our city, together', null) returning id
+-- ), membership as (
+--   insert into public.space_members (space_id, user_id)
+--   select new_space.id, me.id from new_space, me
 -- )
--- -- the trigger adds you as a member automatically.
 -- insert into public.categories (space_id, name, color_index)
 -- select id, c.name, c.ci from new_space,
 --   (values ('Outdoor',0),('City',1),('Brain',2)) as c(name, ci);

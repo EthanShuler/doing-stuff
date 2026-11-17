@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TierItem, TierList, TierPlacement, TierCompletion } from '../../types'
 import {
   TIERS,
+  boardViewers,
   datesArePersonal,
   deriveBoard,
   distinctTags,
@@ -580,5 +581,43 @@ describe('tierSwatch', () => {
     const swatches = TIERS.map((t) => tierSwatch(t))
     for (const s of swatches) expect(palette).toContain(s)
     expect(new Set(swatches.map((s) => s.color)).size).toBe(TIERS.length)
+  })
+})
+
+// --- boardViewers -----------------------------------------------------------------
+
+describe('boardViewers', () => {
+  const profiles = [
+    { id: 'u1', email: 'avery@example.com', displayName: 'Avery' },
+    { id: 'u2', email: 'jordan@example.com', displayName: 'Jordan' },
+    { id: 'u3', email: 'sam.lee@example.com', displayName: null },
+    // A co-member from another of u1's spaces — visible under RLS, not here.
+    { id: 'x9', email: 'other@example.com', displayName: 'Outsider' },
+  ]
+
+  it('is just you in a one-member space', () => {
+    expect(boardViewers(['u1'], profiles, 'u1')).toEqual([{ id: 'u1', label: 'You' }])
+  })
+
+  it('puts you first, then the others in join order', () => {
+    expect(boardViewers(['u2', 'u1', 'u3'], profiles, 'u1')).toEqual([
+      { id: 'u1', label: 'You' },
+      { id: 'u2', label: 'Jordan' },
+      { id: 'u3', label: 'sam.lee' },
+    ])
+  })
+
+  it('leaves out profiles from another space', () => {
+    const ids = boardViewers(['u1', 'u2'], profiles, 'u1').map((v) => v.id)
+    expect(ids).toEqual(['u1', 'u2'])
+    expect(ids).not.toContain('x9')
+  })
+
+  it('falls back to "Member" for a member with no visible profile', () => {
+    expect(boardViewers(['u1', 'u7'], profiles, 'u1')[1]).toEqual({ id: 'u7', label: 'Member' })
+  })
+
+  it('is empty without a signed-in self', () => {
+    expect(boardViewers(['u1', 'u2'], profiles, null)).toEqual([])
   })
 })

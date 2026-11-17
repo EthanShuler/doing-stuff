@@ -149,7 +149,7 @@ test('create a season copying Fall 2026, then delete it', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Edit season' }).click()
   await page.getByRole('button', { name: 'Delete season' }).click()
-  await expect(page.getByText('Delete "Fall 2027" for both of you?')).toBeVisible()
+  await expect(page.getByText('Delete "Fall 2027" for everyone?')).toBeVisible()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page).toHaveURL('/seasons/fall-2026')
   await expect(page.getByRole('button', { name: /Fall 2027$/ })).toHaveCount(0)

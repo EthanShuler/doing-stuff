@@ -1,7 +1,7 @@
 {
   "name": "cajubinile.com",
   "short_name": "cajubinile",
-  "description": "Our shared things: doing stuff, tier lists, lists, seasons, parks, recipes and more.",
+  "description": "Logs, lists and rankings for your space.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

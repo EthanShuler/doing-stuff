@@ -143,7 +143,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
         closeModal()
         return
       }
-      if (!(await confirm({ title: 'Delete this recipe for both of you?', message: 'Its photo is removed too.' }))) return
+      if (!(await confirm({ title: 'Delete this recipe for everyone?', message: 'Its photo is removed too.' }))) return
       try {
         await store.deleteRecipe(editingId)
         closeModal()
@@ -258,7 +258,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
               ) : (
                 <EmptyCard
                   title="No recipes yet"
-                  blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
+                  blurb="Only a title is required."
                 />
               )
             ) : view === 'list' ? (
