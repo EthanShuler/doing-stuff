@@ -120,6 +120,11 @@ export interface TierList {
    *  null userId and either member may write them); false = the usual board
    *  per person. */
   shared: boolean
+  /** Lineage: the ROOT row this was pulled from in another space
+   *  (\`source.copiedFrom ?? source.id\` — see originOf in lib/lineage.ts),
+   *  or null for a row made here. A matching hint for re-pulls, never
+   *  authorization. Normal creates and edits never set it. */
+  copiedFrom: string | null
   /** auth.users id of the member who created it (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp; orders the picker pills. */
@@ -150,6 +155,11 @@ export interface TierItem {
   /** Who made it — author for books, director for movies, etc. (per-kind label
    *  in copy.ts). Free text, shared like the title. '' = unknown/not entered. */
   creator: string
+  /** Lineage: the ROOT row this was pulled from in another space
+   *  (\`source.copiedFrom ?? source.id\` — see originOf in lib/lineage.ts),
+   *  or null for a row made here. A matching hint for re-pulls, never
+   *  authorization. Normal creates and edits never set it. */
+  copiedFrom: string | null
   /** auth.users id of the member who added it (null for legacy rows). */
   createdBy: string | null
   /** ISO timestamp; orders the unranked shelf. */
@@ -327,6 +337,11 @@ export interface Recipe {
   /** groceryList lines (by text) flagged as pantry staples — the grocery step
    *  starts them unticked. */
   stapleItems: string[]
+  /** Lineage: the ROOT row this was pulled from in another space
+   *  (\`source.copiedFrom ?? source.id\` — see originOf in lib/lineage.ts),
+   *  or null for a row made here. A matching hint for re-pulls, never
+   *  authorization. Normal creates and edits never set it. */
+  copiedFrom: string | null
   /** auth.users id of the member who added it (shown as a faint byline). */
   createdBy: string | null
   /** ISO timestamp; the byline's "added" date and the A–Z tiebreak. */

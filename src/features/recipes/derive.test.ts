@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../../types'
 import {
+  cloneRecipe,
   distinctRecipeTags,
   filterRecipes,
   ingredientLines,
   isStapleItem,
   keptStaples,
+  recipePullChoices,
   remapMarks,
   servingsTimeLine,
   sortRecipes,
@@ -31,6 +33,7 @@ const recipe = (overrides: Partial<Recipe>): Recipe => ({
   doneSteps: [],
   groceryList: '',
   stapleItems: [],
+  copiedFrom: null,
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
   ...overrides,
@@ -208,5 +211,105 @@ describe('grocery list staples', () => {
   it('keeps only flags whose line survives, spelled as the list spells it', () => {
     expect(keptStaples(['Salt', 'onion', 'salt'], ['salt', 'cumin'])).toEqual(['Salt', 'salt'])
     expect(keptStaples(['onion'], ['salt'])).toEqual([])
+  })
+})
+
+describe('recipePullChoices', () => {
+  const matchOf = (choices: ReturnType<typeof recipePullChoices>, id: string) =>
+    choices.find((c) => c.recipe.id === id)?.match
+
+  it('matches by lineage when the target was pulled from the source', () => {
+    const source = [recipe({ id: 's1', title: 'Soup' })]
+    const target = [recipe({ id: 't1', title: 'Renamed soup', copiedFrom: 's1' })]
+    expect(matchOf(recipePullChoices(source, target), 's1')).toBe('lineage')
+  })
+
+  it('matches by lineage when the source was pulled from the target', () => {
+    const source = [recipe({ id: 's1', title: 'Soup', copiedFrom: 't1' })]
+    const target = [recipe({ id: 't1', title: 'Soup' })]
+    expect(matchOf(recipePullChoices(source, target), 's1')).toBe('lineage')
+  })
+
+  it('matches by lineage when both descend from a common root', () => {
+    const source = [recipe({ id: 's1', title: 'Soup', copiedFrom: 'root' })]
+    const target = [recipe({ id: 't1', title: 'Other', copiedFrom: 'root' })]
+    expect(matchOf(recipePullChoices(source, target), 's1')).toBe('lineage')
+  })
+
+  it('falls back to a title match, ignoring case and spacing', () => {
+    const source = [recipe({ id: 's1', title: '  Miso   Soup ' })]
+    const target = [recipe({ id: 't1', title: 'miso soup' })]
+    expect(matchOf(recipePullChoices(source, target), 's1')).toBe('title')
+  })
+
+  it('prefers lineage over title', () => {
+    const source = [recipe({ id: 's1', title: 'Soup' })]
+    const target = [recipe({ id: 't1', title: 'Soup', copiedFrom: 's1' })]
+    expect(matchOf(recipePullChoices(source, target), 's1')).toBe('lineage')
+  })
+
+  it('leaves unrelated recipes unmatched and sorts A–Z', () => {
+    const source = [recipe({ id: 's2', title: 'zucchini bread' }), recipe({ id: 's1', title: 'Apple pie' })]
+    const choices = recipePullChoices(source, [recipe({ id: 't1', title: 'Soup' })])
+    expect(choices.map((c) => c.recipe.id)).toEqual(['s1', 's2'])
+    expect(choices.map((c) => c.match)).toEqual([null, null])
+  })
+})
+
+describe('cloneRecipe', () => {
+  const source = recipe({
+    id: 's1',
+    title: 'Shakshuka',
+    imageUrl: 'https://example.com/old.jpg',
+    ingredients: '5 eggs\ntomatoes',
+    steps: 'One.\n\nTwo.',
+    source: 'Smitten Kitchen',
+    sourceUrl: 'https://smittenkitchen.com',
+    tags: ['dinner'],
+    servings: '3',
+    totalTime: '40 min',
+    notes: 'More garlic.',
+    crossedIngredients: [0, 1],
+    doneSteps: [1],
+    groceryList: 'eggs\ncumin',
+    stapleItems: ['cumin'],
+    createdBy: 'u9',
+  })
+
+  it('carries the written-out fields over with the copied photo', () => {
+    const clone = cloneRecipe(source, 'https://example.com/new.jpg')
+    expect(clone).toMatchObject({
+      title: 'Shakshuka',
+      imageUrl: 'https://example.com/new.jpg',
+      ingredients: '5 eggs\ntomatoes',
+      steps: 'One.\n\nTwo.',
+      source: 'Smitten Kitchen',
+      sourceUrl: 'https://smittenkitchen.com',
+      tags: ['dinner'],
+      servings: '3',
+      totalTime: '40 min',
+      notes: 'More garlic.',
+      groceryList: 'eggs\ncumin',
+      stapleItems: ['cumin'],
+    })
+    expect(clone).not.toHaveProperty('id')
+    expect(clone).not.toHaveProperty('createdBy')
+  })
+
+  it('clears the cooking marks', () => {
+    const clone = cloneRecipe(source, '')
+    expect(clone.crossedIngredients).toEqual([])
+    expect(clone.doneSteps).toEqual([])
+  })
+
+  it('records the root origin: the source id, or its own lineage', () => {
+    expect(cloneRecipe(source, '').copiedFrom).toBe('s1')
+    expect(cloneRecipe({ ...source, copiedFrom: 'root' }, '').copiedFrom).toBe('root')
+  })
+
+  it("doesn't share arrays with the source", () => {
+    const clone = cloneRecipe(source, '')
+    expect(clone.tags).not.toBe(source.tags)
+    expect(clone.stapleItems).not.toBe(source.stapleItems)
   })
 })

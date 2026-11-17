@@ -5,10 +5,12 @@ import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCom
 import { supabase } from '../../lib/supabase'
 import { firstGrapheme } from '../../lib/text'
 import { renormalizedPositions } from '../../lib/order'
-import { datesArePersonal, dropItemRows, itemIdsOnList, keyOf, kindColumn, listIdOf, listKeyFor, normalizeTags, placementOwner } from './derive'
+import { datesArePersonal, dropItemRows, itemIdsOnList, keyOf, kindColumn, listIdOf, listKeyFor, normalizeTags, placementOwner, planTierPulls, sumTierPullSummaries, tierPullSummaryLine } from './derive'
+import type { TierPullData, TierPullOptions, TierPullSummary } from './derive'
 import type { ListDraft } from './ListModal'
 import { PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
+import { seedPullFetch } from '../../data/seedPullSource'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
 //   • Supabase keys present → live: reads/writes `tier_items` + `tier_placements`
@@ -35,7 +37,7 @@ import type { ProfileRow } from '../../data/spaceSync'
 // tags live in `tier_item_user_tags` (one row per item per member, members
 // read all, write only their own). The page only ever shows the viewer's.
 
-interface Snapshot {
+export interface Snapshot {
   /** The space's own lists ("Fruits"), in creation order. */
   lists: TierList[]
   items: TierItem[]
@@ -56,46 +58,46 @@ function seed(): Snapshot {
     lists: [
       // Ice cream is a space-defined list like any other (it used to be a
       // built-in kind — the 2026-09-13 migration converted it).
-      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', shared: false, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
-      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
+      { id: 'l0', name: 'Ice Cream', emoji: '🍦', noun: 'flavor', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T08:00:00Z' },
+      { id: 'l1', name: 'Fruits', emoji: '🍎', noun: 'fruit', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T09:00:00Z' },
       // A SHARED list too: one board both members rank (null-owner placements).
-      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', shared: true, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
+      { id: 'l2', name: 'Board games', emoji: '🎲', noun: 'game', shared: true, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-10T09:00:00Z' },
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
-      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', doneOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
-      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', doneOn: '2026-06-02', tags: ['fantasy'], creator: '', createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: '', createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
-      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', doneOn: '2026-06-14', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
-      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', doneOn: '2026-06-20', tags: ['sci-fi'], creator: '', createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
-      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', doneOn: '2026-06-08', tags: ['sci-fi'], creator: '', createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
-      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
-      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', doneOn: '2026-06-15', tags: ['fantasy'], creator: '', createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
-      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', doneOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
+      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', doneOn: '2026-06-02', tags: ['fantasy'], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
+      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', doneOn: '2026-06-14', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
+      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', doneOn: '2026-06-20', tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
+      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', doneOn: '2026-06-08', tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
+      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
+      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', doneOn: '2026-06-15', tags: ['fantasy'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
+      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
       // Books keep the shared doneOn null — read state is per person, in
       // `completions` below.
-      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', doneOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
-      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: 'Andy Weir', createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
-      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
-      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
-      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
+      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', doneOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
+      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: 'Andy Weir', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
+      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
+      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
+      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
       // Ice cream (custom list l0): a custom board tracks no date, so doneOn is
       // ignored there — an item is ranked, or it's on the unranked shelf.
-      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
-      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
-      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
-      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
+      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
+      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
+      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
+      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
       // The custom "Fruits" list — same shape as Ice Cream (no dates, one
       // shelf), keyed by `list:<id>` instead of a kind.
-      { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
-      { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
-      { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
+      { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
+      { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
+      { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
       // The shared Board games list: Catan ranked; Wingspan and Twilight
       // Imperium unranked.
-      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
-      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
+      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few built-in items stay unranked — and some undated → unwatched — to
@@ -145,6 +147,61 @@ function seed(): Snapshot {
   }
 }
 
+/**
+ * Keyless seed mode's "other space" for a pull (see data/seedPullSource.ts):
+ * the same shape fetchPullSource returns live — the source's lists and pool,
+ * plus only the puller's (u1's) own rows and a shared list's null-owner rows.
+ * Fixed and independent of seed() above, with deliberate overlap: Spirited
+ * Away (ranked here already — left alone), Blade Runner 2049 (here but
+ * unranked — gets a ranking), Severance, and the "Board games" list (matched
+ * by name; Catan already ranked on the shared board).
+ */
+export function seedTierPullSource(): TierPullData {
+  const at = (day: number, hour = 9) => `2026-03-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00Z`
+  const base = { imageUrl: '', doneOn: null, tags: [] as string[], creator: '', copiedFrom: null, createdBy: 'u1' }
+  return {
+    lists: [
+      { id: 'src-l1', name: 'Snacks', emoji: '🍿', noun: 'snack', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: at(1) },
+      { id: 'src-l2', name: 'Board games', emoji: '🎲', noun: 'game', shared: true, copiedFrom: null, createdBy: 'u2', createdAt: at(2) },
+    ],
+    items: [
+      // A shared done date there never comes over (it means "that group finished it").
+      { ...base, id: 'src-m1', kind: 'movie', title: 'Spirited Away', doneOn: '2026-03-01', createdAt: at(1, 10) },
+      { ...base, id: 'src-m2', kind: 'movie', title: 'Arrival', creator: 'Denis Villeneuve', tags: ['sci-fi'], doneOn: '2026-03-02', createdAt: at(2, 10) },
+      { ...base, id: 'src-m3', kind: 'movie', title: 'Moonlight', creator: 'Barry Jenkins', doneOn: '2026-03-03', createdAt: at(3, 10) },
+      { ...base, id: 'src-m4', kind: 'movie', title: 'Blade Runner 2049', doneOn: '2026-03-04', createdAt: at(4, 10) },
+      { ...base, id: 'src-m5', kind: 'movie', title: 'Cats', createdAt: at(5, 10) },
+      { ...base, id: 'src-t1', kind: 'tv', title: 'Fleabag', doneOn: '2026-03-05', createdAt: at(1, 11) },
+      { ...base, id: 'src-t2', kind: 'tv', title: 'Severance', doneOn: '2026-03-06', createdAt: at(2, 11) },
+      { ...base, id: 'src-b1', kind: 'book', title: 'The Left Hand of Darkness', creator: 'Ursula K. Le Guin', tags: ['classic'], createdAt: at(1, 12) },
+      { ...base, id: 'src-s1', kind: 'list:src-l1', title: 'Pretzels', createdAt: at(1, 13) },
+      { ...base, id: 'src-s2', kind: 'list:src-l1', title: 'Seaweed snacks', createdAt: at(2, 13) },
+      { ...base, id: 'src-s3', kind: 'list:src-l1', title: 'Licorice', createdAt: at(3, 13) },
+      { ...base, id: 'src-g1', kind: 'list:src-l2', title: 'Catan', createdAt: at(2, 14) },
+      { ...base, id: 'src-g2', kind: 'list:src-l2', title: 'Azul', createdAt: at(3, 14) },
+    ],
+    placements: [
+      { id: 'src-p1', itemId: 'src-m1', userId: 'u1', tier: 'A', position: 1 },
+      { id: 'src-p2', itemId: 'src-m2', userId: 'u1', tier: 'S', position: 1 },
+      { id: 'src-p3', itemId: 'src-m3', userId: 'u1', tier: 'A', position: 2 },
+      { id: 'src-p4', itemId: 'src-m4', userId: 'u1', tier: 'B', position: 1 },
+      { id: 'src-p5', itemId: 'src-t1', userId: 'u1', tier: 'S', position: 1 },
+      { id: 'src-p6', itemId: 'src-t2', userId: 'u1', tier: 'A', position: 1 },
+      { id: 'src-p7', itemId: 'src-b1', userId: 'u1', tier: 'A', position: 1 },
+      { id: 'src-p8', itemId: 'src-s1', userId: 'u1', tier: 'S', position: 1 },
+      { id: 'src-p9', itemId: 'src-s2', userId: 'u1', tier: 'B', position: 1 },
+      // The shared list's one board.
+      { id: 'src-p10', itemId: 'src-g1', userId: null, tier: 'B', position: 1 },
+      { id: 'src-p11', itemId: 'src-g2', userId: null, tier: 'A', position: 1 },
+    ],
+    completions: [{ id: 'src-r1', itemId: 'src-b1', userId: 'u1', doneOn: '2026-02-14' }],
+    userTags: [
+      { id: 'src-ut1', itemId: 'src-m2', userId: 'u1', tags: ['rewatch'] },
+      { id: 'src-ut2', itemId: 'src-b1', userId: 'u1', tags: ['book club'] },
+    ],
+  }
+}
+
 // --- Row → app-type mappers (DB is snake_case) ---
 
 type TierListRow = {
@@ -153,6 +210,7 @@ type TierListRow = {
   emoji: string | null
   noun: string
   shared: boolean
+  copied_from: string | null
   created_by: string | null
   created_at: string
 }
@@ -165,6 +223,7 @@ type TierItemRow = {
   done_on: string | null
   tags: string[] | null
   creator: string | null
+  copied_from: string | null
   created_by: string | null
   created_at: string
 }
@@ -195,6 +254,7 @@ const toTierList = (r: TierListRow): TierList => ({
   emoji: r.emoji ?? '',
   noun: r.noun,
   shared: r.shared,
+  copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -207,6 +267,7 @@ const toTierItem = (r: TierItemRow): TierItem => ({
   doneOn: r.done_on,
   tags: r.tags ?? [],
   creator: r.creator ?? '',
+  copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
 })
@@ -230,14 +291,89 @@ const toTierUserTags = (r: TierUserTagsRow): TierUserTags => ({
   tags: r.tags ?? [],
 })
 
-const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,created_by,created_at'
-const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,created_by,created_at'
+const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,copied_from,created_by,created_at'
+const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,copied_from,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
 const TIER_USER_TAGS_COLUMNS = 'id,item_id,user_id,tags'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('tx', 500)
+
+/** One space's full tier-list snapshot (live mode). The store's load and
+ *  resync use it for its own space. Throws on the first failed query. */
+export async function fetchTierSnapshot(spaceId: string): Promise<Snapshot> {
+  if (!supabase) throw new Error('fetchTierSnapshot needs Supabase')
+  const [ls, its, places, comps_, utags, profs, members] = await Promise.all([
+    supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
+    supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
+    supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
+    supabase.from('tier_item_completions').select(TIER_COMPLETION_COLUMNS).eq('space_id', spaceId).order('created_at'),
+    supabase.from('tier_item_user_tags').select(TIER_USER_TAGS_COLUMNS).eq('space_id', spaceId),
+    // RLS scopes this to the current user + anyone they share a space with.
+    supabase.from('profiles').select(PROFILE_COLUMNS),
+    // ...so the boards to pick from come from THIS space's membership.
+    supabase.from('space_members').select('user_id,created_at').eq('space_id', spaceId).order('created_at'),
+  ])
+  if (ls.error) throw ls.error
+  if (its.error) throw its.error
+  if (places.error) throw places.error
+  if (comps_.error) throw comps_.error
+  if (utags.error) throw utags.error
+  if (profs.error) throw profs.error
+  if (members.error) throw members.error
+  return {
+    lists: (ls.data as TierListRow[]).map(toTierList),
+    items: (its.data as TierItemRow[]).map(toTierItem),
+    placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
+    completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
+    userTags: (utags.data as TierUserTagsRow[]).map(toTierUserTags),
+    profiles: (profs.data as ProfileRow[]).map(toProfile),
+    memberIds: (members.data as { user_id: string }[]).map((m) => m.user_id),
+  }
+}
+
+/**
+ * What a pull reads from another space the caller belongs to: its lists and
+ * pool, plus only the CALLER's own placements / completions / personal tags
+ * and the null-owner placements (shared lists' boards) — by `space_id` +
+ * `user_id`, never a long `.in('item_id', …)`. Nobody else's opinions are
+ * fetched. Keyless seed mode answers with seedTierPullSource().
+ */
+export async function fetchPullSource(sourceSpaceId: string, selfId: string): Promise<TierPullData> {
+  if (!supabase) return seedPullFetch(seedTierPullSource)
+  const [ls, its, places, comps_, utags] = await Promise.all([
+    supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', sourceSpaceId).order('created_at'),
+    supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', sourceSpaceId).order('created_at'),
+    supabase
+      .from('tier_placements')
+      .select(TIER_PLACEMENT_COLUMNS)
+      .eq('space_id', sourceSpaceId)
+      .or(`user_id.eq.${selfId},user_id.is.null`)
+      .order('position'),
+    supabase.from('tier_item_completions').select(TIER_COMPLETION_COLUMNS).eq('space_id', sourceSpaceId).eq('user_id', selfId),
+    supabase.from('tier_item_user_tags').select(TIER_USER_TAGS_COLUMNS).eq('space_id', sourceSpaceId).eq('user_id', selfId),
+  ])
+  if (ls.error) throw ls.error
+  if (its.error) throw its.error
+  if (places.error) throw places.error
+  if (comps_.error) throw comps_.error
+  if (utags.error) throw utags.error
+  return {
+    lists: (ls.data as TierListRow[]).map(toTierList),
+    items: (its.data as TierItemRow[]).map(toTierItem),
+    placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
+    completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
+    userTags: (utags.data as TierUserTagsRow[]).map(toTierUserTags),
+  }
+}
+
+/** Append the rows whose (itemId, userId) isn't taken yet — a pull's
+ *  insert-if-absent for placements and completions. */
+const insertAbsent = <R extends { itemId: string; userId: string | null }>(prev: R[], rows: R[]): R[] => [
+  ...prev,
+  ...rows.filter((r) => !prev.some((x) => x.itemId === r.itemId && x.userId === r.userId)),
+]
 
 // A placement's logical identity is (itemId, userId) — the DB enforces it
 // unique (nulls included: a shared board's null owner is one owner). Upserting
@@ -279,6 +415,9 @@ export interface TierListStore {
   /** Last failed write's message. Cleared when a new write starts, or via clearError. */
   error: string | null
   clearError: () => void
+  /** A non-fatal note — what the last pull brought. */
+  notice: string | null
+  clearNotice: () => void
 
   /** Add to the shared pool. `creator` is who made it (author/director — see
    *  copy.ts). `dateOn` is an ISO date or null (= none yet): the shared
@@ -323,6 +462,15 @@ export interface TierListStore {
    *  placements/completions of them). Mirrored locally slice by slice (itemIdsOnList / dropItemRows).
    *  Throws on failure. */
   deleteList: (id: string) => Promise<void>
+
+  /** Read another space (one the caller belongs to) for a pull: its boards
+   *  plus the caller's own rows there. Throws on failure. */
+  loadPullSource: (sourceSpaceId: string) => Promise<TierPullData>
+  /** Pull boards (source ListKeys) from another space into this one — a
+   *  re-readable merge planned against the current state (see planTierPull).
+   *  Sets `notice` with what came over. Throws on failure with `error` set;
+   *  a failure after the items landed says to pull again, which finishes. */
+  pullBoards: (sourceSpaceId: string, keys: ListKey[], opts: TierPullOptions) => Promise<TierPullSummary>
 }
 
 /** Normalize a list draft for saving: trimmed words, one emoji. */
@@ -347,6 +495,8 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
+  const [notice, setNotice] = useState<string | null>(null)
+  const clearNotice = useCallback(() => setNotice(null), [])
 
   const selfId = supabase ? userId : SEED_SELF_ID
 
@@ -355,33 +505,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // optimistic drop. Throws on the first failed query.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [ls, its, places, comps_, utags, profs, members] = await Promise.all([
-      supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
-      supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
-      supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
-      supabase.from('tier_item_completions').select(TIER_COMPLETION_COLUMNS).eq('space_id', spaceId).order('created_at'),
-      supabase.from('tier_item_user_tags').select(TIER_USER_TAGS_COLUMNS).eq('space_id', spaceId),
-      // RLS scopes this to the current user + anyone they share a space with.
-      supabase.from('profiles').select(PROFILE_COLUMNS),
-      // ...so the boards to pick from come from THIS space's membership.
-      supabase.from('space_members').select('user_id,created_at').eq('space_id', spaceId).order('created_at'),
-    ])
-    if (ls.error) throw ls.error
-    if (its.error) throw its.error
-    if (places.error) throw places.error
-    if (comps_.error) throw comps_.error
-    if (utags.error) throw utags.error
-    if (profs.error) throw profs.error
-    if (members.error) throw members.error
-    return {
-      lists: (ls.data as TierListRow[]).map(toTierList),
-      items: (its.data as TierItemRow[]).map(toTierItem),
-      placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
-      completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
-      userTags: (utags.data as TierUserTagsRow[]).map(toTierUserTags),
-      profiles: (profs.data as ProfileRow[]).map(toProfile),
-      memberIds: (members.data as { user_id: string }[]).map((m) => m.user_id),
-    }
+    return fetchTierSnapshot(spaceId)
   }, [spaceId])
 
   const applySnapshot = useCallback((snap: Snapshot) => {
@@ -553,6 +677,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         doneOn: personal ? null : dateOn,
         tags: cleanTags,
         creator: maker,
+        copiedFrom: null,
         createdBy: selfId,
         createdAt: new Date().toISOString(),
       }
@@ -744,7 +869,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         upsertById(setLists, created)
         return created
       }
-      const created: TierList = { id: nextId(), ...clean, createdBy: selfId, createdAt: new Date().toISOString() }
+      const created: TierList = { id: nextId(), ...clean, copiedFrom: null, createdBy: selfId, createdAt: new Date().toISOString() }
       setLists((prev) => [...prev, created])
       return created
     },
@@ -796,6 +921,142 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     [spaceId, items],
   )
 
+  // --- Pull from another space ---
+
+  const loadPullSource = useCallback(
+    async (sourceSpaceId: string) => {
+      if (!selfId) throw new Error('Sign in to pull.')
+      return fetchPullSource(sourceSpaceId, selfId)
+    },
+    [selfId],
+  )
+
+  const pullBoards = useCallback(
+    async (sourceSpaceId: string, keys: ListKey[], opts: TierPullOptions): Promise<TierPullSummary> => {
+      setError(null)
+      setNotice(null)
+      if (!selfId) {
+        const err = new Error('Sign in to pull.')
+        setError(err.message)
+        throw err
+      }
+      let data: TierPullData
+      try {
+        data = await fetchPullSource(sourceSpaceId, selfId)
+      } catch (err) {
+        setError(`Couldn't read the other space: ${errorMessage(err)}`)
+        throw err
+      }
+      // Plan against what this tab holds right now. Live ids are minted here
+      // so a plan's rows can reference each other (item → list, placement →
+      // item) inside one multi-row statement per table.
+      const mint = supabase ? () => crypto.randomUUID() : nextId
+      const plans = planTierPulls(data, keys, { lists, items, placements, completions, userTags }, selfId, mint, new Date().toISOString(), opts)
+      const summary = sumTierPullSummaries(plans)
+      const newLists = plans.flatMap((p) => (p.newList ? [p.newList] : []))
+      const newItems = plans.flatMap((p) => p.newItems)
+      const newPlacements = plans.flatMap((p) => p.newPlacements)
+      const newCompletions = plans.flatMap((p) => p.newCompletions)
+      const tagUpserts = plans.flatMap((p) => p.userTagUpserts)
+      const line = tierPullSummaryLine(summary)
+      const done = () => {
+        setNotice(line ? `Pulled: ${line}.` : 'Nothing new to pull.')
+        return summary
+      }
+
+      if (!supabase || !spaceId) {
+        setLists((prev) => [...prev, ...newLists])
+        setItems((prev) => [...prev, ...newItems])
+        setPlacements((prev) => insertAbsent(prev, newPlacements))
+        setCompletions((prev) => insertAbsent(prev, newCompletions))
+        setUserTags((prev) => [
+          ...prev.filter((r) => !tagUpserts.some((t) => t.itemId === r.itemId && t.userId === r.userId)),
+          ...tagUpserts,
+        ])
+        return done()
+      }
+
+      const fail = (message: string, err: unknown): never => {
+        setError(message)
+        throw err
+      }
+
+      // 1. Lists, then 2. items — each one multi-row insert, the returned
+      //    rows upserted by id (a realtime echo may land first).
+      if (newLists.length) {
+        const { data: rows, error: err } = await supabase
+          .from('tier_lists')
+          .insert(newLists.map((l) => ({ id: l.id, space_id: spaceId, name: l.name, emoji: l.emoji, noun: l.noun, shared: l.shared, copied_from: l.copiedFrom })))
+          .select(TIER_LIST_COLUMNS)
+        if (err) fail(`Pull failed: ${err.message}`, err)
+        for (const row of rows as TierListRow[]) upsertById(setLists, toTierList(row))
+      }
+      if (newItems.length) {
+        const { data: rows, error: err } = await supabase
+          .from('tier_items')
+          .insert(
+            newItems.map((i) => ({
+              id: i.id,
+              space_id: spaceId,
+              kind: kindColumn(i.kind),
+              list_id: listIdOf(i.kind),
+              title: i.title,
+              image_url: i.imageUrl,
+              creator: i.creator,
+              done_on: null,
+              tags: i.tags,
+              copied_from: i.copiedFrom,
+              // Stepped by 1 ms in source order, so the Unranked shelf keeps it.
+              created_at: i.createdAt,
+            })),
+          )
+          .select(TIER_ITEM_COLUMNS)
+        if (err) fail(newLists.length ? 'Lists copied, but their items failed — pull again to finish.' : `Pull failed: ${err.message}`, err)
+        for (const row of rows as TierItemRow[]) upsertById(setItems, toTierItem(row))
+      }
+
+      // 3. The caller's own rows on top: rankings and read dates are
+      //    insert-if-absent (a card placed meanwhile stays put); personal tags
+      //    upsert the union. Independent of each other, so in parallel.
+      const [placed, read, tagged] = await Promise.all([
+        newPlacements.length
+          ? supabase
+              .from('tier_placements')
+              .upsert(
+                newPlacements.map((p) => ({ id: p.id, space_id: spaceId, item_id: p.itemId, user_id: p.userId, tier: p.tier, position: p.position })),
+                { onConflict: 'item_id,user_id', ignoreDuplicates: true },
+              )
+              .select(TIER_PLACEMENT_COLUMNS)
+          : null,
+        newCompletions.length
+          ? supabase
+              .from('tier_item_completions')
+              .upsert(
+                newCompletions.map((r) => ({ id: r.id, space_id: spaceId, item_id: r.itemId, user_id: r.userId, done_on: r.doneOn })),
+                { onConflict: 'item_id,user_id', ignoreDuplicates: true },
+              )
+              .select(TIER_COMPLETION_COLUMNS)
+          : null,
+        tagUpserts.length
+          ? supabase
+              .from('tier_item_user_tags')
+              .upsert(
+                tagUpserts.map((r) => ({ space_id: spaceId, item_id: r.itemId, user_id: r.userId, tags: r.tags })),
+                { onConflict: 'item_id,user_id' },
+              )
+              .select(TIER_USER_TAGS_COLUMNS)
+          : null,
+      ])
+      for (const row of (placed?.data ?? []) as TierPlacementRow[]) upsertPlacement(setPlacements, toTierPlacement(row))
+      for (const row of (read?.data ?? []) as TierCompletionRow[]) upsertCompletion(setCompletions, toTierCompletion(row))
+      for (const row of (tagged?.data ?? []) as TierUserTagsRow[]) upsertUserTags(setUserTags, toTierUserTags(row))
+      const laterErr = placed?.error ?? read?.error ?? tagged?.error
+      if (laterErr) fail('Items copied, but rankings failed — pull again to finish.', laterErr)
+      return done()
+    },
+    [spaceId, selfId, lists, items, placements, completions, userTags],
+  )
+
   return {
     lists,
     items,
@@ -808,6 +1069,8 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     loading,
     error,
     clearError,
+    notice,
+    clearNotice,
     addItem,
     updateItem,
     deleteItem,
@@ -820,5 +1083,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     addList,
     updateList,
     deleteList,
+    loadPullSource,
+    pullBoards,
   }
 }

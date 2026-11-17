@@ -1,6 +1,8 @@
 import type { Recipe } from '../../types'
 import { fuzzyMatch } from '../../lib/fuzzy'
 import { distinctTagList, tagMatcher } from '../../lib/tags'
+import { originOf } from '../../lib/lineage'
+import { titleKey } from '../../lib/text'
 
 // Pure data-shaping for the recipes feature: parsing the light structure out
 // of the plain-text fields, plus the index's sort / search / tag filter.
@@ -130,4 +132,55 @@ export function toggleStapleItem(stapleItems: string[], line: string): string[] 
  *  spelled as the list now spells it, without repeats. */
 export function keptStaples(lines: string[], stapleItems: string[]): string[] {
   return [...new Set(lines.filter((line) => isStapleItem(line, stapleItems)))]
+}
+
+// --- Pulling recipes from another space ---
+
+/** How a source recipe relates to this space's cookbook:
+ *  • 'lineage' — the same recipe (one was pulled from the other, or both from
+ *    a common root): it's already here, so the picker disables it.
+ *  • 'title'   — a different recipe that happens to share the title: still
+ *    pullable, just flagged so nobody duplicates by accident.
+ *  • null      — new here. */
+export type RecipePullMatch = 'lineage' | 'title' | null
+
+export interface RecipePullChoice {
+  recipe: Recipe
+  match: RecipePullMatch
+}
+
+/** Every source recipe with its match against `target`, A–Z like the index.
+ *  Lineage wins over title (a renamed copy is still "already here"). */
+export function recipePullChoices(source: Recipe[], target: Recipe[]): RecipePullChoice[] {
+  const origins = new Set(target.map(originOf))
+  const titles = new Set(target.map((recipe) => titleKey(recipe.title)))
+  return sortRecipes(source).map((recipe) => ({
+    recipe,
+    match: origins.has(originOf(recipe)) ? 'lineage' : titles.has(titleKey(recipe.title)) ? 'title' : null,
+  }))
+}
+
+/** What a pull inserts for one source recipe: everything written on it
+ *  (title, ingredients, steps, source + link, tags, servings, time, notes,
+ *  grocery list + staple flags) with the copied photo's URL, the cooking
+ *  marks cleared (they're this batch's state, not the recipe's), and
+ *  `copiedFrom` = the source's ROOT origin (lib/lineage.ts). */
+export function cloneRecipe(source: Recipe, imageUrl: string): Omit<Recipe, 'id' | 'createdBy' | 'createdAt'> {
+  return {
+    title: source.title,
+    imageUrl,
+    ingredients: source.ingredients,
+    steps: source.steps,
+    source: source.source,
+    sourceUrl: source.sourceUrl,
+    tags: [...source.tags],
+    servings: source.servings,
+    totalTime: source.totalTime,
+    notes: source.notes,
+    groceryList: source.groceryList,
+    stapleItems: [...source.stapleItems],
+    crossedIngredients: [],
+    doneSteps: [],
+    copiedFrom: originOf(source),
+  }
 }

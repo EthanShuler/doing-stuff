@@ -1,4 +1,4 @@
-import { removeBucketPhoto, uploadBucketPhoto } from '../../lib/photos'
+import { copyBucketPhoto, removeBucketPhoto, uploadBucketPhoto } from '../../lib/photos'
 
 // Recipe photos live in the public `recipes` storage bucket — see
 // src/lib/photos.ts for the shared upload/cleanup mechanics.
@@ -11,3 +11,8 @@ export const uploadRecipePhoto = (spaceId: string | null, file: File): Promise<s
 
 /** Best-effort removal of an uploaded recipe photo (fire-and-forget). */
 export const removeRecipePhoto = (url: string): void => removeBucketPhoto(BUCKET, url)
+
+/** Duplicate a recipe photo into another space for a pull (see
+ *  copyBucketPhoto — '' stays '', throws on failure). */
+export const copyRecipePhoto = (url: string, toSpaceId: string | null): Promise<string> =>
+  copyBucketPhoto(BUCKET, url, toSpaceId)

@@ -17,3 +17,13 @@ export function firstGrapheme(value: string): string {
   }
   return [...trimmed][0] ?? trimmed
 }
+
+/**
+ * The key two titles are "the same title" by: trimmed, lowercased, inner
+ * whitespace runs collapsed to one space. Used wherever a write reuses a row
+ * by name instead of duplicating it — the Lists check-off finding its tier
+ * item, and a cross-space pull matching rows that carry no lineage.
+ */
+export function titleKey(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}

@@ -35,6 +35,7 @@ const recipe = (id: string, title: string, ingredients = ''): Recipe => ({
   doneSteps: [],
   groceryList: '',
   stapleItems: [],
+  copiedFrom: null,
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
 })

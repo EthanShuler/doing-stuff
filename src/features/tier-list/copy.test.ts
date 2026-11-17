@@ -8,6 +8,7 @@ const list = (over: Partial<TierList> = {}): TierList => ({
   emoji: '🍎',
   noun: 'fruit',
   shared: false,
+  copiedFrom: null,
   createdBy: 'u1',
   createdAt: '2026-06-09T09:00:00Z',
   ...over,

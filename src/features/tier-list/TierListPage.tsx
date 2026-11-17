@@ -12,6 +12,7 @@ import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
 import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
+import { PullButton } from '../../components/PullModal'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
 import { boardViewers, datesArePersonal, deriveBoard, distinctTags, distinctUserTags, filterByTags, filterByUserTags, isSharedBoard, listIdOf, listKeyFor, placementOwner, userTagMap } from './derive'
@@ -24,6 +25,7 @@ import { CardVisual } from './TierCard'
 import { ItemModal } from './ItemModal'
 import type { ItemDraft } from './ItemModal'
 import { ListPicker } from './ListPicker'
+import { TierPullModal } from './TierPullBody'
 import { ListModal, draftFromList, emptyListDraft } from './ListModal'
 import type { ListDraft } from './ListModal'
 
@@ -108,6 +110,15 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   // The list modal (create / re-word a space-defined list) is separate: it
   // edits the BOARD, not an item on it.
   const [listModalOpen, setListModalOpen] = useState(false)
+  // "Pull from…" another space (mounted only while open — each open starts fresh).
+  const [pullOpen, setPullOpen] = useState(false)
+  // What the last pull brought is a passing note: it clears itself.
+  const { notice, clearNotice } = store
+  useEffect(() => {
+    if (!notice) return
+    const timer = setTimeout(clearNotice, 6000)
+    return () => clearTimeout(timer)
+  }, [notice, clearNotice])
   const [listDraft, setListDraft] = useState<ListDraft>(emptyListDraft)
   const [editingList, setEditingList] = useState(false)
 
@@ -293,6 +304,12 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     <>
       <title>{`${copy.pageTitle} · cajubinile.com`}</title>
       <FloatingBanner message={store.error} tone="error" onDismiss={store.clearError} />
+      <FloatingBanner
+        message={store.notice}
+        tone="notice"
+        top={store.error ? 116 : 68}
+        onDismiss={store.clearNotice}
+      />
 
       <PageFrame>
         {/* Which list you're looking at — the four boards used to be four
@@ -349,7 +366,13 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               )}
             </>
           }
-          right={<Button onClick={openAdd}>+ Add {noun}</Button>}
+          right={
+            <>
+              {/* Renders nothing unless another space shows Tier Lists. */}
+              {!loadingData && <PullButton featureKey="tier-lists" onClick={() => setPullOpen(true)} />}
+              <Button onClick={openAdd}>+ Add {noun}</Button>
+            </>
+          }
         />
 
         {loadingData ? (
@@ -468,6 +491,8 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         onDelete={deleteActiveList}
         onClose={() => setListModalOpen(false)}
       />
+
+      {pullOpen && <TierPullModal store={store} currentKey={key} onClose={() => setPullOpen(false)} />}
 
       <ItemModal
         opened={modalOpen}

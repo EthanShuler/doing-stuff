@@ -125,6 +125,6 @@ export function copyFor(key: ListKey, lists: TierList[]): KindCopy {
   if (!listId) return KIND_COPY[key as TierKind]
   const list = lists.find((l) => l.id === listId)
   return customCopy(
-    list ?? { id: listId, name: 'List', emoji: '', noun: 'item', shared: false, createdBy: null, createdAt: '' },
+    list ?? { id: listId, name: 'List', emoji: '', noun: 'item', shared: false, copiedFrom: null, createdBy: null, createdAt: '' },
   )
 }
