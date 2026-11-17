@@ -6,13 +6,16 @@ import { defineConfig, devices } from '@playwright/test'
 // no network writes, same data every run.
 //
 // Port 5199 is dedicated to e2e (strictPort) so the suite can never attach to
-// a normally-launched dev server that has real keys loaded.
+// a normally-launched dev server that has real keys loaded. E2E_PORT overrides
+// it, so two suites (e.g. parallel agents) can run side by side.
+const PORT = process.env.E2E_PORT ?? '5199'
+
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:5199',
+    baseURL: `http://localhost:${PORT}`,
     // System Chrome — avoids Playwright's browser download.
     channel: 'chrome',
     trace: 'retain-on-failure',
@@ -31,8 +34,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5199 --strictPort',
-    url: 'http://localhost:5199',
+    command: `npm run dev -- --port ${PORT} --strictPort`,
+    url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },
   },
