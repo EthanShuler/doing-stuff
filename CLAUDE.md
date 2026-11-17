@@ -357,11 +357,11 @@ in one modal, which defaults a new guy's owner to the signed-in member;
 deleting confirms and takes his photo with him. Deliberately no dates, no map,
 no wishlist — a shelf, not a log.
 
-**Parks** (`/parks`) — the 63-national-parks tracker, and **the one feature
-still designed for two people**: everything below (person-fixed colors,
-Together, the split dot) applies to spaces of **one or two members**. A
-simpler group mode for three or more is planned on its own branch; until it
-lands, don't turn Parks on for a bigger space. The parks themselves are
+**Parks** (`/parks`) — the 63-national-parks tracker. It has **two modes**:
+everything below up to the group-mode paragraph (person-fixed colors,
+Together, the split dot) applies to spaces of **one or two members**; a space
+with three or more gets the simpler **group mode** described at the end of
+this section. The parks themselves are
 a **static in-repo list** (the parks feature's `parks.ts`: NPS park code as the
 stable id, name, states, region, lat/lng, year established, one-line blurb,
 nps.gov link) — deliberately no DB table. Only **visits** are stored:
@@ -1280,8 +1280,9 @@ and `src/lib/`.
   in this space" / "anyone" — never "both of you", "your partner", "you two",
   "together" (as in "do it together"), or "our" ("Search our recipes",
   "Our notes"). A per-person thing is "yours" / "only you see this". **Parks**
-  is the one deliberate exception: its Together / Separately design is for
-  spaces of one or two members (see Parks).
+  is the one deliberate exception: its Together / Separately design is only
+  for spaces of one or two members, and group mode (three or more) drops that
+  wording (see Parks).
 - **No filler taglines.** Empty states, hints and placeholders are short plain
   statements of fact ("Only a name is required.", "Checked-off rows move to
   Done.", "No entries in this view.") — not cheerleading ("a name is all it
