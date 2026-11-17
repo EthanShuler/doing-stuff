@@ -7,7 +7,9 @@ import { defineConfig, devices } from '@playwright/test'
 //
 // Port 5199 is dedicated to e2e (strictPort) so the suite can never attach to
 // a normally-launched dev server that has real keys loaded. E2E_PORT overrides
-// it, so two suites (e.g. parallel agents) can run side by side.
+// it, so two suites (e.g. parallel agents) can run side by side. (No
+// @types/node in this repo, hence the one-line declaration.)
+declare const process: { env: Record<string, string | undefined> }
 const PORT = process.env.E2E_PORT ?? '5199'
 
 export default defineConfig({
