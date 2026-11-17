@@ -13,13 +13,19 @@ import {
   useSpaceSync,
 } from '../../data/spaceSync'
 import type { ProfileRow } from '../../data/spaceSync'
+import { SEED_FRIEND_PROFILE, SEED_MEMBERS } from '../../data/seedSpaces'
+import { useSpaceContext } from '../../data/useSpace'
+import { isGroupSpace } from './derive'
 
 // Data seam for the parks tracker, mirroring the other stores' two modes:
 //   • Supabase keys present → live: reads/writes `park_visits` scoped to the
 //     space (shared data — uniform space-member RLS). Also reads profiles and
 //     the ordered membership: person-fixed pin colors are assigned by join
 //     order, so the store must know who joined first.
-//   • No keys → in-memory seed so the UI can be developed offline.
+//   • No keys → in-memory seed so the UI can be developed offline. Unlike
+//     the other seeds it follows the current seed space's membership
+//     (SEED_MEMBERS): the home space keeps the two-person seed, Friends has
+//     a third member and so shows group mode.
 //
 // The parks themselves are static in-repo data (parks.ts) — only visits sync.
 
@@ -30,10 +36,12 @@ interface Snapshot {
   memberIds: string[]
 }
 
-function seed(): Snapshot {
+function seed(seedSpaceId: string | null): Snapshot {
+  const memberIds = (seedSpaceId && SEED_MEMBERS[seedSpaceId]) || ['u1', 'u2']
+  const third = SEED_FRIEND_PROFILE.id
   return {
-    profiles: SEED_PROFILES,
-    memberIds: ['u1', 'u2'],
+    profiles: [...SEED_PROFILES, SEED_FRIEND_PROFILE],
+    memberIds,
     // Exercises every status the UI derives: a repeat park (Yosemite twice,
     // once together), solo parks for each member, an undated childhood visit,
     // a both-but-separately park (Great Smokies), and off-continental pins
@@ -47,6 +55,14 @@ function seed(): Snapshot {
       { id: 'v6', parkCode: 'hale', date: '2025-02-11', notes: 'Sunrise at the summit.', attendeeIds: ['u1', 'u2'], separate: false, createdBy: 'u1', createdAt: '2025-02-12T09:00:00Z' },
       { id: 'v7', parkCode: 'dena', date: '2018-07-30', notes: '', attendeeIds: ['u2'], separate: false, createdBy: 'u2', createdAt: '2018-07-31T09:00:00Z' },
       { id: 'v8', parkCode: 'grsm', date: null, notes: 'Both went as kids — decades apart.', attendeeIds: ['u1', 'u2'], separate: true, createdBy: 'u1', createdAt: '2026-02-01T09:00:00Z' },
+      // Group mode only (a space with the third member): a solo trip of
+      // theirs and one shared with Avery.
+      ...(memberIds.includes(third)
+        ? [
+            { id: 'v9', parkCode: 'olym', date: '2024-09-07', notes: 'Hoh Rain Forest in the rain, as promised.', attendeeIds: [third], separate: false, createdBy: third, createdAt: '2024-09-08T09:00:00Z' },
+            { id: 'v10', parkCode: 'yell', date: '2025-06-21', notes: 'Old Faithful, right on time.', attendeeIds: ['u1', third], separate: false, createdBy: 'u1', createdAt: '2025-06-22T09:00:00Z' },
+          ]
+        : []),
     ],
   }
 }
@@ -110,8 +126,10 @@ export interface ParkStore {
 }
 
 export function useParkStore(spaceId: string | null, userId: string | null): ParkStore {
-  // Keyless dev mode seeds synchronously so the UI never flashes empty.
-  const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed()))
+  // Keyless dev mode seeds synchronously so the UI never flashes empty. The
+  // routes remount per space, so the seed's space is fixed for this mount.
+  const seedSpaceId = useSpaceContext().current?.id ?? null
+  const [initial] = useState<Snapshot | null>(() => (supabase ? null : seed(seedSpaceId)))
   const [visits, setVisits] = useState<ParkVisit[]>(initial?.visits ?? [])
   const [profiles, setProfiles] = useState<Profile[]>(initial?.profiles ?? [])
   const [memberIds, setMemberIds] = useState<string[]>(initial?.memberIds ?? [])
@@ -120,6 +138,8 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
   const clearError = useCallback(() => setError(null), [])
 
   const selfId = supabase ? userId : SEED_SELF_ID
+  const group = isGroupSpace(memberIds)
+  const keepSeparate = (draft: VisitDraft) => !group && draft.attendeeIds.length > 1 && draft.separate
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
@@ -174,8 +194,9 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
         date: draft.date || null,
         notes: draft.notes.trim(),
         attendeeIds: draft.attendeeIds,
-        // The flag is meaningless on a solo trip — never persist it there.
-        separate: draft.attendeeIds.length > 1 && draft.separate,
+        // The flag is meaningless on a solo trip, and group mode (3+
+        // members) has no separately state — never persist it there.
+        separate: keepSeparate(draft),
       }
       if (supabase && spaceId) {
         const { data, error: err } = await supabase
@@ -203,7 +224,7 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
         { id: nextId(), ...fields, createdBy: selfId, createdAt: new Date().toISOString() },
       ])
     },
-    [spaceId, selfId],
+    [spaceId, selfId, group],
   )
 
   const updateVisit = useCallback(
@@ -215,7 +236,7 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
         date: draft.date || null,
         notes: draft.notes.trim(),
         attendeeIds: draft.attendeeIds,
-        separate: draft.attendeeIds.length > 1 && draft.separate,
+        separate: keepSeparate(draft),
       }
       if (supabase && spaceId) {
         const { error: err } = await supabase
@@ -235,7 +256,7 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
       }
       setVisits((prev) => (prev.map((v) => (v.id === id ? { ...v, ...fields } : v))))
     },
-    [spaceId],
+    [spaceId, group],
   )
 
   const deleteVisit = useCallback(

@@ -4,14 +4,18 @@ import type { Member } from './derive'
 import type { VisitDraft } from './useParkStore'
 
 /** The trip fields shared by the park detail modal's add/edit form and the
- *  header's Log visit modal: optional date, who went (≥1 required), notes. */
+ *  header's Log visit modal: optional date, who went (≥1 required), notes.
+ *  In group mode (3+ members) the names carry no color dots and there's no
+ *  "went separately" shorthand. */
 export function VisitFields({
   draft,
   members,
+  group = false,
   onChange,
 }: {
   draft: VisitDraft
   members: Member[]
+  group?: boolean
   onChange: (patch: Partial<VisitDraft>) => void
 }) {
   const toggleAttendee = (id: string, checked: boolean) =>
@@ -38,17 +42,21 @@ export function VisitFields({
         <Text component="span" style={fieldLabelStyle}>
           Who went
         </Text>
-        <Group gap={18} mt={2}>
+        <Group gap={group ? 14 : 18} mt={2}>
           {members.map((member) => (
             <Checkbox
               key={member.id}
               checked={draft.attendeeIds.includes(member.id)}
               onChange={(e) => toggleAttendee(member.id, e.currentTarget.checked)}
               label={
-                <Group gap={7} wrap="nowrap" component="span" display="inline-flex">
-                  <Box w={9} h={9} component="span" style={{ borderRadius: '50%', background: member.color }} />
-                  <span>{member.name || 'Member'}</span>
-                </Group>
+                group ? (
+                  member.name || 'Member'
+                ) : (
+                  <Group gap={7} wrap="nowrap" component="span" display="inline-flex">
+                    <Box w={9} h={9} component="span" style={{ borderRadius: '50%', background: member.color }} />
+                    <span>{member.name || 'Member'}</span>
+                  </Group>
+                )
               }
             />
           ))}
@@ -58,7 +66,7 @@ export function VisitFields({
             Somebody must have gone — check at least one name.
           </Text>
         )}
-        {draft.attendeeIds.length > 1 && (
+        {!group && draft.attendeeIds.length > 1 && (
           <>
             <Checkbox
               mt={12}

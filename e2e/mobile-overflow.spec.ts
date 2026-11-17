@@ -68,3 +68,16 @@ test('the Seasons plan screen (and its scheduler) doesn\'t scroll sideways at 39
   await expect(page.getByRole('dialog', { name: 'Plan “color walk”' })).toBeVisible()
   expect(await overflow(page)).toBeLessThanOrEqual(0)
 })
+
+test('group-mode Parks (the Friends space) doesn\'t scroll sideways at 390px', async ({ page }) => {
+  // The remembered seed-space pick (see useSpace) opens Friends directly; its
+  // three members put Parks in group mode, with the whose-map picker added to
+  // the control bar.
+  await page.addInitScript("localStorage.setItem('cajubinile.space.seed', 'seed-friends')")
+  await page.goto('/parks')
+  await expect(page.getByRole('radiogroup', { name: 'Whose map' })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  expect(await overflow(page)).toBeLessThanOrEqual(0)
+  await pickSegment(page, 'List')
+  expect(await overflow(page)).toBeLessThanOrEqual(0)
+})

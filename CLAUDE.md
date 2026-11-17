@@ -398,6 +398,28 @@ header "+ Log visit" button opens the same trip fields behind a searchable
 park picker. Scope cuts (deliberate): no photos, no parks wishlist (the
 Unvisited filter is the wishlist).
 
+Everything above is for a space of **one or two** members. A space with
+**more than two** (`isGroupSpace` in the parks `derive.ts`) switches to
+**group mode**, because person colors, the ring and the split don't scale
+past a pair: a **whose-map picker** in the control bar (Everyone · each
+member — a SegmentedControl up to four choices, a Select beyond; page state
+in `ParksPage`, default Everyone, falls back to Everyone if that member
+leaves); **two pin states only** — visited for that viewer (`groupVisited`:
+anyone for Everyone, else that member) = the solid blue dot, not yet = the
+small faint one (`groupVariant` in `StatusDot.tsx`; size + opacity differ as
+well as hue); popups and list rows say **"Visited by Avery, Sam"** (everyone
+who has been, whichever map is showing — `groupStatusLine`) or "Not visited
+yet"; a Visited / Not yet legend; a stats strip of each member n/63 with no
+Together and no color dots; **All / Visited / Unvisited** filter pills read
+against the viewer (`groupParkKeys` / `filterGroupParks`; the page prunes
+the other mode's keys); attendee checkboxes without color dots and no "went
+separately" checkbox (the store never persists `separate` in a group
+space); trip history joins names with commas and never says "separately".
+No together/each-of-you wording in group mode. In keyless seed mode the
+Parks seed follows the current seed space's `SEED_MEMBERS`
+(`src/data/seedSpaces.ts`): "Friends" has a third member (Riley), so Parks
+there runs in group mode (`e2e/parks-group.spec.ts`).
+
 **Recipes** (`/recipes`, `/recipes/:id`) — the shared cookbook. Deliberately a
 **pure cookbook**: only recipes the space has actually made, fully written out — no
 ratings (opinions live in the notes field), no cook log, no to-try queue, no
