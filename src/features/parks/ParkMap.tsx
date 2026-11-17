@@ -6,10 +6,10 @@ import { MapCanvas, cachedDivIcon } from '../../components/MapCanvas'
 import { formatDateWithYear } from '../../lib/format'
 import type { ReactNode } from 'react'
 import type { Park } from './parks'
-import type { Member, ParkStatus } from './derive'
-import { parkPin } from './derive'
+import type { GroupViewer, Member, ParkStatus } from './derive'
+import { groupStatusLine, groupVisited, parkPin } from './derive'
 import type { DotVariant } from './StatusDot'
-import { StatusDot, pinVariant, separateVariant, togetherVariant } from './StatusDot'
+import { StatusDot, groupVariant, pinVariant, separateVariant, togetherVariant } from './StatusDot'
 
 /** The divIcon HTML mirror of StatusDot (Leaflet pins are raw HTML): solid
  *  member dot, together ring, separately split, faint not-yet. Shape + the
@@ -72,12 +72,16 @@ export function ParkMap({
   parks,
   statuses,
   members,
+  viewer,
   filters,
   onOpen,
 }: {
   parks: Park[]
   statuses: Map<string, ParkStatus>
   members: Member[]
+  /** Group mode's whose-map choice (3+ members); null = the one/two-person
+   *  design. */
+  viewer: GroupViewer | null
   /** The filter pill row, owned by the page so it survives the Map/List switch. */
   filters: ReactNode
   onOpen: (park: Park) => void
@@ -89,14 +93,24 @@ export function ParkMap({
       {filters}
 
       {/* Legend: who owns which color, and the two shape-coded combined
-          states. Person-fixed, so it reads the same on both logins. */}
+          states. Person-fixed, so it reads the same on both logins. Group
+          mode has just the two states. */}
       <Group gap={20} mt={14} wrap="wrap">
-        {members.map((m) => (
-          <LegendItem key={m.id} variant={{ kind: 'solid', color: m.color }} label={m.name || 'Member'} />
-        ))}
-        {members.length > 1 && <LegendItem variant={togetherVariant(members)} label="Together" />}
-        {members.length > 1 && <LegendItem variant={separateVariant(members)} label="Separately" />}
-        <LegendItem variant={{ kind: 'faint' }} label="Not yet" />
+        {viewer !== null ? (
+          <>
+            <LegendItem variant={groupVariant(true)} label="Visited" />
+            <LegendItem variant={groupVariant(false)} label="Not yet" />
+          </>
+        ) : (
+          <>
+            {members.map((m) => (
+              <LegendItem key={m.id} variant={{ kind: 'solid', color: m.color }} label={m.name || 'Member'} />
+            ))}
+            {members.length > 1 && <LegendItem variant={togetherVariant(members)} label="Together" />}
+            {members.length > 1 && <LegendItem variant={separateVariant(members)} label="Separately" />}
+            <LegendItem variant={{ kind: 'faint' }} label="Not yet" />
+          </>
+        )}
       </Group>
 
       {/* Continental-US default framing; Alaska, Hawaiʻi, and the territories
@@ -108,7 +122,11 @@ export function ParkMap({
             <Marker
               key={park.code}
               position={[park.lat, park.lng]}
-              icon={parkIcon(pinVariant(parkPin(status, memberIds), members))}
+              icon={parkIcon(
+                viewer !== null
+                  ? groupVariant(groupVisited(status, viewer))
+                  : pinVariant(parkPin(status, memberIds), members),
+              )}
             >
               <Popup>
                 <Box style={{ fontFamily: fonts.sans, minWidth: 170 }}>
@@ -116,7 +134,7 @@ export function ParkMap({
                     {park.name}
                   </Text>
                   <Text fz={12} c={colors.muted} mb={6}>
-                    {park.states} · {statusLine(status, members)}
+                    {park.states} · {viewer !== null ? groupStatusLine(status, members) : statusLine(status, members)}
                   </Text>
                   <Button size="compact-xs" variant="default" radius={8} onClick={() => onOpen(park)}>
                     Details

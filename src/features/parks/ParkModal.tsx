@@ -21,12 +21,13 @@ const eyebrowStyle = {
 }
 
 /** Names of a visit's attendees, resolved against the member list (attendee
- *  ids that aren't members — someone who left — are skipped). */
-function attendeeNames(visit: ParkVisit, members: Member[]): string {
+ *  ids that aren't members — someone who left — are skipped). A pair reads
+ *  "Avery + Jordan"; a group's longer lists read "Avery, Jordan, Sam". */
+function attendeeNames(visit: ParkVisit, members: Member[], group: boolean): string {
   return members
     .filter((m) => visit.attendeeIds.includes(m.id))
     .map((m) => m.name || 'Member')
-    .join(' + ')
+    .join(group ? ', ' : ' + ')
 }
 
 /**
@@ -37,6 +38,7 @@ export function ParkModal({
   park,
   visits,
   members,
+  group = false,
   onAdd,
   onUpdate,
   onDelete,
@@ -46,6 +48,8 @@ export function ParkModal({
   /** This park's visits (any order — sorted here). */
   visits: ParkVisit[]
   members: Member[]
+  /** Group mode (3+ members): no together/separately wording. */
+  group?: boolean
   /** Store actions; they throw on failure so the form can stay open. */
   onAdd: (draft: VisitDraft) => Promise<void>
   onUpdate: (id: string, draft: VisitDraft) => Promise<void>
@@ -144,7 +148,7 @@ export function ParkModal({
           <Text style={{ ...eyebrowStyle, color: colors.muted }} mb={14}>
             {editing.id ? 'Edit visit' : 'Log a visit'}
           </Text>
-          <VisitFields draft={draft} members={members} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
+          <VisitFields draft={draft} members={members} group={group} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
           <ModalFooter
             onCancel={() => setEditing(null)}
             onConfirm={() => void save()}
@@ -181,8 +185,8 @@ export function ParkModal({
                     {visit.date ? formatDateWithYear(visit.date) : 'Sometime, long ago'}
                     <Text component="span" fz={text.small} fw={500} c={colors.muted}>
                       {'  ·  '}
-                      {attendeeNames(visit, members) || '—'}
-                      {visit.separate && ', separately'}
+                      {attendeeNames(visit, members, group) || '—'}
+                      {!group && visit.separate && ', separately'}
                     </Text>
                   </Text>
                   {visit.notes && (

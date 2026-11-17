@@ -152,3 +152,62 @@ export function parkPin(status: ParkStatus | undefined, memberIds: string[]): Pa
 export function memberColor(memberId: string, members: Member[]): string {
   return members.find((m) => m.id === memberId)?.color ?? MEMBER_COLORS[0]
 }
+
+// --- Group mode: a space with three or more members. ---
+//
+// The two-person design above (person-fixed blue/orange, the Together ring,
+// the Separately split) doesn't scale past a pair, so a bigger space gets a
+// simpler model: one "whose map" viewer at a time — everyone, or one member —
+// and every park is just visited or not for that viewer. Visited is the
+// solid blue dot, not yet the small faint one (size + opacity as well as hue,
+// so it never leans on color alone).
+
+/** True when Parks should run in group mode (more than two members). */
+export function isGroupSpace(memberIds: string[]): boolean {
+  return memberIds.length > 2
+}
+
+/** The whose-map picker's choice: everyone, or one member's id (a uuid, so
+ *  it can't collide with the 'everyone' sentinel). */
+export const EVERYONE = 'everyone'
+export type GroupViewer = string
+
+/** The group filter's other key (UNVISITED above is the first). */
+export const VISITED = 'visited'
+
+/** Whether a park counts as visited on this viewer's map: anyone has been
+ *  (Everyone), or that member has. */
+export function groupVisited(status: ParkStatus | undefined, viewer: GroupViewer): boolean {
+  if (!status) return false
+  return viewer === EVERYONE ? status.visitorIds.length > 0 : status.visitorIds.includes(viewer)
+}
+
+/** A park's group-mode filter keys for this viewer. */
+export function groupParkKeys(status: ParkStatus | undefined, viewer: GroupViewer): string[] {
+  return [groupVisited(status, viewer) ? VISITED : UNVISITED]
+}
+
+/** filterParks for group mode: the All / Visited / Unvisited pills, read
+ *  against the chosen viewer. */
+export function filterGroupParks(
+  parks: Park[],
+  statuses: Map<string, ParkStatus>,
+  viewer: GroupViewer,
+  filter: TriFilterState,
+): Park[] {
+  const matches = triMatcher(filter)
+  return parks.filter((p) => matches(groupParkKeys(statuses.get(p.code), viewer)))
+}
+
+/** Names of every member who has been (join order), whichever map is on
+ *  screen. */
+export function visitorNames(status: ParkStatus | undefined, members: Member[]): string[] {
+  if (!status) return []
+  return members.filter((m) => status.visitorIds.includes(m.id)).map((m) => m.name || 'Member')
+}
+
+/** The popup / list-row line: "Visited by Avery, Sam" or "Not visited yet". */
+export function groupStatusLine(status: ParkStatus | undefined, members: Member[]): string {
+  const names = visitorNames(status, members)
+  return names.length > 0 ? `Visited by ${names.join(', ')}` : 'Not visited yet'
+}

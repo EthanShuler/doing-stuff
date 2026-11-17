@@ -2,21 +2,25 @@ import type { ReactNode } from 'react'
 import { Box, Group, Text, UnstyledButton } from '@mantine/core'
 import { colors, fonts } from '../../theme'
 import type { Park } from './parks'
-import type { Member, ParkStatus } from './derive'
-import { groupByRegion } from './derive'
-import { StatusDot } from './StatusDot'
+import type { GroupViewer, Member, ParkStatus } from './derive'
+import { groupByRegion, groupStatusLine, groupVisited } from './derive'
+import { StatusDot, groupVariant } from './StatusDot'
 
 /** The region-grouped list of `parks` (already filtered by the page's pills). */
 export function ParkList({
   parks,
   statuses,
   members,
+  viewer,
   filters,
   onOpen,
 }: {
   parks: Park[]
   statuses: Map<string, ParkStatus>
   members: Member[]
+  /** Group mode's whose-map choice (3+ members); null = the one/two-person
+   *  design. */
+  viewer: GroupViewer | null
   /** The filter pill row, owned by the page so it survives the Map/List switch. */
   filters: ReactNode
   onOpen: (park: Park) => void
@@ -51,7 +55,8 @@ export function ParkList({
           </Text>
           {parks.map((park) => {
             const status = statuses.get(park.code)
-            const visited = (status?.visitorIds.length ?? 0) > 0
+            const visited =
+              viewer !== null ? groupVisited(status, viewer) : (status?.visitorIds.length ?? 0) > 0
             return (
               <UnstyledButton
                 key={park.code}
@@ -69,6 +74,13 @@ export function ParkList({
                     <Text fz={12} c={colors.muted} style={{ fontFamily: fonts.sans }}>
                       {park.states} · est. {park.established}
                     </Text>
+                    {/* Group mode: everyone who has been, whoever's map is
+                        showing (the dot is the viewer's). */}
+                    {viewer !== null && (
+                      <Text fz={12} c={colors.inkSoft} style={{ fontFamily: fonts.sans }}>
+                        {groupStatusLine(status, members)}
+                      </Text>
+                    )}
                   </Box>
                   <Group gap={8} wrap="nowrap" style={{ flexShrink: 0 }}>
                     {status && status.visits.length > 1 && (
@@ -76,7 +88,8 @@ export function ParkList({
                         ×{status.visits.length}
                       </Text>
                     )}
-                    {status?.together && (
+                    {viewer !== null && <StatusDot variant={groupVariant(visited)} size={11} />}
+                    {viewer === null && status?.together && (
                       <Text
                         fz={11}
                         fw={600}
@@ -88,12 +101,13 @@ export function ParkList({
                         together
                       </Text>
                     )}
-                    {members
-                      .filter((m) => status?.visitorIds.includes(m.id))
-                      .map((m) => (
-                        <StatusDot key={m.id} variant={{ kind: 'solid', color: m.color }} size={11} title={m.name} />
-                      ))}
-                    {!visited && <StatusDot variant={{ kind: 'faint' }} size={11} />}
+                    {viewer === null &&
+                      members
+                        .filter((m) => status?.visitorIds.includes(m.id))
+                        .map((m) => (
+                          <StatusDot key={m.id} variant={{ kind: 'solid', color: m.color }} size={11} title={m.name} />
+                        ))}
+                    {viewer === null && !visited && <StatusDot variant={{ kind: 'faint' }} size={11} />}
                   </Group>
                 </Group>
               </UnstyledButton>

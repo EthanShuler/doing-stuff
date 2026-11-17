@@ -19,11 +19,14 @@ const PARK_OPTIONS = [...PARKS]
 export function LogVisitModal({
   opened,
   members,
+  group = false,
   onSave,
   onClose,
 }: {
   opened: boolean
   members: Member[]
+  /** Group mode (3+ members): see VisitFields. */
+  group?: boolean
   /** Store add action; throws on failure so the modal can stay open. */
   onSave: (draft: VisitDraft) => Promise<void>
   onClose: () => void
@@ -64,7 +67,7 @@ export function LogVisitModal({
         mb={18}
       />
 
-      <VisitFields draft={draft} members={members} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
+      <VisitFields draft={draft} members={members} group={group} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
 
       <Group justify="flex-end" gap={10} mt={22}>
         <Button variant="secondary" onClick={onClose}>
