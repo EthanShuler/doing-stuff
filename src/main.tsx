@@ -5,6 +5,7 @@ import '@mantine/core/styles.css'
 import App from './App.tsx'
 import { ConfirmProvider } from './components/ConfirmModal'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SET_PASSWORD_PATH, SetPasswordScreen } from './components/SetPasswordScreen'
 import { mantineTheme } from './mantineTheme'
 import './index.css'
 
@@ -31,15 +32,19 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload()
 })
 
+// A set-password link renders its own screen INSTEAD of the app, ahead of
+// App's session gate: verifying the link signs this browser in (and emits
+// PASSWORD_RECOVERY), which would otherwise swap the app in mid-form. The
+// screen leaves with a full page load, so checking the path once is enough.
+const onSetPassword = window.location.pathname.replace(/\/$/, '') === SET_PASSWORD_PATH
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider theme={mantineTheme}>
       {/* Inside the provider so the confirm dialog is themed; outside the
           router so any feature page can await one. */}
       <ErrorBoundary>
-        <ConfirmProvider>
-          <App />
-        </ConfirmProvider>
+        <ConfirmProvider>{onSetPassword ? <SetPasswordScreen /> : <App />}</ConfirmProvider>
       </ErrorBoundary>
     </MantineProvider>
   </StrictMode>,
