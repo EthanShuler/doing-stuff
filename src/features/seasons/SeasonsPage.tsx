@@ -310,7 +310,7 @@ export function SeasonsPage({
         ) : !season ? (
           <EmptyCard
             title="No seasons yet"
-            blurb="A season is a bucket list with dates — “Fall 2026”, the weekends from late September to mid-November."
+            blurb="A season is a bucket list for a date range, like Fall 2026."
           >
             <Button onClick={openNewSeason}>+ New season</Button>
           </EmptyCard>

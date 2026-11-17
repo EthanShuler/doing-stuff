@@ -21,12 +21,9 @@ export function AuthScreen() {
     <Center mih="100dvh" bg={colors.pageBg} p={24} c={colors.ink} style={{ fontFamily: fonts.sans }}>
       <title>Sign in · cajubinile.com</title>
       <Box w="100%" maw={380}>
-        <Title order={1} ta="center" fz={36} lh={1.05} mb={6} style={{ letterSpacing: '-0.01em' }}>
-          Doing Stuff
+        <Title order={1} ta="center" fz={36} lh={1.05} mb={28} style={{ letterSpacing: '-0.01em' }}>
+          cajubinile.com
         </Title>
-        <Text ta="center" c={colors.muted} fz={14} mb={28}>
-          Sign in to your shared log
-        </Text>
 
         <Paper
           component="form"

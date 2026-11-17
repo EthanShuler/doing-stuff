@@ -117,7 +117,7 @@ export function EntryModal({
         label="Notes"
         value={draft.description}
         onChange={(e) => onChange({ description: e.currentTarget.value })}
-        placeholder="What did you two do? How did it go?"
+        placeholder="How did it go?"
         autosize
         minRows={3}
         mb={4}

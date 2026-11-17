@@ -147,7 +147,7 @@ export function AlignmentPage({
         ) : !chart ? (
           <EmptyCard
             title="No alignment charts yet"
-            blurb="Pick a topic — sandwiches, our friends, ways to load a dishwasher — and sort it from Lawful Good to Chaotic Evil."
+            blurb="Pick a topic, like sandwiches, and sort it from Lawful Good to Chaotic Evil."
           >
             <Button onClick={openNew}>+ New chart</Button>
           </EmptyCard>

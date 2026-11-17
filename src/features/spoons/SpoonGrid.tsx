@@ -33,7 +33,7 @@ export function SpoonGrid({ spoons, onEdit }: { spoons: Spoon[]; onEdit: (spoon:
     return (
       <EmptyCard
         title="No spoons yet"
-        blurb="Log the first one — a name is all it takes; photo and place can come later."
+        blurb="Only a name is required."
       />
     )
   }

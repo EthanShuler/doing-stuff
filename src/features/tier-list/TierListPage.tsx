@@ -330,7 +330,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
                 ) : (
                   // Third row at phone width — the board itself says as much.
                   <Text fz={text.small} c={colors.muted} visibleFrom="sm" style={{ fontFamily: fonts.sans }}>
-                    Just your board for now — everyone gets their own once others join.
+                    You’re the only one in this space.
                   </Text>
                 ))}
               {/* The want-to list moved out to its own feature; point at it

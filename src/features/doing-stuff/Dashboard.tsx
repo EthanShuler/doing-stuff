@@ -374,7 +374,7 @@ function RepeatBadge({ count, since }: { count: number; since: string }) {
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <EmptyCard title="Nothing here yet" blurb="No entries in this view. Log your next outing together.">
+    <EmptyCard title="Nothing here yet" blurb="No entries in this view.">
       <Button onClick={onAdd} px={20} py={11} style={{ background: ACCENT }}>
         + New entry
       </Button>

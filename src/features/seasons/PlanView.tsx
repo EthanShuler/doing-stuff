@@ -87,7 +87,7 @@ export function PlanView({
             <EmptyCard
               mt={0}
               title="No weekends left"
-              blurb="This season’s weekends are behind you — start the next one with “+ New season”."
+              blurb="No weekends left in this season."
             />
           ) : (
             plans.map((plan) => (
@@ -174,7 +174,7 @@ function UnplannedTray({ items, all, actions }: { items: SeasonItem[]; all: Seas
   const shown = showAll ? items : items.slice(0, TRAY_PREVIEW)
   return (
     <Box bg={colors.surface} style={panelStyle} mb={16} data-tray="unplanned">
-      <TrayHeading title="Unplanned" count={items.length} hint="Soonest deadline first — tap one to give it a day." />
+      <TrayHeading title="Unplanned" count={items.length} hint="Soonest deadline first. Tap one to schedule it." />
       {items.length === 0 ? (
         <Text px={12} pb={12} fz={text.small} c={colors.muted} style={{ fontStyle: 'italic' }}>
           Everything has a day. 🎉
@@ -209,7 +209,7 @@ function UnplannedTray({ items, all, actions }: { items: SeasonItem[]; all: Seas
 function MissedTray({ items, all, actions }: { items: SeasonItem[]; all: SeasonItem[]; actions: RowActions }) {
   return (
     <Box bg={colors.surface} style={panelStyle} mb={16} data-tray="missed">
-      <TrayHeading title="Missed" count={items.length} hint="Planned, but the day went by — give it a new one." />
+      <TrayHeading title="Missed" count={items.length} hint="These days have passed. Tap one to reschedule." />
       {items.map((item) => (
         <TrayRow
           key={item.id}

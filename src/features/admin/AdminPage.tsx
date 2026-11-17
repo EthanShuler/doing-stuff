@@ -99,7 +99,7 @@ function AdminScreen() {
             onOpen={(space) => open({ kind: 'space', spaceId: space.id })}
           />
         ) : (
-          <EmptyCard title="No spaces yet" blurb="Make the first one — a name and who’s in it." />
+          <EmptyCard title="No spaces yet" blurb="Use + New space to add one." />
         )}
 
         <Text fz={text.caption} c={colors.faint} mt={20} style={{ fontFamily: fonts.sans }}>

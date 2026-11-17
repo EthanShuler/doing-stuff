@@ -53,7 +53,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     imageLabel: 'Poster image URL',
     creatorLabel: 'Director',
     dates: { shelfLabel: 'Unwatched', past: 'watched', fieldLabel: 'Watched on' },
-    boardHint: 'New movies land on everyone’s unranked shelf — or unwatched, with no watched date.',
+    boardHint: 'New movies start on Unranked, or Unwatched if they have no watched date.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
   },
   tv: {
@@ -64,7 +64,7 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
     imageLabel: 'Poster image URL',
     creatorLabel: 'Creator',
     dates: { shelfLabel: 'Unwatched', past: 'watched', fieldLabel: 'Watched on' },
-    boardHint: 'New shows land on everyone’s unranked shelf — or unwatched, with no watched date.',
+    boardHint: 'New shows start on Unranked, or Unwatched if they have no watched date.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
   },
   book: {

@@ -258,7 +258,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
               ) : (
                 <EmptyCard
                   title="No recipes yet"
-                  blurb="Write down the first thing you've made — a title is all it takes; the rest can come later."
+                  blurb="Only a title is required."
                 />
               )
             ) : view === 'list' ? (

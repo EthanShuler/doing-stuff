@@ -69,7 +69,7 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     example: 'Paddington 2',
     hint: 'Check it off later and it lands on everyone’s unranked shelf.',
     emptyTitle: 'Nothing to watch yet',
-    emptyBlurb: 'Add a movie you want to see together. Check it off and it lands on your tier board, ready to rank.',
+    emptyBlurb: 'Movies to watch. Checking one off adds it to your tier board.',
     onBoardNote: 'On your tier board — go rank it.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
     searchKind: 'movie',
@@ -88,7 +88,7 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     example: 'Severance',
     hint: 'Check it off later and it lands on everyone’s unranked shelf.',
     emptyTitle: 'Nothing to watch yet',
-    emptyBlurb: 'Add a show you want to see together. Check it off and it lands on your tier board, ready to rank.',
+    emptyBlurb: 'Shows to watch. Checking one off adds it to your tier board.',
     onBoardNote: 'On your tier board — go rank it.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
     searchKind: 'tv',
@@ -105,10 +105,10 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     creatorLabel: 'Author',
     imageLabel: 'Cover image URL',
     example: 'Piranesi',
-    hint: 'This list is just yours. Check it off when you finish — it lands ready to rank for you, and unread for everyone else.',
+    hint: 'Only you see this list. Checking a book off adds it to your board, unranked.',
     emptyTitle: 'Nothing to read yet',
     emptyBlurb:
-      'Add a book you want to read — this list is yours alone. Check it off when you finish and it lands on your tier board, ready to rank.',
+      'Books to read. Only you see this list. Checking one off adds it to your board, unranked.',
     onBoardNote: 'On the board — it stays on your Unread shelf until you mark it read.',
     attribution: 'Book search by Open Library.',
     searchKind: 'book',
@@ -123,16 +123,16 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
 
 const NO_BOARD_COPY: Record<'movie' | 'tv' | 'book', Pick<ListCopy, 'hint' | 'emptyBlurb'>> = {
   movie: {
-    hint: 'Check it off once you’ve watched it — it moves down to Done.',
-    emptyBlurb: 'Add a movie you want to see together. Check it off once you’ve watched it.',
+    hint: 'Checked-off movies move to Done.',
+    emptyBlurb: 'Movies to watch. Checking one off moves it to Done.',
   },
   tv: {
-    hint: 'Check it off once you’ve watched it — it moves down to Done.',
-    emptyBlurb: 'Add a show you want to see together. Check it off once you’ve watched it.',
+    hint: 'Checked-off shows move to Done.',
+    emptyBlurb: 'Shows to watch. Checking one off moves it to Done.',
   },
   book: {
-    hint: 'This list is just yours. Check it off when you finish — it moves down to Done.',
-    emptyBlurb: 'Add a book you want to read — this list is yours alone. Check it off when you finish.',
+    hint: 'Only you see this list. Checked-off books move to Done.',
+    emptyBlurb: 'Books to read. Only you see this list.',
   },
 }
 
@@ -167,7 +167,7 @@ export function customListCopy(def: ListDef): ListCopy {
     example: '',
     hint: 'Check it off when it’s done — it stays on the list, below the open rows.',
     emptyTitle: `Nothing on ${def.name} yet`,
-    emptyBlurb: 'Add the first thing above. Check rows off as you go — they drop into Done, not away.',
+    emptyBlurb: 'Checked-off rows move to Done.',
     onBoardNote: '',
     attribution: '',
     searchKind: null,
