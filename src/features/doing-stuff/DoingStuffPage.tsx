@@ -77,7 +77,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
 
   // View state (not persisted).
   // Category + activity pills, shared by Log and Calendar. Deleting a category
-  // or activity (locally or via a partner's realtime delete) prunes its pill
+  // or activity (locally or via someone else's realtime delete) prunes its pill
   // state, so the view never filters on a pill that's gone.
   const [rawFilter, setFilter] = useState<EntryFilter>(NO_ENTRY_FILTER)
   const filter = pruneEntryFilter(rawFilter, store.categories, store.activities)
@@ -219,7 +219,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   // button, so removing one asks first — same as entries.
   const deleteWish = async (id: string) => {
     const wish = store.wishlist.find((w) => w.id === id)
-    if (!(await confirm({ title: 'Remove this wish?', message: wish ? `"${wish.text}" comes off the list for both of you.` : undefined })))
+    if (!(await confirm({ title: 'Remove this wish?', message: wish ? `"${wish.text}" comes off the list for everyone.` : undefined })))
       return
     store.deleteWishlistItem(id)
   }
@@ -228,7 +228,7 @@ export function DoingStuffPage({ screen, spaceId, userId, configured }: DoingStu
   // first like every other delete.
   const deleteRepeat = async (repeatId: string) => {
     const repeat = store.repeats.find((r) => r.id === repeatId)
-    const message = repeat ? `The ${formatDate(repeat.date)} visit comes off this entry for both of you.` : undefined
+    const message = repeat ? `The ${formatDate(repeat.date)} visit comes off this entry for everyone.` : undefined
     if (!(await confirm({ title: 'Remove this repeat?', message }))) return
     store.deleteRepeat(repeatId).catch(() => {
       // Failure surfaces via the store.error banner.

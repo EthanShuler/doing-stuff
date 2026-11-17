@@ -1,7 +1,8 @@
-import type { ListKey, Tier, TierItem, TierList, TierPlacement, TierCompletion, TierUserTags } from '../../types'
+import type { ListKey, Profile, Tier, TierItem, TierList, TierPlacement, TierCompletion, TierUserTags } from '../../types'
 import type { PaletteSwatch } from '../../theme'
 import { swatchFor } from '../../theme'
 import { distinctTagList, tagKey, tagMatcher } from '../../lib/tags'
+import { displayNameFor } from '../../lib/profile'
 
 /** The fixed ladder, best first — drives row order and drop-target ids. */
 export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
@@ -73,6 +74,28 @@ export function isSharedBoard(key: ListKey, lists: TierList[]): boolean {
  *  on a shared board — the space's null-owner rows. */
 export const placementOwner = (shared: boolean, viewerId: string | null): string | null =>
   shared ? null : viewerId
+
+// --- Whose board ---------------------------------------------------------------
+// Every member has their own board on a per-person list; the page picks one
+// to show. `profiles` holds everyone RLS lets you see — co-members of ANY of
+// your spaces — so the candidates come from THIS space's membership instead.
+
+/** One pickable board: whose it is and what the picker calls it. */
+export interface BoardViewer {
+  id: string
+  label: string
+}
+
+/** The boards to pick from: "You" first, then the space's other members in
+ *  join order, each named by their profile ("Member" when it has no name).
+ *  Empty with no signed-in self. */
+export function boardViewers(memberIds: string[], profiles: Profile[], selfId: string | null): BoardViewer[] {
+  if (!selfId) return []
+  const others = [...new Set(memberIds)]
+    .filter((id) => id !== selfId)
+    .map((id) => ({ id, label: displayNameFor(profiles.find((p) => p.id === id)) || 'Member' }))
+  return [{ id: selfId, label: 'You' }, ...others]
+}
 
 /** Palette index per tier — a classic hot→cool ramp through the theme swatches. */
 const TIER_COLOR_INDEX: Record<Tier, number> = { S: 5, A: 1, B: 3, C: 0, D: 4, F: 2 }

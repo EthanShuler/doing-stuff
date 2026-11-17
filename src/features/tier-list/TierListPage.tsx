@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
-import { Button, SegmentedControl, Text } from '@mantine/core'
+import { Button, SegmentedControl, Select, Text } from '@mantine/core'
 import type { ListKey, Tier, TierItem, TierKind } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
-import { displayNameFor } from '../../lib/profile'
 import { useBusy } from '../../lib/useBusy'
+import { useFeatureEnabled } from '../../data/useSpace'
 import { keysIn, pickKeys, useTriFilter } from '../../lib/triFilter'
 import { TagFilterPills } from '../../components/TagFilterPills'
 import { useConfirm } from '../../components/ConfirmModal'
@@ -14,7 +14,7 @@ import { FloatingBanner } from '../../components/FloatingBanner'
 import { PageFrame } from '../../components/PageFrame'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
-import { datesArePersonal, deriveBoard, distinctTags, distinctUserTags, filterByTags, filterByUserTags, isSharedBoard, listIdOf, listKeyFor, placementOwner, userTagMap } from './derive'
+import { boardViewers, datesArePersonal, deriveBoard, distinctTags, distinctUserTags, filterByTags, filterByUserTags, isSharedBoard, listIdOf, listKeyFor, placementOwner, userTagMap } from './derive'
 import type { ShelfId } from './derive'
 import { copyFor } from './copy'
 import { TierBoard } from './TierBoard'
@@ -56,6 +56,9 @@ interface TierListPageProps {
   configured: boolean
 }
 
+/** Up to this many boards the picker is a SegmentedControl; beyond, a Select. */
+const MAX_SEGMENTED_VIEWERS = 3
+
 /** Every tier-list route — the four built-ins and `/tiers/:id` — renders this
  *  same component in the same tree slot, so the store (and its realtime
  *  channel) survives switching boards; only the key changes and the board
@@ -75,20 +78,25 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const dates = copy.dates
   // Books track "have I read it" per person; everything else shares one date.
   const personal = datesArePersonal(key)
-  // A shared custom list has ONE board both members drag on (null-owner
-  // placements) — no You/Partner toggle, nothing read-only.
+  // A shared custom list has ONE board every member drags on (null-owner
+  // placements) — no board picker, nothing read-only.
   const shared = isSharedBoard(key, store.lists)
+  // The want-to list link points into the Lists feature — only when this
+  // space uses it.
+  const listsEnabled = useFeatureEnabled('lists')
 
-  // Whose board is showing. Yours is drag-and-drop; the partner's renders the
-  // same layout read-only (their placements are also read-only under RLS).
-  const [viewer, setViewer] = useState<'you' | 'partner'>('you')
-  const partner = store.profiles.find((p) => p.id !== store.selfId) ?? null
-  const partnerName = displayNameFor(partner) || 'Partner'
-  const showingPartner = viewer === 'partner' && partner !== null && !shared
+  // Whose board is showing: "You" first, then this space's other members in
+  // join order. Yours is drag-and-drop; anyone else's renders the same layout
+  // read-only (their placements are also read-only under RLS). A pick whose
+  // member has left falls back to your own board.
+  const viewers = boardViewers(store.memberIds, store.profiles, store.selfId)
+  const [pickedViewerId, setPickedViewerId] = useState<string | null>(null)
+  const viewer = viewers.find((v) => v.id === pickedViewerId) ?? viewers[0] ?? null
+  const showingOther = !shared && viewer !== null && viewer.id !== store.selfId
 
   // The shelves under the tiers start collapsed (a long unranked shelf
   // otherwise pushes the tiers off screen). Owned here rather than in
-  // BoardView so expanding one survives the You/Partner and filter switches
+  // BoardView so expanding one survives the board-picker and filter switches
   // — which swap board components — and resets on a board switch.
   const [openShelves, setOpenShelves] = useState<ShelfOpenState>(SHELVES_COLLAPSED)
   const toggleShelf = (shelf: ShelfId) => setOpenShelves((prev) => ({ ...prev, [shelf]: !prev[shelf] }))
@@ -105,7 +113,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
 
   // Tag filters — two tri-state pill rows (see src/lib/triFilter): the
   // item's SHARED tags, and YOUR OWN tags ("Mine" filters by yours even on
-  // the partner's board). The rows AND together. While either is set the
+  // someone else's board). The rows AND together. While either is set the
   // board shows only matching items — read-only, because drops between
   // visible neighbors would land at arbitrary positions relative to the
   // hidden cards. Each row's state is pruned to tags still in use, so a
@@ -133,7 +141,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     setListModalOpen(false)
     setOpenShelves(SHELVES_COLLAPSED)
   }, [key])
-  const viewerId = showingPartner ? partner.id : store.selfId
+  const viewerId = showingOther ? viewer.id : store.selfId
   const visibleItems = filterByUserTags(
     filterByTags(store.items, keysIn(sharedTagState, 'include'), keysIn(sharedTagState, 'exclude')),
     store.userTags,
@@ -160,7 +168,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const openEdit = (item: TierItem) => {
     setEditingId(item.id)
     // The date field edits the shared watched date — or, for books, YOUR own
-    // read date (blank = you haven't read it, whatever the partner has done).
+    // read date (blank = you haven't read it, whatever anyone else has done).
     const dateOn = personal
       ? store.completions.find((r) => r.itemId === item.id && r.userId === store.selfId)?.doneOn ?? ''
       : item.doneOn ?? ''
@@ -203,7 +211,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
     }
     try {
       const ok = await confirm({
-        title: `Delete this ${noun} for both of you?`,
+        title: `Delete this ${noun} for everyone?`,
         message: "Everyone's rankings of it are removed too.",
       })
       if (!ok) return
@@ -253,7 +261,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const deleteActiveList = async () => {
     if (!activeList) return
     const ok = await confirm({
-      title: `Delete the "${activeList.name}" list for both of you?`,
+      title: `Delete the "${activeList.name}" list for everyone?`,
       message: `Every ${activeList.noun} on it and everyone's rankings of them are removed too.`,
     })
     if (!ok) return
@@ -272,7 +280,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
   const loadingData = configured && store.loading
 
   // A `list:<id>` key with no matching row means the list never existed, or
-  // the partner just deleted the one you were looking at. Checked AFTER the
+  // someone else just deleted the one you were looking at. Checked AFTER the
   // loading gate so a hard load of /tiers/:id in live mode waits for the
   // snapshot instead of bouncing on an empty store; in seed mode the data is
   // there from the first render, so it bounces immediately.
@@ -302,26 +310,33 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               {!loadingData &&
                 (shared ? (
                   <Text fz={text.small} c={colors.muted} visibleFrom="sm" style={{ fontFamily: fonts.sans }}>
-                    Shared board — you both rank together.
+                    Shared board — everyone ranks together.
                   </Text>
-                ) : partner ? (
+                ) : viewer && viewers.length > MAX_SEGMENTED_VIEWERS ? (
+                  <Select
+                    aria-label="Whose board"
+                    value={viewer.id}
+                    onChange={(value) => value && setPickedViewerId(value)}
+                    data={viewers.map((v) => ({ label: v.label, value: v.id }))}
+                    allowDeselect={false}
+                    w={180}
+                  />
+                ) : viewer && viewers.length > 1 ? (
                   <SegmentedControl
-                    value={viewer}
-                    onChange={(value) => setViewer(value as 'you' | 'partner')}
-                    data={[
-                      { label: 'You', value: 'you' },
-                      { label: partnerName, value: 'partner' },
-                    ]}
+                    value={viewer.id}
+                    onChange={setPickedViewerId}
+                    data={viewers.map((v) => ({ label: v.label, value: v.id }))}
                   />
                 ) : (
                   // Third row at phone width — the board itself says as much.
                   <Text fz={text.small} c={colors.muted} visibleFrom="sm" style={{ fontFamily: fonts.sans }}>
-                    Just your board for now — rankings are per person once your partner joins.
+                    Just your board for now — everyone gets their own once others join.
                   </Text>
                 ))}
               {/* The want-to list moved out to its own feature; point at it
-                  from the board it feeds. Custom boards have none. */}
-              {kind && LIST_LINK[kind] && (
+                  from the board it feeds, when this space uses Lists. Custom
+                  boards have none. */}
+              {listsEnabled && kind && LIST_LINK[kind] && (
                 <Text
                   component={Link}
                   to={LIST_LINK[kind].path}
@@ -362,15 +377,15 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
               onClear={clearMyTagFilter}
             />
 
-            {showingPartner ? (
+            {showingOther ? (
               <>
                 <Text fz={text.small} c={colors.faint} mt={16} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                  {partnerName}'s board — just for looking.
+                  {viewer.label}'s board — just for looking.
                 </Text>
                 <BoardView
                   board={board}
                   renderCard={(item) => <CardVisual key={item.id} item={item} emoji={copy.emoji} />}
-                  shelfHint={`${partnerName} hasn't ranked everything yet.`}
+                  shelfHint={`${viewer.label} hasn't ranked everything yet.`}
                   unwatchedHint={dates ? `Nothing waiting to be ${dates.past}.` : undefined}
                   unwatchedLabel={dates?.shelfLabel ?? null}
                   openShelves={openShelves}

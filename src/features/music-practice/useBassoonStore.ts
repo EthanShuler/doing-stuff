@@ -6,8 +6,11 @@ import { isoDate, today } from '../../lib/format'
 
 // Data seam for the Bassoon circle-of-fifths daily key, mirroring the other
 // stores' two modes but deliberately lighter:
-//   • Supabase keys present → live: reads/writes `music_practice_days` scoped
-//     to the space AND this user (personal data — split RLS like placements).
+//   • Supabase keys present → live: reads/writes `music_practice_days` for
+//     this user (personal data — split RLS like placements). Practice follows
+//     the PERSON, not the space: the read takes every day this user logged in
+//     any space, and a write stamps the current space only because the column
+//     is required (one row per user per day, whichever space wrote it).
 //   • No keys → in-memory seed so the wheel works offline.
 //
 // No realtime channel (unlike the shared-data stores): this is solo,
@@ -85,7 +88,6 @@ export function useBassoonStore(spaceId: string | null, userId: string | null): 
       const { data, error: err } = await client
         .from('music_practice_days')
         .select(DAY_COLUMNS)
-        .eq('space_id', spaceId)
         .eq('user_id', userId)
         .order('practice_date')
       if (cancelled) return

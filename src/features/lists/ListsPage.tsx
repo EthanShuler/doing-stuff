@@ -4,6 +4,7 @@ import { Text } from '@mantine/core'
 import type { ListItem, ListRef } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
+import { useFeatureEnabled } from '../../data/useSpace'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
 import { FloatingBanner } from '../../components/FloatingBanner'
@@ -51,7 +52,10 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
   // Which list is showing: a built-in from the route, or the free-form list
   // named in the URL.
   const ref: ListRef = kind ?? refFor(routeListId ?? '')
-  const copy = copyFor(ref, store.lists)
+  // With Tier Lists off a check-off still writes the tier item, but the
+  // wording stops promising a board nobody can open.
+  const boardsEnabled = useFeatureEnabled('tier-lists')
+  const copy = copyFor(ref, store.lists, { boards: boardsEnabled })
 
   const [itemModalOpen, setItemModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -180,7 +184,7 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
   const deleteActiveList = async () => {
     if (!activeList) return
     const ok = await confirm({
-      title: `Delete "${activeList.name}" for both of you?`,
+      title: `Delete "${activeList.name}" for everyone?`,
       message: 'Everything on it is removed too.',
     })
     if (!ok) return
@@ -199,7 +203,7 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
   const loadingData = configured && store.loading
 
   // A `custom:<id>` ref with no matching row means the list never existed, or
-  // the partner just deleted the one you were looking at. Checked AFTER the
+  // someone else just deleted the one you were looking at. Checked AFTER the
   // loading gate so a hard load of /lists/:id in live mode waits for the
   // snapshot instead of bouncing on an empty store; in seed mode the data is
   // there from the first render, so it bounces immediately.
@@ -233,7 +237,7 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
               )}
               {listIsPersonal(ref) && (
                 <Text fz={text.small} c={colors.faint} style={{ fontFamily: fonts.sans, fontStyle: 'italic' }}>
-                  Just yours — your partner keeps their own.
+                  Just yours — everyone keeps their own.
                 </Text>
               )}
             </>

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router'
 import type { Recipe } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
+import { useFeatureEnabled } from '../../data/useSpace'
 import { ControlBar } from '../../components/ControlBar'
 import { addDays, groceryGroups, plannedCount, weekDays, weekLabel, weekStart } from './derive'
 import { GroceryModal } from './GroceryModal'
@@ -28,6 +29,9 @@ export function MealPlanScreen({
   screenToggle: ReactNode
 }) {
   const navigate = useNavigate()
+  // The grocery step sends into the Lists feature's Groceries list — so it
+  // only shows in a space that uses Lists.
+  const listsEnabled = useFeatureEnabled('lists')
   const [week, setWeek] = useState<Week>('this')
   const start = addDays(weekStart(today()), week === 'next' ? 7 : 0)
   const days = weekDays(start)
@@ -61,7 +65,7 @@ export function MealPlanScreen({
             </Text>
           </>
         }
-        right={<Button onClick={openGroceries}>🛒 Plan groceries</Button>}
+        right={listsEnabled ? <Button onClick={openGroceries}>🛒 Plan groceries</Button> : undefined}
       />
 
       <MealPlanView

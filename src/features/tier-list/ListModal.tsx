@@ -14,7 +14,7 @@ export interface ListDraft {
   emoji: string
   /** Singular noun, lowercase: "fruit" → "Add a fruit". */
   noun: string
-  /** One board you both rank together, instead of a board each. */
+  /** One board everyone ranks together, instead of a board each. */
   shared: boolean
 }
 
@@ -90,15 +90,15 @@ export function ListModal({
         Add a {noun}{draft.shared ? ' · one shared board' : ''}
       </Text>
 
-      {/* Shared = ONE board the space ranks together (no You/Partner toggle).
+      {/* Shared = ONE board the space ranks together (no board picker).
           Flipping it later doesn't move any rankings: the other mode's rows
           stay put in the DB and come back if you flip it again. */}
       <Checkbox
         label="Shared board"
         description={
           isEditing
-            ? 'One set of tiers you both edit, instead of a board each. Rankings from the other mode are kept if you switch back.'
-            : 'One set of tiers you both edit, instead of a board each.'
+            ? 'One set of tiers everyone edits, instead of a board each. Rankings from the other mode are kept if you switch back.'
+            : 'One set of tiers everyone edits, instead of a board each.'
         }
         checked={draft.shared}
         onChange={(e) => onChange({ shared: e.currentTarget.checked })}

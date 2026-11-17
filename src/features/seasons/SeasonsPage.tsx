@@ -166,7 +166,7 @@ export function SeasonsPage({
     }
     const children = seasonItems.filter((i) => i.parentId === item.id).length
     const ok = await confirm({
-      title: 'Delete this item for both of you?',
+      title: 'Delete this item for everyone?',
       message:
         children > 0
           ? `"${item.title}" and its ${children === 1 ? 'sub-option' : `${children} sub-options`} come off the list.`
@@ -240,7 +240,7 @@ export function SeasonsPage({
   const deleteSeason = async () => {
     if (!season) return
     const ok = await confirm({
-      title: `Delete "${season.name}" for both of you?`,
+      title: `Delete "${season.name}" for everyone?`,
       message: 'Everything on its list — plans and check-offs too — is removed.',
     })
     if (!ok) return
@@ -260,7 +260,7 @@ export function SeasonsPage({
       const current = currentSeason(store.seasons, today)
       if (current) return <Navigate to={`/seasons/${current.id}`} replace />
     } else if (!season) {
-      // Never existed, or the partner just deleted it.
+      // Never existed, or someone else just deleted it.
       return <Navigate to="/seasons" replace />
     }
   }

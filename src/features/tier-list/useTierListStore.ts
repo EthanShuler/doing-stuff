@@ -43,11 +43,14 @@ interface Snapshot {
   completions: TierCompletion[]
   userTags: TierUserTags[]
   profiles: Profile[]
+  /** This space's members, in join order (the board picker's order). */
+  memberIds: string[]
 }
 
 function seed(): Snapshot {
   return {
     profiles: SEED_PROFILES,
+    memberIds: SEED_PROFILES.map((p) => p.id),
     // One space-defined list, so /tiers/:id and the picker are demoable
     // offline exactly like the built-ins.
     lists: [
@@ -265,7 +268,11 @@ export interface TierListStore {
   completions: TierCompletion[]
   /** All members' personal tag rows; the page shows only the viewer's own. */
   userTags: TierUserTags[]
+  /** Every profile RLS lets you see — co-members of ANY of your spaces. Pick
+   *  this space's with `memberIds`. */
   profiles: Profile[]
+  /** This space's members in join order — whose boards there are to view. */
+  memberIds: string[]
   /** Whose board "You" is: the auth user, or the seed self in keyless mode. */
   selfId: string | null
   loading: boolean
@@ -336,6 +343,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   const [completions, setCompletions] = useState<TierCompletion[]>(initial?.completions ?? [])
   const [userTags, setUserTags] = useState<TierUserTags[]>(initial?.userTags ?? [])
   const [profiles, setProfiles] = useState<Profile[]>(initial?.profiles ?? [])
+  const [memberIds, setMemberIds] = useState<string[]>(initial?.memberIds ?? [])
   const [loading, setLoading] = useState<boolean>(Boolean(supabase))
   const [error, setError] = useState<string | null>(null)
   const clearError = useCallback(() => setError(null), [])
@@ -347,7 +355,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // optimistic drop. Throws on the first failed query.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [ls, its, places, comps_, utags, profs] = await Promise.all([
+    const [ls, its, places, comps_, utags, profs, members] = await Promise.all([
       supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
@@ -355,6 +363,8 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       supabase.from('tier_item_user_tags').select(TIER_USER_TAGS_COLUMNS).eq('space_id', spaceId),
       // RLS scopes this to the current user + anyone they share a space with.
       supabase.from('profiles').select(PROFILE_COLUMNS),
+      // ...so the boards to pick from come from THIS space's membership.
+      supabase.from('space_members').select('user_id,created_at').eq('space_id', spaceId).order('created_at'),
     ])
     if (ls.error) throw ls.error
     if (its.error) throw its.error
@@ -362,6 +372,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     if (comps_.error) throw comps_.error
     if (utags.error) throw utags.error
     if (profs.error) throw profs.error
+    if (members.error) throw members.error
     return {
       lists: (ls.data as TierListRow[]).map(toTierList),
       items: (its.data as TierItemRow[]).map(toTierItem),
@@ -369,6 +380,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
       userTags: (utags.data as TierUserTagsRow[]).map(toTierUserTags),
       profiles: (profs.data as ProfileRow[]).map(toProfile),
+      memberIds: (members.data as { user_id: string }[]).map((m) => m.user_id),
     }
   }, [spaceId])
 
@@ -379,6 +391,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     setCompletions(snap.completions)
     setUserTags(snap.userTags)
     setProfiles(snap.profiles)
+    setMemberIds(snap.memberIds)
   }, [])
 
   // Resync after a failed inline write: the optimistic local change is wrong,
@@ -790,6 +803,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
     completions,
     userTags,
     profiles,
+    memberIds,
     selfId,
     loading,
     error,

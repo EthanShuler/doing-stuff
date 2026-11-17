@@ -42,7 +42,7 @@ test('shelves start collapsed with a count, expand on click, and reset on a boar
   await expect(unranked.getByText('Everything Everywhere All at Once')).toBeVisible()
   await expect(boardShelf(page, 'unwatched').getByText('Blade Runner 2049')).toHaveCount(0)
 
-  // Expanding survives the You/Partner switch (the page owns the state)…
+  // Expanding survives the board-picker switch (the page owns the state)…
   await pickSegment(page, 'Jordan')
   await expect(boardShelf(page, 'unranked').locator('[data-shelf-toggle]')).toHaveAttribute('aria-expanded', 'true')
   await pickSegment(page, 'You')
@@ -62,7 +62,7 @@ test('the list picker switches boards without leaving the page', async ({ page }
   await expect(page.getByText('Spirited Away')).not.toBeVisible()
 })
 
-test('You/Partner toggle swaps whose board is derived, read-only', async ({ page }) => {
+test('the board picker swaps whose board is derived, read-only', async ({ page }) => {
   await page.goto('/movies')
   await pickSegment(page, 'Jordan')
 
@@ -225,18 +225,18 @@ test('the picker reaches a space-defined board without leaving the page', async 
   await expect(boardShelf(page, 'unwatched')).toHaveCount(0)
 })
 
-/** The You/Partner toggle's partner tab (Mantine's SegmentedControl label). */
+/** The board picker's tab for the other seed member (Mantine's SegmentedControl label). */
 const partnerTab = (page: Page) => page.locator('.mantine-SegmentedControl-label').filter({ hasText: /^Jordan$/ })
 
 // Seed list l2 is "Board games", flagged SHARED: one board for the space
 // (null-owner placements) — Catan S, Wingspan and Twilight Imperium unranked.
-test('a shared list shows one board for both members, with no You/Partner toggle', async ({ page }) => {
+test('a shared list shows one board for everyone, with no board picker', async ({ page }) => {
   await page.goto('/movies')
   await expect(partnerTab(page)).toBeVisible()
 
   await pickList(page, 'Board games')
   await expect(page).toHaveURL('/tiers/l2')
-  await expect(page.getByText('Shared board — you both rank together.')).toBeVisible()
+  await expect(page.getByText('Shared board — everyone ranks together.')).toBeVisible()
   await expect(partnerTab(page)).toHaveCount(0)
   await expect(page.getByText("Jordan's board — just for looking.")).toHaveCount(0)
 
@@ -266,7 +266,7 @@ test('a new list can be created shared from the modal', async ({ page }) => {
   await page.getByRole('button', { name: 'Create list' }).click()
 
   await expect(page).toHaveURL(/\/tiers\//)
-  await expect(page.getByText('Shared board — you both rank together.')).toBeVisible()
+  await expect(page.getByText('Shared board — everyone ranks together.')).toBeVisible()
   await expect(partnerTab(page)).toHaveCount(0)
 
   // Flip it back to per-person: the toggle returns.
@@ -299,7 +299,7 @@ test('create, rename, and delete a custom list', async ({ page }) => {
   // Delete → the themed confirm modal, then a bounce back to /movies.
   await page.getByRole('button', { name: 'Edit list' }).click()
   await page.getByRole('button', { name: 'Delete list' }).click()
-  await expect(page.getByText('Delete the "Beetles" list for both of you?')).toBeVisible()
+  await expect(page.getByText('Delete the "Beetles" list for everyone?')).toBeVisible()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
 
   await expect(page).toHaveURL('/movies')

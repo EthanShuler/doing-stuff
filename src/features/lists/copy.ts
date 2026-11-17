@@ -11,6 +11,11 @@ import { listIdOf } from './derive'
  * except for the three flags at the bottom, which say what a list HAS
  * (a board to promote onto, images, a title-lookup provider) rather than what
  * it's called.
+ *
+ * A space with Tier Lists turned off still gets the tier item written on
+ * check-off (the data is there if the feature comes back), but nothing should
+ * promise a board nobody can open — `copyFor(..., { boards: false })` swaps
+ * in the board-free wording below.
  */
 export interface ListCopy {
   /** Picker pill label and page title: "Movies", "Groceries". */
@@ -42,8 +47,10 @@ export interface ListCopy {
   attribution: string
   /** Which provider backs title suggestions (null = plain hand entry). */
   searchKind: SearchKind
-  /** Checking a row off creates a tier item on the matching board. False for
-   *  a free-form list: it just stamps the row done. */
+  /** Checking a row off lands it on a tier board this space can see. False
+   *  for a free-form list (it just stamps the row done) — and for the
+   *  built-ins in a space with Tier Lists off, where the tier item is still
+   *  written but no board shows it. */
   linksToBoard: boolean
   /** Whether rows carry a poster/cover at all. */
   hasImage: boolean
@@ -60,9 +67,9 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     creatorLabel: 'Director',
     imageLabel: 'Poster image URL',
     example: 'Paddington 2',
-    hint: 'Check it off later and it joins both of your unranked shelves.',
+    hint: 'Check it off later and it lands on everyone’s unranked shelf.',
     emptyTitle: 'Nothing to watch yet',
-    emptyBlurb: 'Add a movie you both want to see. Check it off and it lands on your tier board, ready to rank.',
+    emptyBlurb: 'Add a movie you want to see together. Check it off and it lands on your tier board, ready to rank.',
     onBoardNote: 'On your tier board — go rank it.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
     searchKind: 'movie',
@@ -79,9 +86,9 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     creatorLabel: 'Creator',
     imageLabel: 'Poster image URL',
     example: 'Severance',
-    hint: 'Check it off later and it joins both of your unranked shelves.',
+    hint: 'Check it off later and it lands on everyone’s unranked shelf.',
     emptyTitle: 'Nothing to watch yet',
-    emptyBlurb: 'Add a show you both want to see. Check it off and it lands on your tier board, ready to rank.',
+    emptyBlurb: 'Add a show you want to see together. Check it off and it lands on your tier board, ready to rank.',
     onBoardNote: 'On your tier board — go rank it.',
     attribution: 'Title search by TMDB (not endorsed or certified by TMDB).',
     searchKind: 'tv',
@@ -98,7 +105,7 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     creatorLabel: 'Author',
     imageLabel: 'Cover image URL',
     example: 'Piranesi',
-    hint: 'This list is just yours. Check it off when you finish — it lands ready to rank for you, and unread for your partner.',
+    hint: 'This list is just yours. Check it off when you finish — it lands ready to rank for you, and unread for everyone else.',
     emptyTitle: 'Nothing to read yet',
     emptyBlurb:
       'Add a book you want to read — this list is yours alone. Check it off when you finish and it lands on your tier board, ready to rank.',
@@ -108,6 +115,30 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     linksToBoard: true,
     hasImage: true,
   },
+}
+
+// --- Without a tier board -----------------------------------------------------
+// The built-ins' words when the space has Tier Lists off: checking a row off
+// just moves it to Done, as far as anyone can see.
+
+const NO_BOARD_COPY: Record<'movie' | 'tv' | 'book', Pick<ListCopy, 'hint' | 'emptyBlurb'>> = {
+  movie: {
+    hint: 'Check it off once you’ve watched it — it moves down to Done.',
+    emptyBlurb: 'Add a movie you want to see together. Check it off once you’ve watched it.',
+  },
+  tv: {
+    hint: 'Check it off once you’ve watched it — it moves down to Done.',
+    emptyBlurb: 'Add a show you want to see together. Check it off once you’ve watched it.',
+  },
+  book: {
+    hint: 'This list is just yours. Check it off when you finish — it moves down to Done.',
+    emptyBlurb: 'Add a book you want to read — this list is yours alone. Check it off when you finish.',
+  },
+}
+
+/** A built-in list's wording with no board to promise. */
+function withoutBoard(kind: 'movie' | 'tv' | 'book'): ListCopy {
+  return { ...LIST_COPY[kind], ...NO_BOARD_COPY[kind], onBoardNote: '', linksToBoard: false }
 }
 
 // --- Free-form lists ----------------------------------------------------------
@@ -147,14 +178,19 @@ export function customListCopy(def: ListDef): ListCopy {
 
 /**
  * The wording for whichever list is showing. Built-in refs read LIST_COPY; a
- * `custom:<id>` ref templates its row. A ref whose row is missing — a partner
+ * `custom:<id>` ref templates its row. A ref whose row is missing — someone
  * deleted the list a moment ago, and the realtime DELETE landed before the
  * page redirected — yields neutral placeholder copy instead of throwing, so
- * that render survives until the <Navigate> fires.
+ * that render survives until the <Navigate> fires. `boards: false` (the space
+ * has Tier Lists off) drops every promise that a checked-off row lands on a
+ * board.
  */
-export function copyFor(ref: ListRef, lists: ListDef[]): ListCopy {
+export function copyFor(ref: ListRef, lists: ListDef[], { boards = true }: { boards?: boolean } = {}): ListCopy {
   const listId = listIdOf(ref)
-  if (!listId) return LIST_COPY[ref as 'movie' | 'tv' | 'book']
+  if (!listId) {
+    const kind = ref as 'movie' | 'tv' | 'book'
+    return boards ? LIST_COPY[kind] : withoutBoard(kind)
+  }
   const def = lists.find((l) => l.id === listId)
   return customListCopy(def ?? { id: listId, name: 'List', emoji: '', createdBy: null, createdAt: '' })
 }

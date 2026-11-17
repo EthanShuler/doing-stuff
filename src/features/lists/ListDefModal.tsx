@@ -62,7 +62,7 @@ export function ListDefModal({
         />
       </Group>
       <Text fz={text.caption} c={colors.faint} style={{ fontFamily: fonts.sans }}>
-        A shared list you both add to. Check a row off and it drops into Done — nothing lands on a tier board.
+        A shared list everyone adds to. Check a row off and it drops into Done — nothing lands on a tier board.
       </Text>
 
       <ModalFooter

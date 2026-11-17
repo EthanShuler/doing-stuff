@@ -90,7 +90,7 @@ export function AlignmentPage({
   const deleteChart = async () => {
     if (!chart) return
     const ok = await confirm({
-      title: `Delete "${chart.title}" for both of you?`,
+      title: `Delete "${chart.title}" for everyone?`,
       message: 'The chart and everything in its nine squares is removed.',
     })
     if (!ok) return
@@ -110,7 +110,7 @@ export function AlignmentPage({
       const first = defaultChart(store.charts)
       if (first) return <Navigate to={`/alignment/${first.id}`} replace />
     } else if (!chart) {
-      // Never existed, or the partner just deleted it.
+      // Never existed, or someone else just deleted it.
       return <Navigate to="/alignment" replace />
     }
   }
