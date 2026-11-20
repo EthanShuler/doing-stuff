@@ -800,10 +800,13 @@ the email's local part — then a recovery token) and `password_link` (a fresh
 recovery token for an existing user). It checks the caller with
 `auth.getUser(token)`, then asks `is_admin()` **as the caller**, and only then
 builds the service client (new `SUPABASE_SECRET_KEYS` dictionary first, legacy
-`SUPABASE_SERVICE_ROLE_KEY` second). Its CORS allow-list is
-`https://cajubinile.com`, `https://www.cajubinile.com` and
-**`http://localhost:5173`** — the dev server's port, so add any other origin
-there before calling it from one. Deploy it as a function named `admin` with
+`SUPABASE_SERVICE_ROLE_KEY` second). Its CORS allow-list (the same in the
+`igdb` function) is `https://cajubinile.com`, `https://www.cajubinile.com`,
+**`https://doing-stuff.pages.dev`** (where the live site is actually served —
+the custom domain has no DNS yet) plus any `*.doing-stuff.pages.dev` deploy
+preview, and **`http://localhost:5173`** — the dev server's port. Any other
+origin gets `cajubinile.com` echoed back and the browser blocks the call, so
+add an origin to **both** functions (and redeploy them) before calling from it. Deploy it as a function named `admin` with
 the Supabase connector's `deploy_edge_function`, the dashboard's editor, or
 `supabase functions deploy admin`; if the platform's "Verify JWT" setting
 blocks the OPTIONS preflight, turn it off (the in-function check is the real

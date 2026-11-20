@@ -21,12 +21,22 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 // Browser origins allowed to call this. Auth is a bearer token (no cookies),
 // so this is defense in depth, not the gate.
-const ALLOWED_ORIGINS = ['https://cajubinile.com', 'https://www.cajubinile.com', 'http://localhost:5173']
+// The site is served from the Cloudflare Pages domain (plus the custom domain
+// once its DNS is pointed there); a deploy preview is a subdomain of it.
+const ALLOWED_ORIGINS = [
+  'https://cajubinile.com',
+  'https://www.cajubinile.com',
+  'https://doing-stuff.pages.dev',
+  'http://localhost:5173',
+]
+const PREVIEW_ORIGIN = /^https:\/\/[a-z0-9-]+\.doing-stuff\.pages\.dev$/
+
+const isAllowedOrigin = (origin: string) => ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN.test(origin)
 
 function corsFor(req: Request): Record<string, string> {
   const origin = req.headers.get('Origin') ?? ''
   return {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0],
     'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     // Echo what the SDK asks for, so a new SDK header can't break preflight.
