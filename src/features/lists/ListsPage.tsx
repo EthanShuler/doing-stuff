@@ -4,6 +4,7 @@ import { Text } from '@mantine/core'
 import type { ListItem, ListRef } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
+import { parseReleaseYear } from '../../lib/releaseYear'
 import { useFeatureEnabled } from '../../data/useSpace'
 import { useConfirm } from '../../components/ConfirmModal'
 import { ControlBar } from '../../components/ControlBar'
@@ -29,7 +30,7 @@ const BUILT_INS: { ref: 'movie' | 'tv' | 'book'; path: string }[] = [
   { ref: 'book', path: '/lists/books' },
 ]
 
-const emptyItemDraft = (): ListItemDraft => ({ title: '', imageUrl: '', creator: '' })
+const emptyItemDraft = (): ListItemDraft => ({ title: '', imageUrl: '', creator: '', releaseYear: '' })
 
 interface ListsPageProps {
   /** The built-in list this route renders. Omitted for `/lists/:id`, where the
@@ -103,7 +104,12 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
 
   const openEdit = (item: ListItem) => {
     setEditingId(item.id)
-    setItemDraft({ title: item.title, imageUrl: item.imageUrl, creator: item.creator })
+    setItemDraft({
+      title: item.title,
+      imageUrl: item.imageUrl,
+      creator: item.creator,
+      releaseYear: item.releaseYear ? String(item.releaseYear) : '',
+    })
     setItemModalOpen(true)
   }
 
@@ -117,7 +123,9 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
     runSaveItem(async () => {
       if (!editingId || !itemDraft.title.trim()) return
       try {
-        await store.updateItem(editingId, itemDraft.title, itemDraft.imageUrl, itemDraft.creator)
+        // The modal blocks saving an unparseable year; a free-form list has none.
+        const year = copy.hasYear ? parseReleaseYear(itemDraft.releaseYear) ?? null : null
+        await store.updateItem(editingId, itemDraft.title, itemDraft.imageUrl, itemDraft.creator, year)
         closeItemModal()
       } catch {
         // Write failed — keep the modal open; store.error shows the reason.
@@ -250,7 +258,7 @@ export function ListsPage({ kind, spaceId, userId, configured }: ListsPageProps)
           <ListRows
             items={rows}
             copy={copy}
-            onAdd={(title, imageUrl, creator) => store.addItem(ref, title, imageUrl, creator)}
+            onAdd={(title, imageUrl, creator, releaseYear) => store.addItem(ref, title, imageUrl, creator, releaseYear)}
             onCheck={(item) => {
               void store.checkOff(item)
             }}

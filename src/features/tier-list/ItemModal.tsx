@@ -8,6 +8,8 @@ import { TitleSearchInput, canSearch } from '../../components/TitleSearchInput'
 import type { SearchKind } from '../../components/TitleSearchInput'
 import type { KindCopy } from './copy'
 import { CardVisual } from './TierCard'
+import { tracksReleaseYear } from './derive'
+import { parseReleaseYear } from '../../lib/releaseYear'
 
 /** The draft backing the add/edit item modal. */
 export interface ItemDraft {
@@ -24,6 +26,9 @@ export interface ItemDraft {
   myTags: string[]
   /** Who made it — author/director/etc. (label per kind in copy.ts). */
   creator: string
+  /** The year it came out, as typed ('' = unknown). Parsed on save —
+   *  parseReleaseYear; a custom list shows no field and saves none. */
+  releaseYear: string
 }
 
 export function ItemModal({
@@ -61,7 +66,10 @@ export function ItemModal({
   onClose: () => void
 }) {
   const noun = copy.noun
-  const canSave = Boolean(draft.title.trim())
+  const showYear = tracksReleaseYear(kind)
+  const parsedYear = showYear ? parseReleaseYear(draft.releaseYear) : null
+  const yearInvalid = parsedYear === undefined
+  const canSave = Boolean(draft.title.trim()) && !yearInvalid
 
   // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
   // books (keyless, so always on), IGDB for games (through the backend's
@@ -84,6 +92,7 @@ export function ItemModal({
     doneOn: null,
     tags: [],
     creator: draft.creator.trim(),
+    releaseYear: parsedYear ?? null,
     copiedFrom: null,
     createdBy: null,
     createdAt: '',
@@ -105,6 +114,8 @@ export function ItemModal({
                   title: result.title,
                   imageUrl: result.imageUrl,
                   ...(result.creator ? { creator: result.creator } : {}),
+                  // Same for the year: a pick without one keeps what's typed.
+                  ...(result.releaseYear ? { releaseYear: String(result.releaseYear) } : {}),
                 })
               }
               label="Title"
@@ -121,13 +132,27 @@ export function ItemModal({
             placeholder="Paste an image link (optional)"
             mb={18}
           />
-          <TextInput
-            label={copy.creatorLabel}
-            value={draft.creator}
-            onChange={(e) => onChange({ creator: e.currentTarget.value })}
-            placeholder="Optional"
-            mb={18}
-          />
+          <Group gap={12} align="flex-start" wrap="nowrap" mb={18}>
+            <TextInput
+              label={copy.creatorLabel}
+              value={draft.creator}
+              onChange={(e) => onChange({ creator: e.currentTarget.value })}
+              placeholder="Optional"
+              flex={1}
+            />
+            {showYear && (
+              <TextInput
+                label="Year"
+                value={draft.releaseYear}
+                onChange={(e) => onChange({ releaseYear: e.currentTarget.value })}
+                placeholder="e.g. 2019"
+                inputMode="numeric"
+                maxLength={4}
+                error={yearInvalid ? 'A 4-digit year' : undefined}
+                w={104}
+              />
+            )}
+          </Group>
           {/* Dateless boards (custom lists) get no field here — an item there
               is simply ranked or unranked. */}
           {copy.dates && (

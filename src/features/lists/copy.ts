@@ -54,6 +54,8 @@ export interface ListCopy {
   linksToBoard: boolean
   /** Whether rows carry a poster/cover at all. */
   hasImage: boolean
+  /** Whether rows carry a release year (the media lists; free-form lists don't). */
+  hasYear: boolean
 }
 
 export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
@@ -75,6 +77,7 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     searchKind: 'movie',
     linksToBoard: true,
     hasImage: true,
+    hasYear: true,
   },
   tv: {
     label: 'TV',
@@ -94,6 +97,7 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     searchKind: 'tv',
     linksToBoard: true,
     hasImage: true,
+    hasYear: true,
   },
   book: {
     label: 'Books',
@@ -114,6 +118,7 @@ export const LIST_COPY: Record<'movie' | 'tv' | 'book', ListCopy> = {
     searchKind: 'book',
     linksToBoard: true,
     hasImage: true,
+    hasYear: true,
   },
 }
 
@@ -173,6 +178,7 @@ export function customListCopy(def: ListDef): ListCopy {
     searchKind: null,
     linksToBoard: false,
     hasImage: false,
+    hasYear: false,
   }
 }
 

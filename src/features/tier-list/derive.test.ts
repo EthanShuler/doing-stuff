@@ -12,6 +12,8 @@ import {
   filterByTags,
   findContainer,
   hasUndatedShelf,
+  tracksReleaseYear,
+  cardByline,
   isSharedBoard,
   keyOf,
   kindColumn,
@@ -54,6 +56,7 @@ function item(over: Partial<TierItem> = {}): TierItem {
     doneOn: '2026-06-15',
     tags: [],
     creator: '',
+    releaseYear: null,
     copiedFrom: null,
     createdBy: 'u1',
     createdAt: `2026-07-0${(seq % 9) + 1}T00:00:00Z`,
@@ -311,6 +314,24 @@ describe('hasUndatedShelf', () => {
   it('is true for the built-in kinds and false for a custom list', () => {
     for (const key of ['movie', 'tv', 'book'] as const) expect(hasUndatedShelf(key)).toBe(true)
     expect(hasUndatedShelf('list:l1')).toBe(false)
+  })
+})
+
+describe('tracksReleaseYear', () => {
+  it('is true for the built-in kinds and false for a custom list', () => {
+    for (const key of ['movie', 'tv', 'book', 'game'] as const) expect(tracksReleaseYear(key)).toBe(true)
+    expect(tracksReleaseYear('list:l1')).toBe(false)
+  })
+})
+
+describe('cardByline', () => {
+  it('puts the year first so a clamped card keeps it', () => {
+    expect(cardByline({ creator: 'Denis Villeneuve', releaseYear: 2021 })).toBe('2021 · Denis Villeneuve')
+  })
+  it('drops whichever part is missing', () => {
+    expect(cardByline({ creator: 'Andy Weir', releaseYear: null })).toBe('Andy Weir')
+    expect(cardByline({ creator: '', releaseYear: 1937 })).toBe('1937')
+    expect(cardByline({ creator: '', releaseYear: null })).toBe('')
   })
 })
 
@@ -659,6 +680,7 @@ describe('planTierPull', () => {
     doneOn: '2026-05-01',
     tags: [],
     creator: '',
+    releaseYear: null,
     copiedFrom: null,
     createdBy: 'u9',
     createdAt: '2026-05-01T00:00:00Z',
@@ -690,7 +712,7 @@ describe('planTierPull', () => {
   })
 
   it('copies ranked items with lineage and no shared date, and ranks them in source order', () => {
-    const a = src({ id: 'a', title: 'Arrival', imageUrl: 'https://x/a.jpg', creator: 'Villeneuve', tags: ['sci-fi'], createdAt: '2026-05-01T00:00:00Z' })
+    const a = src({ id: 'a', title: 'Arrival', imageUrl: 'https://x/a.jpg', creator: 'Villeneuve', releaseYear: 2016, tags: ['sci-fi'], createdAt: '2026-05-01T00:00:00Z' })
     const b = src({ id: 'b', title: 'Moonlight', copiedFrom: 'root-b', createdAt: '2026-05-02T00:00:00Z' })
     const c = src({ id: 'c', title: 'Cats', createdAt: '2026-05-03T00:00:00Z' })
     const plan = planTierPull(
@@ -706,6 +728,7 @@ describe('planTierPull', () => {
       kind: 'movie',
       imageUrl: 'https://x/a.jpg',
       creator: 'Villeneuve',
+      releaseYear: 2016,
       tags: ['sci-fi'],
       doneOn: null,
       copiedFrom: 'a',

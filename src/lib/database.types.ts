@@ -296,6 +296,7 @@ export type Database = {
           kind: string
           list_id: string | null
           position: number
+          release_year: number | null
           space_id: string
           tier_item_id: string | null
           title: string
@@ -310,6 +311,7 @@ export type Database = {
           kind: string
           list_id?: string | null
           position?: number
+          release_year?: number | null
           space_id: string
           tier_item_id?: string | null
           title: string
@@ -324,6 +326,7 @@ export type Database = {
           kind?: string
           list_id?: string | null
           position?: number
+          release_year?: number | null
           space_id?: string
           tier_item_id?: string | null
           title?: string
@@ -996,6 +999,7 @@ export type Database = {
           image_url: string
           kind: string
           list_id: string | null
+          release_year: number | null
           space_id: string
           tags: string[]
           title: string
@@ -1010,6 +1014,7 @@ export type Database = {
           image_url?: string
           kind: string
           list_id?: string | null
+          release_year?: number | null
           space_id: string
           tags?: string[]
           title: string
@@ -1024,6 +1029,7 @@ export type Database = {
           image_url?: string
           kind?: string
           list_id?: string | null
+          release_year?: number | null
           space_id?: string
           tags?: string[]
           title?: string

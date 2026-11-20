@@ -4,6 +4,7 @@ import { Button, SegmentedControl, Select, Text } from '@mantine/core'
 import type { ListKey, Tier, TierItem, TierKind } from '../../types'
 import { colors, fonts, text } from '../../theme'
 import { today } from '../../lib/format'
+import { parseReleaseYear } from '../../lib/releaseYear'
 import { useBusy } from '../../lib/useBusy'
 import { useFeatureEnabled } from '../../data/useSpace'
 import { keysIn, pickKeys, useTriFilter } from '../../lib/triFilter'
@@ -15,7 +16,7 @@ import { PageFrame } from '../../components/PageFrame'
 import { PullButton } from '../../components/PullModal'
 import { Splash } from '../../components/Splash'
 import { useTierListStore } from './useTierListStore'
-import { boardViewers, datesArePersonal, deriveBoard, distinctTags, distinctUserTags, filterByTags, filterByUserTags, isSharedBoard, listIdOf, listKeyFor, placementOwner, userTagMap } from './derive'
+import { boardViewers, datesArePersonal, deriveBoard, distinctTags, distinctUserTags, filterByTags, filterByUserTags, isSharedBoard, listIdOf, listKeyFor, placementOwner, tracksReleaseYear, userTagMap } from './derive'
 import type { ShelfId } from './derive'
 import { copyFor } from './copy'
 import { TierBoard } from './TierBoard'
@@ -39,6 +40,7 @@ const emptyDraft = (): ItemDraft => ({
   tags: [],
   myTags: [],
   creator: '',
+  releaseYear: '',
 })
 
 /** The built-in kinds whose want-to list lives in the Lists feature: what that
@@ -190,6 +192,7 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
       tags: item.tags,
       myTags: userTagMap(store.userTags, store.selfId).get(item.id) ?? [],
       creator: item.creator,
+      releaseYear: item.releaseYear ? String(item.releaseYear) : '',
     })
     setModalOpen(true)
   }
@@ -207,8 +210,10 @@ export function TierListPage({ kind, spaceId, userId, configured }: TierListPage
         // A custom list tracks no date — never write one, even though the
         // draft carries today's by default.
         const dateOn = dates ? draft.doneOn || null : null
-        if (editingId) await store.updateItem(editingId, key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags, draft.myTags)
-        else await store.addItem(key, draft.title, draft.imageUrl, draft.creator, dateOn, draft.tags, draft.myTags)
+        // Same for the year; the modal blocks saving an unparseable one.
+        const year = tracksReleaseYear(key) ? parseReleaseYear(draft.releaseYear) ?? null : null
+        if (editingId) await store.updateItem(editingId, key, draft.title, draft.imageUrl, draft.creator, year, dateOn, draft.tags, draft.myTags)
+        else await store.addItem(key, draft.title, draft.imageUrl, draft.creator, year, dateOn, draft.tags, draft.myTags)
         closeModal()
       } catch {
         // Write failed — keep the modal open; store.error shows the reason.

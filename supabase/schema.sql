@@ -272,6 +272,10 @@ create table if not exists public.tier_items (
   -- text, shared like the title ('' = unknown/not entered). On an existing DB:
   --   alter table public.tier_items add column creator text not null default '';
   creator     text not null default '',
+  -- The year it came out (null = unknown), filled from the title search on a
+  -- pick or typed by hand. Shared like the title; custom boards leave it
+  -- null. Added 2026-11-20 (migrations/20261120_release_years.sql).
+  release_year integer constraint tier_items_release_year_check check (release_year between 1000 and 9999),
   -- Pull lineage (see tier_lists.copied_from): the root item this was copied
   -- from, null = an original. No FK on purpose.
   copied_from uuid,
@@ -435,6 +439,9 @@ create table if not exists public.list_items (
   -- carried onto the tier item when checked off, like the image. Free-form
   -- rows reuse the column as an optional free-text note.
   creator      text not null default '',
+  -- The year it came out (null = unknown), carried onto the tier item when
+  -- checked off. Free-form rows leave it null.
+  release_year integer constraint list_items_release_year_check check (release_year between 1000 and 9999),
   -- Queue order within the list — it's a priority queue, top (lowest
   -- position) = watch/read/do next. Fractional midpoint insertion on drag,
   -- like tier_placements.position; the client appends new rows at max + 1.

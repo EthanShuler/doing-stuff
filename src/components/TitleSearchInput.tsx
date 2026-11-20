@@ -6,6 +6,7 @@ import { colors, fonts, radii, shadows, text } from '../theme'
 import { isTmdbConfigured, searchTmdb } from '../lib/tmdb'
 import { searchOpenLibrary } from '../lib/openLibrary'
 import { isIgdbConfigured, searchIgdb } from '../lib/igdb'
+import { yearFromIsoDate } from '../lib/releaseYear'
 
 /** Which provider backs the suggestions — null means "plain input, no lookup"
  *  (a space-defined tier list, a free-form list). */
@@ -23,6 +24,9 @@ export interface TitleSuggestion {
   /** Creator to prefill on pick — the author for books, the developer for
    *  games; '' for TMDB results (its search response doesn't carry a director). */
   creator: string
+  /** Release year to prefill on pick (first-publish year for books); null
+   *  when the provider doesn't know. */
+  releaseYear: number | null
 }
 
 /**
@@ -104,6 +108,7 @@ export function TitleSearchInput({
               imageUrl: b.coverUrl,
               thumbUrl: b.thumbUrl,
               creator: b.author,
+              releaseYear: yearFromIsoDate(b.year),
             }))
           : searchKind === 'game'
           ? (await searchIgdb(query)).map((g) => ({
@@ -113,6 +118,7 @@ export function TitleSearchInput({
               imageUrl: g.coverUrl,
               thumbUrl: g.thumbUrl,
               creator: g.developer,
+              releaseYear: yearFromIsoDate(g.year),
             }))
           : (await searchTmdb(searchKind, query)).map((r) => ({
               key: String(r.id),
@@ -121,6 +127,7 @@ export function TitleSearchInput({
               imageUrl: r.posterUrl,
               thumbUrl: r.thumbUrl,
               creator: '',
+              releaseYear: yearFromIsoDate(r.year),
             }))
       if (!cancelled) setSuggestions(results)
     }, 300)

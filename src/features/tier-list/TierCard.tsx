@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { TierItem } from '../../types'
 import { colors, fonts, shadows, text } from '../../theme'
 import { MediaImage } from '../../components/MediaImage'
+import { cardByline } from './derive'
 
 /** Card footprint — constant so tier rows pack densely and wrap cleanly. */
 export const CARD_WIDTH = 76
@@ -27,6 +28,7 @@ export function CardVisual({
   lifted?: boolean
   onClick?: () => void
 }) {
+  const byline = cardByline(item)
   return (
     <Box
       w={CARD_WIDTH}
@@ -62,7 +64,7 @@ export function CardVisual({
       >
         {item.title}
       </Text>
-      {item.creator && (
+      {byline && (
         <Text
           fz={9}
           lh={1.2}
@@ -74,7 +76,7 @@ export function CardVisual({
           ta="center"
           style={{ fontFamily: fonts.sans }}
         >
-          {item.creator}
+          {byline}
         </Text>
       )}
     </Box>

@@ -65,44 +65,44 @@ function seed(): Snapshot {
     ],
     // A few items carry tags so the filter pills are demoable offline.
     items: [
-      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', doneOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
-      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', doneOn: '2026-06-02', tags: ['fantasy'], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
-      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
-      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', doneOn: '2026-06-14', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
-      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
-      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', doneOn: '2026-06-20', tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
-      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', doneOn: '2026-06-08', tags: ['sci-fi'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
-      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
-      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', doneOn: '2026-06-15', tags: ['fantasy'], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
-      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
+      { id: 'm1', kind: 'movie', title: 'Spirited Away', imageUrl: '', doneOn: '2026-06-01', tags: ['fantasy', 'ghibli'], creator: '', releaseYear: 2001, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T09:00:00Z' },
+      { id: 'm2', kind: 'movie', title: 'The Princess Bride', imageUrl: '', doneOn: '2026-06-02', tags: ['fantasy'], creator: '', releaseYear: 1987, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T09:00:00Z' },
+      { id: 'm3', kind: 'movie', title: 'Blade Runner 2049', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: '', releaseYear: 2017, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T09:00:00Z' },
+      { id: 'm4', kind: 'movie', title: 'Paddington 2', imageUrl: '', doneOn: '2026-06-14', tags: [], creator: '', releaseYear: 2017, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T09:00:00Z' },
+      { id: 'm5', kind: 'movie', title: 'The Room', imageUrl: '', doneOn: null, tags: [], creator: '', releaseYear: 2003, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-05T09:00:00Z' },
+      { id: 'm6', kind: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', doneOn: '2026-06-20', tags: ['sci-fi'], creator: '', releaseYear: 2022, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-06T09:00:00Z' },
+      { id: 't1', kind: 'tv', title: 'Severance', imageUrl: '', doneOn: '2026-06-08', tags: ['sci-fi'], creator: '', releaseYear: 2022, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T10:00:00Z' },
+      { id: 't2', kind: 'tv', title: 'The Great British Bake Off', imageUrl: '', doneOn: null, tags: [], creator: '', releaseYear: 2010, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T10:00:00Z' },
+      { id: 't3', kind: 'tv', title: 'Avatar: The Last Airbender', imageUrl: '', doneOn: '2026-06-15', tags: ['fantasy'], creator: '', releaseYear: 2005, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T10:00:00Z' },
+      { id: 't4', kind: 'tv', title: 'Emily in Paris', imageUrl: '', doneOn: null, tags: [], creator: '', releaseYear: 2020, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T10:00:00Z' },
       // Books keep the shared doneOn null — read state is per person, in
       // `completions` below.
-      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', doneOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
-      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: 'Andy Weir', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
-      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
-      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
-      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
+      { id: 'b1', kind: 'book', title: 'Piranesi', imageUrl: '', doneOn: null, tags: ['fantasy'], creator: 'Susanna Clarke', releaseYear: 2020, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T11:00:00Z' },
+      { id: 'b2', kind: 'book', title: 'Project Hail Mary', imageUrl: '', doneOn: null, tags: ['sci-fi'], creator: 'Andy Weir', releaseYear: 2021, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-02T11:00:00Z' },
+      { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', releaseYear: 2022, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
+      { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', releaseYear: 1937, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
+      { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', releaseYear: 2018, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
       // Games: played state is per person, like books (completions below).
-      { id: 'vg1', kind: 'game', title: 'Hades', imageUrl: '', doneOn: null, tags: ['roguelike'], creator: 'Supergiant Games', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T13:00:00Z' },
-      { id: 'vg2', kind: 'game', title: 'Stardew Valley', imageUrl: '', doneOn: null, tags: ['cozy'], creator: 'ConcernedApe', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T13:00:00Z' },
-      { id: 'vg3', kind: 'game', title: 'Outer Wilds', imageUrl: '', doneOn: null, tags: [], creator: 'Mobius Digital', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T13:00:00Z' },
-      { id: 'vg4', kind: 'game', title: 'Celeste', imageUrl: '', doneOn: null, tags: [], creator: 'Maddy Makes Games', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T13:00:00Z' },
+      { id: 'vg1', kind: 'game', title: 'Hades', imageUrl: '', doneOn: null, tags: ['roguelike'], creator: 'Supergiant Games', releaseYear: 2020, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T13:00:00Z' },
+      { id: 'vg2', kind: 'game', title: 'Stardew Valley', imageUrl: '', doneOn: null, tags: ['cozy'], creator: 'ConcernedApe', releaseYear: 2016, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T13:00:00Z' },
+      { id: 'vg3', kind: 'game', title: 'Outer Wilds', imageUrl: '', doneOn: null, tags: [], creator: 'Mobius Digital', releaseYear: 2019, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T13:00:00Z' },
+      { id: 'vg4', kind: 'game', title: 'Celeste', imageUrl: '', doneOn: null, tags: [], creator: 'Maddy Makes Games', releaseYear: 2018, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T13:00:00Z' },
       // Ice cream (custom list l0): a custom board tracks no date, so doneOn is
       // ignored there — an item is ranked, or it's on the unranked shelf.
-      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
-      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
-      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
-      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
+      { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
+      { id: 'i2', kind: 'list:l0', title: 'Pistachio', imageUrl: '', doneOn: '2026-06-13', tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T12:00:00Z' },
+      { id: 'i3', kind: 'list:l0', title: 'Rum raisin', imageUrl: '', doneOn: null, tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T12:00:00Z' },
+      { id: 'i4', kind: 'list:l0', title: 'Strawberry cheesecake', imageUrl: '', doneOn: '2026-06-21', tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T12:00:00Z' },
       // The custom "Fruits" list — same shape as Ice Cream (no dates, one
       // shelf), keyed by `list:<id>` instead of a kind.
-      { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
-      { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
-      { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
+      { id: 'f1', kind: 'list:l1', title: 'Mango', imageUrl: '', doneOn: '2026-06-09', tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T10:00:00Z' },
+      { id: 'f2', kind: 'list:l1', title: 'Durian', imageUrl: '', doneOn: null, tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-09T11:00:00Z' },
+      { id: 'f3', kind: 'list:l1', title: 'Honeycrisp apple', imageUrl: '', doneOn: '2026-06-10', tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-09T12:00:00Z' },
       // The shared Board games list: Catan ranked; Wingspan and Twilight
       // Imperium unranked.
-      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
-      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
-      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
+      { id: 'g1', kind: 'list:l2', title: 'Catan', imageUrl: '', doneOn: '2026-06-11', tags: [], creator: 'Klaus Teuber', releaseYear: null, copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-10T10:00:00Z' },
+      { id: 'g2', kind: 'list:l2', title: 'Wingspan', imageUrl: '', doneOn: '2026-06-12', tags: [], creator: 'Elizabeth Hargrave', releaseYear: null, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T11:00:00Z' },
+      { id: 'g3', kind: 'list:l2', title: 'Twilight Imperium', imageUrl: '', doneOn: null, tags: [], creator: '', releaseYear: null, copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-10T12:00:00Z' },
     ],
     // Both viewers have rankings so the You/Partner toggle is demoable offline;
     // a few built-in items stay unranked — and some undated → unwatched — to
@@ -170,7 +170,7 @@ function seed(): Snapshot {
  */
 export function seedTierPullSource(): TierPullData {
   const at = (day: number, hour = 9) => `2026-03-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00Z`
-  const base = { imageUrl: '', doneOn: null, tags: [] as string[], creator: '', copiedFrom: null, createdBy: 'u1' }
+  const base = { imageUrl: '', doneOn: null, tags: [] as string[], creator: '', releaseYear: null as number | null, copiedFrom: null, createdBy: 'u1' }
   return {
     lists: [
       { id: 'src-l1', name: 'Snacks', emoji: '🍿', noun: 'snack', shared: false, copiedFrom: null, createdBy: 'u1', createdAt: at(1) },
@@ -235,6 +235,7 @@ type TierItemRow = {
   done_on: string | null
   tags: string[] | null
   creator: string | null
+  release_year: number | null
   copied_from: string | null
   created_by: string | null
   created_at: string
@@ -279,6 +280,7 @@ const toTierItem = (r: TierItemRow): TierItem => ({
   doneOn: r.done_on,
   tags: r.tags ?? [],
   creator: r.creator ?? '',
+  releaseYear: r.release_year,
   copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
@@ -304,7 +306,7 @@ const toTierUserTags = (r: TierUserTagsRow): TierUserTags => ({
 })
 
 const TIER_LIST_COLUMNS = 'id,name,emoji,noun,shared,copied_from,created_by,created_at'
-const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,copied_from,created_by,created_at'
+const TIER_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,done_on,tags,creator,release_year,copied_from,created_by,created_at'
 const TIER_PLACEMENT_COLUMNS = 'id,item_id,user_id,tier,position'
 const TIER_COMPLETION_COLUMNS = 'id,item_id,user_id,done_on'
 const TIER_USER_TAGS_COLUMNS = 'id,item_id,user_id,tags'
@@ -432,14 +434,14 @@ export interface TierListStore {
   clearNotice: () => void
 
   /** Add to the shared pool. `creator` is who made it (author/director — see
-   *  copy.ts). `dateOn` is an ISO date or null (= none yet): the shared
+   *  copy.ts), `releaseYear` the year it came out (null = unknown). `dateOn` is an ISO date or null (= none yet): the shared
    *  watched date for movies/TV, YOUR OWN read date for books. `tags` are
    *  shared filter labels, `myTags` YOUR OWN (both normalized before saving).
    *  Throws only when the item itself fails (the modal stays open). */
-  addItem: (key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => Promise<void>
-  /** Edit a pool item's title/image/creator/tags + its date and your own tags
+  addItem: (key: ListKey, title: string, imageUrl: string, creator: string, releaseYear: number | null, dateOn: string | null, tags: string[], myTags: string[]) => Promise<void>
+  /** Edit a pool item's title/image/creator/year/tags + its date and your own tags
    *  (same semantics as addItem). Throws only when the item write fails. */
-  updateItem: (id: string, key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => Promise<void>
+  updateItem: (id: string, key: ListKey, title: string, imageUrl: string, creator: string, releaseYear: number | null, dateOn: string | null, tags: string[], myTags: string[]) => Promise<void>
   /** Remove from the pool — deletes EVERYONE's placements (and, for books,
    *  read records) of it. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
@@ -651,7 +653,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   // --- Pool actions. These throw on failure so the item modal can stay open. ---
 
   const addItem = useCallback(
-    async (key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => {
+    async (key: ListKey, title: string, imageUrl: string, creator: string, releaseYear: number | null, dateOn: string | null, tags: string[], myTags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -665,7 +667,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
           .from('tier_items')
           // kind + list_id always travel together — the DB CHECK ties them,
           // so a missed site fails as a store error, never as bad data.
-          .insert({ space_id: spaceId, kind: kindColumn(key), list_id: listIdOf(key), title: trimmed, image_url: image, creator: maker, done_on: personal ? null : dateOn, tags: cleanTags })
+          .insert({ space_id: spaceId, kind: kindColumn(key), list_id: listIdOf(key), title: trimmed, image_url: image, creator: maker, release_year: releaseYear, done_on: personal ? null : dateOn, tags: cleanTags })
           .select(TIER_ITEM_COLUMNS)
           .single()
         if (err) {
@@ -689,6 +691,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         doneOn: personal ? null : dateOn,
         tags: cleanTags,
         creator: maker,
+        releaseYear,
         copiedFrom: null,
         createdBy: selfId,
         createdAt: new Date().toISOString(),
@@ -701,7 +704,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
   )
 
   const updateItem = useCallback(
-    async (id: string, key: ListKey, title: string, imageUrl: string, creator: string, dateOn: string | null, tags: string[], myTags: string[]) => {
+    async (id: string, key: ListKey, title: string, imageUrl: string, creator: string, releaseYear: number | null, dateOn: string | null, tags: string[], myTags: string[]) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -713,8 +716,8 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
         // For books, leave the shared done_on alone — the date belongs to
         // the caller's own read record instead.
         const patch = personal
-          ? { title: trimmed, image_url: image, creator: maker, tags: cleanTags }
-          : { title: trimmed, image_url: image, creator: maker, tags: cleanTags, done_on: dateOn }
+          ? { title: trimmed, image_url: image, creator: maker, release_year: releaseYear, tags: cleanTags }
+          : { title: trimmed, image_url: image, creator: maker, release_year: releaseYear, tags: cleanTags, done_on: dateOn }
         const { error: err } = await supabase.from('tier_items').update(patch).eq('id', id)
         if (err) {
           setError(err.message)
@@ -724,7 +727,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
       setItems((prev) =>
         prev.map((x) =>
           x.id === id
-            ? { ...x, title: trimmed, imageUrl: image, creator: maker, tags: cleanTags, ...(personal ? {} : { doneOn: dateOn }) }
+            ? { ...x, title: trimmed, imageUrl: image, creator: maker, releaseYear, tags: cleanTags, ...(personal ? {} : { doneOn: dateOn }) }
             : x,
         ),
       )
@@ -1015,6 +1018,7 @@ export function useTierListStore(spaceId: string | null, userId: string | null =
               title: i.title,
               image_url: i.imageUrl,
               creator: i.creator,
+              release_year: i.releaseYear,
               done_on: null,
               tags: i.tags,
               copied_from: i.copiedFrom,
