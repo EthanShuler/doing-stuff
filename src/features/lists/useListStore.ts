@@ -47,19 +47,19 @@ function seed(): Snapshot {
     lists: [{ id: 'g1', name: 'Groceries', emoji: '🛒', createdBy: 'u1', createdAt: '2026-09-01T09:00:00Z' }],
     items: [
       // Movies — the shared watchlist, one row already checked off.
-      { id: 'w1', key: 'movie', title: 'Dune: Part Two', imageUrl: '', creator: 'Denis Villeneuve', position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-01T10:00:00Z' },
-      { id: 'w2', key: 'movie', title: 'Past Lives', imageUrl: '', creator: 'Celine Song', position: 2, tierItemId: null, doneOn: null, createdBy: 'u2', createdAt: '2026-09-02T10:00:00Z' },
+      { id: 'w1', key: 'movie', title: 'Dune: Part Two', imageUrl: '', creator: 'Denis Villeneuve', releaseYear: 2024, position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-01T10:00:00Z' },
+      { id: 'w2', key: 'movie', title: 'Past Lives', imageUrl: '', creator: 'Celine Song', releaseYear: 2023, position: 2, tierItemId: null, doneOn: null, createdBy: 'u2', createdAt: '2026-09-02T10:00:00Z' },
       // Checked off: it made tier item m6 (the tier board's own seed store —
       // see checkOff below on why the two seeds don't talk to each other).
-      { id: 'w5', key: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', creator: '', position: 3, tierItemId: 'm6', doneOn: null, createdBy: 'u1', createdAt: '2026-09-03T10:00:00Z' },
-      { id: 'w3', key: 'tv', title: 'The Bear', imageUrl: '', creator: 'Christopher Storer', position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-01T11:00:00Z' },
+      { id: 'w5', key: 'movie', title: 'Everything Everywhere All at Once', imageUrl: '', creator: '', releaseYear: 2022, position: 3, tierItemId: 'm6', doneOn: null, createdBy: 'u1', createdAt: '2026-09-03T10:00:00Z' },
+      { id: 'w3', key: 'tv', title: 'The Bear', imageUrl: '', creator: 'Christopher Storer', releaseYear: 2022, position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-01T11:00:00Z' },
       // Books are a PER-PERSON list: w4 is the seed viewer's (u1), w6 is the
       // partner's — so the personal filter is demoable offline.
-      { id: 'w4', key: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', creator: 'Samantha Shannon', position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-01T12:00:00Z' },
-      { id: 'w6', key: 'book', title: 'Babel', imageUrl: '', creator: 'R. F. Kuang', position: 2, tierItemId: null, doneOn: null, createdBy: 'u2', createdAt: '2026-09-02T12:00:00Z' },
+      { id: 'w4', key: 'book', title: 'The Priory of the Orange Tree', imageUrl: '', creator: 'Samantha Shannon', releaseYear: 2019, position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-01T12:00:00Z' },
+      { id: 'w6', key: 'book', title: 'Babel', imageUrl: '', creator: 'R. F. Kuang', releaseYear: 2022, position: 2, tierItemId: null, doneOn: null, createdBy: 'u2', createdAt: '2026-09-02T12:00:00Z' },
       // The free-form list: one open row, one stamped done.
-      { id: 'w7', key: 'custom:g1', title: 'Oat milk', imageUrl: '', creator: '', position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-04T09:00:00Z' },
-      { id: 'w8', key: 'custom:g1', title: 'Coffee beans', imageUrl: '', creator: 'the dark roast', position: 2, tierItemId: null, doneOn: '2026-09-05', createdBy: 'u2', createdAt: '2026-09-04T10:00:00Z' },
+      { id: 'w7', key: 'custom:g1', title: 'Oat milk', imageUrl: '', creator: '', releaseYear: null, position: 1, tierItemId: null, doneOn: null, createdBy: 'u1', createdAt: '2026-09-04T09:00:00Z' },
+      { id: 'w8', key: 'custom:g1', title: 'Coffee beans', imageUrl: '', creator: 'the dark roast', releaseYear: null, position: 2, tierItemId: null, doneOn: '2026-09-05', createdBy: 'u2', createdAt: '2026-09-04T10:00:00Z' },
     ],
   }
 }
@@ -80,6 +80,7 @@ type ListItemRow = {
   title: string
   image_url: string | null
   creator: string | null
+  release_year: number | null
   position: number
   tier_item_id: string | null
   done_on: string | null
@@ -101,6 +102,7 @@ const toListItem = (r: ListItemRow): ListItem => ({
   title: r.title,
   imageUrl: r.image_url ?? '',
   creator: r.creator ?? '',
+  releaseYear: r.release_year,
   position: r.position,
   tierItemId: r.tier_item_id,
   doneOn: r.done_on,
@@ -109,7 +111,7 @@ const toListItem = (r: ListItemRow): ListItem => ({
 })
 
 const LIST_COLUMNS = 'id,name,emoji,created_by,created_at'
-const LIST_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,creator,position,tier_item_id,done_on,created_by,created_at'
+const LIST_ITEM_COLUMNS = 'id,kind,list_id,title,image_url,creator,release_year,position,tier_item_id,done_on,created_by,created_at'
 
 // In-memory fallback only: stable client ids for seed-mode edits.
 const nextId = idFactory('lx', 500)
@@ -138,9 +140,9 @@ export interface ListStore {
 
   /** Add a row to the bottom of a list's queue. Resolves false when the write
    *  failed, so the quick-add input can put the text back. */
-  addItem: (ref: ListRef, title: string, imageUrl: string, creator: string) => Promise<boolean>
-  /** Edit a row's title / image / creator. Throws (the modal stays open). */
-  updateItem: (id: string, title: string, imageUrl: string, creator: string) => Promise<void>
+  addItem: (ref: ListRef, title: string, imageUrl: string, creator: string, releaseYear: number | null) => Promise<boolean>
+  /** Edit a row's title / image / creator / year. Throws (the modal stays open). */
+  updateItem: (id: string, title: string, imageUrl: string, creator: string, releaseYear: number | null) => Promise<void>
   /** Remove a row. Throws on failure. */
   deleteItem: (id: string) => Promise<void>
 
@@ -296,7 +298,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
   //     failure); update/delete throw so the edit modal can stay open. ---
 
   const addItem = useCallback(
-    async (ref: ListRef, title: string, imageUrl: string, creator: string): Promise<boolean> => {
+    async (ref: ListRef, title: string, imageUrl: string, creator: string, releaseYear: number | null): Promise<boolean> => {
       const trimmed = title.trim()
       if (!trimmed) return false
       setError(null)
@@ -309,7 +311,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
           .from('list_items')
           // kind + list_id always travel together — the DB CHECK ties them, so
           // a missed site fails as a store error, never as bad data.
-          .insert({ space_id: spaceId, kind: kindColumn(ref), list_id: listIdOf(ref), title: trimmed, image_url: image, creator: maker, position })
+          .insert({ space_id: spaceId, kind: kindColumn(ref), list_id: listIdOf(ref), title: trimmed, image_url: image, creator: maker, release_year: releaseYear, position })
           .select(LIST_ITEM_COLUMNS)
           .single()
         if (err) {
@@ -321,7 +323,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
       }
       setItems((prev) => [
         ...prev,
-        { id: nextId(), key: ref, title: trimmed, imageUrl: image, creator: maker, position, tierItemId: null, doneOn: null, createdBy: selfId, createdAt: new Date().toISOString() },
+        { id: nextId(), key: ref, title: trimmed, imageUrl: image, creator: maker, releaseYear, position, tierItemId: null, doneOn: null, createdBy: selfId, createdAt: new Date().toISOString() },
       ])
       return true
     },
@@ -329,7 +331,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
   )
 
   const updateItem = useCallback(
-    async (id: string, title: string, imageUrl: string, creator: string) => {
+    async (id: string, title: string, imageUrl: string, creator: string, releaseYear: number | null) => {
       const trimmed = title.trim()
       if (!trimmed) return
       setError(null)
@@ -338,14 +340,14 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
       if (supabase && spaceId) {
         const { error: err } = await supabase
           .from('list_items')
-          .update({ title: trimmed, image_url: image, creator: maker })
+          .update({ title: trimmed, image_url: image, creator: maker, release_year: releaseYear })
           .eq('id', id)
         if (err) {
           setError(err.message)
           throw err
         }
       }
-      setItems((prev) => prev.map((w) => (w.id === id ? { ...w, title: trimmed, imageUrl: image, creator: maker } : w)))
+      setItems((prev) => prev.map((w) => (w.id === id ? { ...w, title: trimmed, imageUrl: image, creator: maker, releaseYear } : w)))
     },
     [spaceId],
   )
@@ -453,7 +455,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
           const title = item.title.trim()
           const { data: found, error: findErr } = await supabase
             .from('tier_items')
-            .select('id, title, done_on')
+            .select('id, title, done_on, release_year')
             .eq('space_id', spaceId)
             .eq('kind', boardKey)
             .is('list_id', null)
@@ -469,10 +471,15 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
             tierItemId = existing.id
             // Movies/TV: a board item that never got a watched date gets one
             // now. Books keep a null shared date; the completion below dates it.
-            if (!personal && existing.done_on === null) {
+            // Either way a board item with no year takes the row's.
+            const patch = {
+              ...(!personal && existing.done_on === null ? { done_on: today() } : {}),
+              ...(existing.release_year === null && item.releaseYear !== null ? { release_year: item.releaseYear } : {}),
+            }
+            if (Object.keys(patch).length > 0) {
               const { error: dateErr } = await supabase
                 .from('tier_items')
-                .update({ done_on: today() })
+                .update(patch)
                 .eq('id', tierItemId)
               if (dateErr) setError(dateErr.message)
             }
@@ -486,6 +493,7 @@ export function useListStore(spaceId: string | null, userId: string | null = nul
                 title: item.title,
                 image_url: item.imageUrl,
                 creator: item.creator,
+                release_year: item.releaseYear,
                 done_on: personal ? null : today(),
               })
               .select('id')

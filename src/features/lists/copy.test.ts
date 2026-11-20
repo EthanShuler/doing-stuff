@@ -24,6 +24,7 @@ describe('LIST_COPY', () => {
     for (const copy of Object.values(LIST_COPY)) {
       expect(copy.linksToBoard).toBe(true)
       expect(copy.hasImage).toBe(true)
+      expect(copy.hasYear).toBe(true)
       expect(copy.searchKind).not.toBeNull()
     }
   })
@@ -45,6 +46,7 @@ describe('customListCopy', () => {
     const copy = customListCopy(def())
     expect(copy.linksToBoard).toBe(false)
     expect(copy.hasImage).toBe(false)
+    expect(copy.hasYear).toBe(false)
     expect(copy.searchKind).toBeNull()
     expect(copy.attribution).toBe('')
     expect(copy.example).toBe('')

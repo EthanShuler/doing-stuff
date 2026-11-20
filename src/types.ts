@@ -156,6 +156,9 @@ export interface TierItem {
   /** Who made it — author for books, director for movies, etc. (per-kind label
    *  in copy.ts). Free text, shared like the title. '' = unknown/not entered. */
   creator: string
+  /** The year it came out; null = unknown. Movies/TV/books/games — filled
+   *  from the title search on a pick (or typed); custom lists leave it null. */
+  releaseYear: number | null
   /** Lineage: the ROOT row this was pulled from in another space
    *  (\`source.copiedFrom ?? source.id\` — see originOf in lib/lineage.ts),
    *  or null for a row made here. A matching hint for re-pulls, never
@@ -256,6 +259,9 @@ export interface ListItem {
   /** Who made it — author/director (per-kind label in the lists copy.ts).
    *  On a free-form row this doubles as the optional NOTE line. '' = none. */
   creator: string
+  /** The year it came out; null = unknown. Media rows only (free-form rows
+   *  leave it null); carried onto the tier item when checked off. */
+  releaseYear: number | null
   /** Fractional queue position; lowest = next up (midpoint insertion on drag). */
   position: number
   /** The tier item this produced when checked off; null while still open.

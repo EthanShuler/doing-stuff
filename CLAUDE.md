@@ -135,6 +135,12 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   title and shown as a faint line under the card title; the modal labels it
   per kind via `creatorLabel` in `copy.ts` (Author / Director / Creator /
   Brand or shop), and picking an Open Library suggestion prefills the author.
+  Built-in kinds also carry a shared **`release_year`** (nullable integer,
+  year only — `src/lib/releaseYear.ts`): a TMDB / Open Library / IGDB pick
+  fills it (books get the first-publish year), the modal's "Year" field
+  edits it beside the creator, and the card's faint line reads
+  "2021 · Denis Villeneuve" (year first, so the narrow card keeps it —
+  `cardByline`). Custom lists have none (`tracksReleaseYear`).
   Any member can add/edit/delete; deleting removes everyone's rankings of it.
 - **Tier placement** (`tier_placements`) — **one person's** ranking of one item:
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
@@ -209,7 +215,10 @@ switching lists; a `PickerRow` pill row above the control bar picks which
 - **List item** (`list_items`) — one row on one list: `kind
   'movie'|'tv'|'book'|'custom'` plus a nullable `list_id` (→ `lists`), a
   `title`, an optional `image_url` and `creator` (Director / Creator / Author;
-  on a free-form list the same column is the optional **Note**), a fractional
+  on a free-form list the same column is the optional **Note**), a nullable
+  **`release_year`** on media rows (filled by a search pick, shown after the
+  creator, carried onto the tier item at check-off — and onto an existing
+  board item that has none), a fractional
   `position` (midpoint insertion via `src/lib/order.ts`, drag-to-reorder, top
   = next up, new rows append at max + 1), and TWO done markers: `tier_item_id`
   for media rows and `done_on` for free-form rows — `isDone()` in the lists

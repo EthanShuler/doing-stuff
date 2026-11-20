@@ -59,6 +59,18 @@ export const datesArePersonal = (key: ListKey): boolean => key === 'book' || key
  */
 export const hasUndatedShelf = (key: ListKey): boolean => listIdOf(key) === null
 
+/**
+ * Whether a board's items carry a release year — the built-in kinds (movies,
+ * TV, books, games) do, and their title searches fill it. A custom list's
+ * items ("Mint chocolate chip") have none, so its modal shows no field.
+ */
+export const tracksReleaseYear = (key: ListKey): boolean => listIdOf(key) === null
+
+/** A card's faint second line: the year FIRST (the card is narrow and clamps
+ *  to one line, so the short part must survive), then who made it. */
+export const cardByline = (item: Pick<TierItem, 'creator' | 'releaseYear'>): string =>
+  [item.releaseYear ? String(item.releaseYear) : '', item.creator].filter(Boolean).join(' · ')
+
 // --- Shared boards -------------------------------------------------------------
 // A custom list can be `shared`: ONE board the space ranks together instead of
 // a board per person. Its placements carry a null userId (the DB's unique
@@ -595,6 +607,7 @@ export function planTierPull(
       doneOn: null,
       tags: normalizeTags(s.tags),
       creator: s.creator,
+      releaseYear: s.releaseYear,
       copiedFrom: originOf(s),
       createdBy: selfId,
       createdAt: new Date(base + newItems.length).toISOString(),

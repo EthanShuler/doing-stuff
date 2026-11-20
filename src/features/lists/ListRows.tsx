@@ -28,7 +28,7 @@ import { EmptyCard } from '../../components/EmptyCard'
 import { MediaImage } from '../../components/MediaImage'
 import { TitleSearchInput } from '../../components/TitleSearchInput'
 import { positionBetween } from '../../lib/order'
-import { isDone } from './derive'
+import { isDone, rowByline } from './derive'
 import type { ListCopy } from './copy'
 
 /** Row height. Dense on purpose: the point of this page is seeing a whole
@@ -48,12 +48,12 @@ interface ListRowsProps {
   copy: ListCopy
   /** Add a row from the quick-add field. Resolves false when the write failed,
    *  so the typed text can go back into the input. */
-  onAdd: (title: string, imageUrl: string, creator: string) => Promise<boolean>
+  onAdd: (title: string, imageUrl: string, creator: string, releaseYear: number | null) => Promise<boolean>
   /** Check off an open row. */
   onCheck: (item: ListItem) => void
   /** Reopen a done row. */
   onUncheck: (item: ListItem) => void
-  /** Edit an open row's title/image/creator (opens the modal). */
+  /** Edit an open row's title/image/creator/year (opens the modal). */
   onEdit: (item: ListItem) => void
   onDelete: (item: ListItem) => void
   /** A drag settled: move one open row to this queue position. */
@@ -86,6 +86,7 @@ function Row({
 }) {
   // On a phone the title wraps instead of truncating, so the row grows.
   const wrapTitle = useMediaQuery('(max-width: 48em)') ?? false
+  const byline = rowByline(item)
   return (
     <Group
       gap={8}
@@ -138,10 +139,10 @@ function Row({
         }}
       >
         {item.title}
-        {item.creator && (
+        {byline && (
           <Text component="span" fz={text.caption} c={colors.faint}>
             {' '}
-            · {item.creator}
+            · {byline}
           </Text>
         )}
       </Text>
@@ -255,11 +256,11 @@ export function ListRows({
   // Adding clears the field right away (so Enter-Enter can't double-add) but
   // puts the text back if the write failed — no retyping from memory. Focus
   // stays where it is, so several rows can go in one after another.
-  const submitAdd = async (title: string, imageUrl = '', creator = '') => {
+  const submitAdd = async (title: string, imageUrl = '', creator = '', releaseYear: number | null = null) => {
     const trimmed = title.trim()
     if (!trimmed) return
     setAddText('')
-    const ok = await onAdd(trimmed, imageUrl, creator)
+    const ok = await onAdd(trimmed, imageUrl, creator, releaseYear)
     if (!ok) setAddText((current) => current || trimmed)
   }
 
@@ -286,7 +287,7 @@ export function ListRows({
           value={addText}
           onChange={setAddText}
           onPick={(result) => {
-            void submitAdd(result.title, copy.hasImage ? result.imageUrl : '', result.creator)
+            void submitAdd(result.title, copy.hasImage ? result.imageUrl : '', result.creator, copy.hasYear ? result.releaseYear : null)
           }}
           onSubmit={() => {
             void submitAdd(addText)

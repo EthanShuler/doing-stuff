@@ -43,6 +43,10 @@ export const listIsPersonal = (ref: ListRef): boolean => ref === 'book'
  */
 export const isDone = (item: ListItem): boolean => item.tierItemId !== null || item.doneOn !== null
 
+/** A row's faint trailing text: who made it (or the note), then the year. */
+export const rowByline = (item: Pick<ListItem, 'creator' | 'releaseYear'>): string =>
+  [item.creator, item.releaseYear ? String(item.releaseYear) : ''].filter(Boolean).join(' · ')
+
 /**
  * Display order: the open queue on top — position order, lowest first, so the
  * top is what you'll do next — then the done rows, keeping their old queue

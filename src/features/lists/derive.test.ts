@@ -10,6 +10,7 @@ import {
   refFor,
   refOf,
   sortListItems,
+  rowByline,
 } from './derive'
 
 // --- factory ------------------------------------------------------------------
@@ -23,6 +24,7 @@ function row(over: Partial<ListItem> = {}): ListItem {
     title: `Row ${seq}`,
     imageUrl: '',
     creator: '',
+    releaseYear: null,
     position: seq,
     tierItemId: null,
     doneOn: null,
@@ -173,5 +175,14 @@ describe('pruneListDef', () => {
   it('leaves a snapshot with nothing on that list alone', () => {
     const keep = row({ key: 'custom:g2' })
     expect(pruneListDef([keep], 'g1')).toEqual([keep])
+  })
+})
+
+describe('rowByline', () => {
+  it('joins the creator and the year', () => {
+    expect(rowByline({ creator: 'Celine Song', releaseYear: 2023 })).toBe('Celine Song · 2023')
+    expect(rowByline({ creator: '', releaseYear: 2023 })).toBe('2023')
+    expect(rowByline({ creator: 'the dark roast', releaseYear: null })).toBe('the dark roast')
+    expect(rowByline({ creator: '', releaseYear: null })).toBe('')
   })
 })
