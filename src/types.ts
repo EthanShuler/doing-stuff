@@ -81,17 +81,17 @@ export interface WishlistItem {
   lng: number | null
 }
 
-// --- Tier lists (movies + TV + books + custom lists) --------------------------
+// --- Tier lists (movies + TV + books + games + custom lists) ------------------
 
-/** The three BUILT-IN boards, each with its own route and its own wording in
+/** The four BUILT-IN boards, each with its own route and its own wording in
  *  the tier-list copy.ts. They're built in because each has a title-search
- *  provider (TMDB / Open Library) and a want-to list in the Lists feature;
- *  everything else (ice cream included) is a space-defined `TierList` row.
- *  Stays a closed union. */
-export type TierKind = 'movie' | 'tv' | 'book'
+ *  provider (TMDB / Open Library / IGDB); movies, TV and books also have a
+ *  want-to list in the Lists feature (games don't). Everything else (ice
+ *  cream included) is a space-defined `TierList` row. Stays a closed union. */
+export type TierKind = 'movie' | 'tv' | 'book' | 'game'
 
 /**
- * Which board a pool item belongs to: one of the three built-ins, or
+ * Which board a pool item belongs to: one of the four built-ins, or
  * `list:<tier_lists.id>` for a space-defined one. This is the app-side key
  * only — in the DB it's a `kind` column ('custom' for a custom list) plus a
  * nullable `list_id`; the tier-list derive.ts converts
@@ -134,7 +134,7 @@ export interface TierList {
 /** The fixed tier ladder — not user-editable. */
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
 
-/** A movie, show, book, or custom-list item in the space's SHARED
+/** A movie, show, book, game, or custom-list item in the space's SHARED
  *  pool — one row in `tier_items`. */
 export interface TierItem {
   id: string
@@ -144,8 +144,9 @@ export interface TierItem {
   /** Poster/cover image URL, pasted by hand. '' = none (card shows a fallback). */
   imageUrl: string
   /** The SHARED "we finished this" date, ISO ("YYYY-MM-DD"); null when unknown
-   *  (legacy rows). Movies/TV only — books are read separately, so their dates
-   *  live per person in TierCompletion and this stays null. Custom lists
+   *  (legacy rows). Movies/TV only — books and games are read / played
+   *  separately, so their dates live per person in TierCompletion and this
+   *  stays null. Custom lists
    *  ignore it entirely: they show no dates and have no second shelf, so an
    *  item there is either ranked or unranked. */
   doneOn: string | null

@@ -5,36 +5,41 @@ import type { MantineSize } from '@mantine/core'
 import { colors, fonts, radii, shadows, text } from '../theme'
 import { isTmdbConfigured, searchTmdb } from '../lib/tmdb'
 import { searchOpenLibrary } from '../lib/openLibrary'
+import { isIgdbConfigured, searchIgdb } from '../lib/igdb'
 
 /** Which provider backs the suggestions — null means "plain input, no lookup"
  *  (a space-defined tier list, a free-form list). */
-export type SearchKind = 'movie' | 'tv' | 'book' | null
+export type SearchKind = 'movie' | 'tv' | 'book' | 'game' | null
 
-/** One dropdown row, whichever provider it came from (TMDB or Open Library). */
+/** One dropdown row, whichever provider it came from (TMDB, Open Library or IGDB). */
 export interface TitleSuggestion {
   key: string
   title: string
-  /** Secondary line — release year for TMDB, "author · year" for books. */
+  /** Secondary line — release year for TMDB, "author · year" for books,
+   *  "developer · year" for games. */
   meta: string
   imageUrl: string
   thumbUrl: string
-  /** Creator to prefill on pick — the author for books; '' for TMDB results
-   *  (its search response doesn't carry a director). */
+  /** Creator to prefill on pick — the author for books, the developer for
+   *  games; '' for TMDB results (its search response doesn't carry a director). */
   creator: string
 }
 
 /**
  * Whether a kind has a title-lookup provider at all. Books use Open Library,
  * which needs no key, so they're always searchable; movies and TV use TMDB,
- * which is only there when the public browser key is configured. Callers use
+ * which is only there when the public browser key is configured; games use
+ * IGDB through the `igdb` Edge Function, so they need the backend. Callers use
  * this to decide whether to credit the provider in a hint line.
  */
 export function canSearch(kind: SearchKind): boolean {
-  return kind === 'book' || ((kind === 'movie' || kind === 'tv') && isTmdbConfigured)
+  if (kind === 'book') return true
+  if (kind === 'game') return isIgdbConfigured
+  return (kind === 'movie' || kind === 'tv') && isTmdbConfigured
 }
 
 /**
- * A title field with debounced TMDB / Open Library suggestions under it.
+ * A title field with debounced TMDB / Open Library / IGDB suggestions under it.
  *
  * Lookup is a convenience: hand-typed titles work exactly as they would in a
  * plain `TextInput`, and with `searchKind={null}` that's all this is. The
@@ -99,6 +104,15 @@ export function TitleSearchInput({
               imageUrl: b.coverUrl,
               thumbUrl: b.thumbUrl,
               creator: b.author,
+            }))
+          : searchKind === 'game'
+          ? (await searchIgdb(query)).map((g) => ({
+              key: String(g.id),
+              title: g.title,
+              meta: [g.developer, g.year].filter(Boolean).join(' · '),
+              imageUrl: g.coverUrl,
+              thumbUrl: g.thumbUrl,
+              creator: g.developer,
             }))
           : (await searchTmdb(searchKind, query)).map((r) => ({
               key: String(r.id),

@@ -10,7 +10,7 @@ import { titleKey } from '../../lib/text'
 export const TIERS: readonly Tier[] = ['S', 'A', 'B', 'C', 'D', 'F']
 
 /** A droppable container on the board: a tier row, the unranked shelf, or the
- *  unwatched (for books: unread) shelf — which a custom list's board doesn't
+ *  unwatched (books: unread, games: unplayed) shelf — which a custom list's board doesn't
  *  have at all (see hasUndatedShelf). */
 export type ContainerId = Tier | 'unranked' | 'unwatched'
 
@@ -18,7 +18,7 @@ export type ContainerId = Tier | 'unranked' | 'unwatched'
 export type ShelfId = Exclude<ContainerId, Tier>
 
 // --- List keys ---------------------------------------------------------------
-// A board is identified app-side by a ListKey: one of the four built-in kinds,
+// A board is identified app-side by a ListKey: one of the built-in kinds,
 // or `list:<tier_lists.id>`. The DB stores that as two columns — `kind`
 // ('custom' for a space-defined list) and a nullable `list_id` — so these four
 // converters are the only place the two shapes meet.
@@ -43,15 +43,16 @@ export const keyOf = (kind: string, listId: string | null): ListKey =>
 /**
  * Whether a kind's "done with it" date belongs to one person rather than the
  * shared item. Movies and TV are watched together, so `TierItem.doneOn` (the
- * shared date) is the truth; books are read separately, so each member's date
- * is their own TierCompletion row and the shared one is ignored. A custom
+ * shared date) is the truth; books and games are read / played separately, so
+ * each member's date is their own TierCompletion row and the shared one is
+ * ignored. A custom
  * list ("Ice Cream") has no date of either sort — see hasUndatedShelf below.
  */
-export const datesArePersonal = (key: ListKey): boolean => key === 'book'
+export const datesArePersonal = (key: ListKey): boolean => key === 'book' || key === 'game'
 
 /**
  * Whether a board has the second, undated shelf beneath the tiers (Unwatched,
- * or Unread for books) — the three built-in kinds do. A custom list ("Ice
+ * Unread for books, Unplayed for games) — the built-in kinds do. A custom list ("Ice
  * Cream") tracks no "done with it" date in the UI, so an item there is either
  * ranked or Unranked and its shared `doneOn` is ignored entirely.
  * `copy.dates === null` is the wording side of this same switch.
@@ -460,10 +461,10 @@ export interface TierPullChoice {
   ranked: number
 }
 
-/** The source's boards for the checklist: the three built-ins, then its own
+/** The source's boards for the checklist: the four built-ins, then its own
  *  lists in creation order. */
 export function tierPullChoices(data: TierPullData, selfId: string): TierPullChoice[] {
-  const keys: ListKey[] = ['movie', 'tv', 'book', ...[...data.lists].sort(byCreated).map((l) => listKeyFor(l.id))]
+  const keys: ListKey[] = ['movie', 'tv', 'book', 'game', ...[...data.lists].sort(byCreated).map((l) => listKeyFor(l.id))]
   return keys.map((key) => {
     const source = tierPullSource(data, key, selfId)
     return { key, list: source.list, total: source.items.length, ranked: source.placements.length }

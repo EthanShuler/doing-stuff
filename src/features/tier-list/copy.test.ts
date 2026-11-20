@@ -20,6 +20,8 @@ describe('KIND_COPY', () => {
     expect(KIND_COPY.movie.dates?.fieldLabel).toBe('Watched on')
     expect(KIND_COPY.book.dates?.shelfLabel).toBe('Unread')
     expect(KIND_COPY.book.dates?.past).toBe('read')
+    expect(KIND_COPY.game.dates?.shelfLabel).toBe('Unplayed')
+    expect(KIND_COPY.game.creatorLabel).toBe('Developer')
   })
 })
 

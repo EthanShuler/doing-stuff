@@ -38,6 +38,7 @@ describe('featureForPath', () => {
     expect(featureForPath('/recipes/abc')?.key).toBe('recipes')
     expect(featureForPath('/recipes/plan')?.key).toBe('recipes')
     expect(featureForPath('/tiers/xyz')?.key).toBe('tier-lists')
+    expect(featureForPath('/games')?.key).toBe('tier-lists')
     expect(featureForPath('/lists/books')?.key).toBe('lists')
     expect(featureForPath('/seasons/fall-2026')?.key).toBe('seasons')
   })

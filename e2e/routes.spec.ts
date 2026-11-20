@@ -50,6 +50,15 @@ test('/books renders the book board', async ({ page }) => {
   await expect(page.getByText('Piranesi')).toBeVisible()
 })
 
+test('/games renders the video game board, with a per-person Unplayed shelf', async ({ page }) => {
+  // Seed: Avery (the viewer) ranked Hades S; Stardew Valley and Celeste have
+  // no played date for Avery, so they wait on the (collapsed) Unplayed shelf.
+  await page.goto('/games')
+  await expect(page.getByText('Hades', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Unplayed/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Add game' })).toBeVisible()
+})
+
 test('ice cream is a space-defined board at /tiers/:id, not a route of its own', async ({ page }) => {
   // Seed list l0 is "Ice Cream" (🍦 / flavor / tried).
   await page.goto('/tiers/l0')

@@ -13,7 +13,7 @@ behind a persistent Mantine AppShell header (brand link + feature nav + the
 `AccountMenu`, which replaced the bare Sign out button: a space switcher when
 you're in more than one, Admin for the admin, Change password, Sign out). The
 nav is **one item per feature, not per route** — up to ten of them,
-collapsing into the burger drawer below Mantine's `lg` breakpoint; the five
+collapsing into the burger drawer below Mantine's `lg` breakpoint; the
 tier-list routes share a single "Tier Lists" item and are chosen in-page with
 the `ListPicker` pill row, and the Lists routes likewise share one "Lists"
 item. The nav items and the home hub both render from one list,
@@ -31,7 +31,7 @@ static index of one ruled row per enabled feature, so any feature is one tap
 from home on a phone, with an empty state when the space has none; unknown
 paths redirect here); `/log`, `/wishlist`, `/map`,
 `/calendar` are the Doing Stuff feature's screens; `/movies`, `/tv`, `/books`,
-and `/tiers/:id` (a space-defined board — ice cream lives here) are the **Tier Lists**
+`/games`, and `/tiers/:id` (a space-defined board — ice cream lives here) are the **Tier Lists**
 feature; `/lists/movies`, `/lists/tv`, `/lists/books`, and `/lists/:id` (a
 free-form list) are the **Lists** feature (`/lists` redirects to
 `/lists/movies`); `/spoons` is the **Spoons**
@@ -77,11 +77,11 @@ that activity (`entryMatcher` in the doing-stuff `derive.ts`). All four routes r
 switches. Entry editing, repeats, and category/activity/home management happen
 in modals.
 
-**Tier Lists** (`/movies`, `/tv`, `/books`, `/tiers/:id`) —
+**Tier Lists** (`/movies`, `/tv`, `/books`, `/games`, `/tiers/:id`) —
 drag-n-drop S/A/B/C/D/F boards — **tiers only**; the want-to queues are the
 separate Lists feature below, and each movie/TV/book board links to its list
-from the control bar. Four routes, ONE header nav item: which board
-you're on is chosen in-page by the `ListPicker` pill row (three built-ins, then
+from the control bar (the games board has no list). Five routes, ONE header nav item: which board
+you're on is chosen in-page by the `ListPicker` pill row (four built-ins, then
 the space's own lists, then "+ New list" and — on a custom board — a faint
 "Edit list"). The domain model splits pool from opinion:
 
@@ -107,7 +107,7 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   statement** and Postgres cascades the items (and every member's
   placements/completions of them); the store mirrors that with `pruneList()`.
   App-side a board is one **`ListKey`**: a `TierKind` or `` `list:${id}` ``
-  (`TierKind` itself stays a closed 3-member union — movies/TV/books are built in only for their search providers and want-to lists; everything else, ice cream included, is a `tier_lists` row). `copyFor(key, lists)`
+  (`TierKind` itself stays a closed 4-member union — movies/TV/books/games are built in only for their search providers and (all but games) want-to lists; everything else, ice cream included, is a `tier_lists` row). `copyFor(key, lists)`
   resolves either into wording — and never throws for a list row that's gone,
   so another member's tab survives the beat between a realtime DELETE and the
   `<Navigate>` back to `/movies`.
@@ -118,7 +118,7 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   title, a hand-pasted poster/cover `image_url`, a nullable `done_on` date —
   the SHARED "the space finished it" date; defaults to today on a board add or a
   Lists check-off.
-  Movies/TV only — books leave it null and use per-person completions instead,
+  Movies/TV only — books and games leave it null and use per-person completions instead,
   and a **custom list ignores it entirely**: it tracks no date, so its board
   has no second shelf and its item modal no date field (`dates: null` in the
   tier-list `copy.ts`, mirrored by `hasUndatedShelf()` in its `derive.ts`)
@@ -140,9 +140,9 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   `tier` + fractional `position` within the tier (midpoint insertion on drop =
   one-row upsert on `unique (item_id, user_id)`; the client renormalizes a tier
   to integers if float precision ever runs out). "Unranked" is the absence of a
-  placement row. On the three **built-in** boards an unplaced item with **no
+  placement row. On the four **built-in** boards an unplaced item with **no
   date for the viewer** lands on a second dashed **Unwatched** (books:
-  **Unread**) shelf instead (a placement wins over a missing date); dragging
+  **Unread**, games: **Unplayed**) shelf instead (a placement wins over a missing date); dragging
   out of that shelf stamps today's date, dropping onto it unranks the card and
   clears the date. A **custom list has only the unranked shelf** — it tracks
   no date, so there's nothing to split on. The shelves are
@@ -155,14 +155,14 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   boundary, not just in the UI. (Shared custom lists are the one exception —
   see Custom list above.)
 - **Completion** (`tier_item_completions`) — **one person's** "I'm done with
-  this" for an item; today only BOOKS use it (a `done_on` date, upsert on
+  this" for an item; today BOOKS and GAMES use it (a `done_on` date, upsert on
   `unique (item_id, user_id)` — deliberately the same column name as the
   shared `tier_items.done_on`, so the shared and personal sides read in
   parallel). Movies/TV are watched as a group, so their date is shared on the
-  item; books are read separately, so each member marks their own — the same
-  book can be ranked on one board and Unread on the other.
+  item; books are read (and games played) separately, so each member marks
+  their own — the same book can be ranked on one board and Unread on the other.
   `datesArePersonal()` in the tier-list `derive.ts` is the behavior switch:
-  for books, shelf drags and the modal's date field write the viewer's own
+  for books and games, shelf drags and the modal's date field write the viewer's own
   completion row and never touch the item's shared `done_on`.
   Same split RLS as placements (read everyone's, write only your own).
 - **Personal tags** (`tier_item_user_tags`) — **one person's** own filter
@@ -174,7 +174,7 @@ the space's own lists, then "+ New list" and — on a custom board — a faint
   `derive.ts`). Work on every board, shared custom lists included; the item
   modal edits them in a second "My tags" field.
 
-All four routes render the same `TierListPage` (a `kind` prop for a built-in,
+All five routes render the same `TierListPage` (a `kind` prop for a built-in,
 the URL's list id for `/tiers/:id`), so the store —
 holding every kind plus all users' placements and completions — survives
 kind switches. A
@@ -583,11 +583,22 @@ paper), ported from the Claude Design "Compass" direction.
   (`src/lib/openLibrary.ts`) — no API key at all, so it's always on. Covers are
   plain `covers.openlibrary.org` URLs. Polite-use API like Nominatim: only the
   debounced modal autocomplete may call it, never render-time code.
+- **IGDB** (Twitch's game database) for video game title + cover + developer
+  lookup in the same modal (`src/lib/igdb.ts`). IGDB needs a Twitch client
+  **secret**, so the browser can't call it: it goes through the `igdb` **Edge
+  Function** (`supabase/functions/igdb/index.ts`), which checks the caller is
+  signed in, mints and caches a Twitch app token from the function secrets
+  `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET`, and returns plain rows; the
+  browser builds `images.igdb.com` `t_cover_big` URLs (and `posterSrc`
+  resizes them). Keyless seed mode, an undeployed function, or missing
+  secrets = no suggestions; hand entry still works. Same CORS allow-list and
+  "Verify JWT" note as the `admin` function.
 - **Supabase** (`@supabase/supabase-js`) — Postgres + Auth, called directly from
-  the browser. Protected by Row Level Security, not by a server — with ONE
-  exception, the `admin` **Edge Function** (`supabase/functions/admin/`), which
+  the browser. Protected by Row Level Security, not by a server — with two
+  exceptions: the `admin` **Edge Function** (`supabase/functions/admin/`), which
   does the two admin jobs that need the service role (see Spaces, accounts &
-  the admin). **Realtime**
+  the admin), and the `igdb` one, which holds the Twitch secret for game
+  search (see IGDB above). **Realtime**
   (`postgres_changes`) streams other members' edits into an open tab; the space
   tables must be in the `supabase_realtime` publication (see `schema.sql`).
 - **Hosting target: Cloudflare Pages** (build `npm run build`, output `dist`).
@@ -955,7 +966,7 @@ follows the person instead (Music Practice).
 
 **Tier-list pull** (`planTierPull` / `planTierPulls` in the tier-list
 `derive.ts`, pure and heavily tested; `pullBoards` in `useTierListStore`;
-`TierPullBody` is the checklist of the source's boards — Movies / TV / Books /
+`TierPullBody` is the checklist of the source's boards — Movies / TV / Books / Games /
 each custom list, with counts, the board on screen pre-ticked via
 `defaultPullKeys`). The source fetch (`fetchPullSource`) reads the source's
 lists and pool plus only the **puller's own** placements / completions / tags
@@ -977,7 +988,7 @@ and the null-owner placements — never anyone else's opinions. Rules:
   the puller's own, or null-owner on a shared list (source rows picked by the
   *source* list's mode). An item **already ranked here** for that owner keeps
   its spot; the rest **append** after that tier's last card, in source order.
-- **Books:** only the puller's own completion, insert-if-absent. **Tags:**
+- **Books and games:** only the puller's own completion, insert-if-absent. **Tags:**
   the puller's personal tags are unioned. A pull **never edits** an existing
   item here, so re-pulling is idempotent ("Nothing new to pull.").
 - **Writes, in order:** lists → items (one multi-row insert each, client-minted
@@ -1044,6 +1055,7 @@ src/
     profile.ts             displayNameFor() — profile → short display label
     tmdb.ts                TMDB title search (movie/TV posters) for TitleSearchInput
     openLibrary.ts         Open Library book search (covers) for TitleSearchInput — keyless
+    igdb.ts                IGDB game search (covers, developer) via the `igdb` Edge Function
     supabase.ts            client; null until env keys are set; isSupabaseConfigured
     database.types.ts      typed schema (regenerate with supabase gen types)
   data/                    shared (cross-feature) hooks
@@ -1092,7 +1104,7 @@ src/
       CategoryPills.tsx    tri-state category pills + the activity (subcategory) row
       HeaderActions.tsx    feature control bar: screen toggle + Manage / New entry
       ScreenToggle.tsx     Log / Wishlist / Map / Calendar switcher (navigates)
-    tier-list/             movie/TV/book + custom boards (ice cream is one)
+    tier-list/             movie/TV/book/game + custom boards (ice cream is one)
       TierListPage.tsx     owns the store, member picker, item modal state, pull modal
       useTierListStore.ts  data seam: lists + pool + placements + completions CRUD, pullBoards
       derive.ts            board building, moveItem, list keys, shared boards, pruneList,
@@ -1213,6 +1225,7 @@ supabase/
   schema.sql               tables + RLS + grants (the source of truth)
   migrations/*.sql         dated deltas for a live DB (connector apply_migration, or SQL Editor)
   functions/admin/index.ts the `admin` Edge Function (Deno; deployed separately, not built by Vite)
+  functions/igdb/index.ts  the `igdb` Edge Function: signed-in-only IGDB game search (Twitch secrets)
 ```
 
 New features get their own `src/features/<name>/` directory with their own

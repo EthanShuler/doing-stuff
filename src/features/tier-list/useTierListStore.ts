@@ -14,7 +14,7 @@ import { seedPullFetch } from '../../data/seedPullSource'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
 //   • Supabase keys present → live: reads/writes `tier_items` + `tier_placements`
-//     (+ `tier_item_completions` for books) scoped to the space. The pool is
+//     (+ `tier_item_completions` for books and games) scoped to the space. The pool is
 //     shared; placements and completions are per-person (RLS lets members read
 //     each other's but write only their own).
 //   • No keys → in-memory seed so the boards can be developed offline.
@@ -30,7 +30,7 @@ import { seedPullFetch } from '../../data/seedPullSource'
 //
 // The "we're done with this" date splits by kind (see datesArePersonal in
 // derive.ts): movies/TV/custom lists carry one SHARED `done_on` on the item;
-// books ignore it and track each member's OWN `done_on` in
+// books and games ignore it and track each member's OWN `done_on` in
 // `tier_item_completions`. Same column name on both sides on purpose.
 //
 // Tags split the same way: `tier_items.tags` are SHARED; each member's own
@@ -82,6 +82,11 @@ function seed(): Snapshot {
       { id: 'b3', kind: 'book', title: 'Tomorrow, and Tomorrow, and Tomorrow', imageUrl: '', doneOn: null, tags: [], creator: 'Gabrielle Zevin', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-03T11:00:00Z' },
       { id: 'b4', kind: 'book', title: 'The Hobbit', imageUrl: '', doneOn: null, tags: ['fantasy', 'childhood reads'], creator: 'J. R. R. Tolkien', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-04T11:00:00Z' },
       { id: 'b5', kind: 'book', title: 'Circe', imageUrl: '', doneOn: null, tags: [], creator: 'Madeline Miller', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-05T11:00:00Z' },
+      // Games: played state is per person, like books (completions below).
+      { id: 'vg1', kind: 'game', title: 'Hades', imageUrl: '', doneOn: null, tags: ['roguelike'], creator: 'Supergiant Games', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T13:00:00Z' },
+      { id: 'vg2', kind: 'game', title: 'Stardew Valley', imageUrl: '', doneOn: null, tags: ['cozy'], creator: 'ConcernedApe', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-02T13:00:00Z' },
+      { id: 'vg3', kind: 'game', title: 'Outer Wilds', imageUrl: '', doneOn: null, tags: [], creator: 'Mobius Digital', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-03T13:00:00Z' },
+      { id: 'vg4', kind: 'game', title: 'Celeste', imageUrl: '', doneOn: null, tags: [], creator: 'Maddy Makes Games', copiedFrom: null, createdBy: 'u2', createdAt: '2026-06-04T13:00:00Z' },
       // Ice cream (custom list l0): a custom board tracks no date, so doneOn is
       // ignored there — an item is ranked, or it's on the unranked shelf.
       { id: 'i1', kind: 'list:l0', title: 'Mint chocolate chip', imageUrl: '', doneOn: '2026-06-07', tags: [], creator: '', copiedFrom: null, createdBy: 'u1', createdAt: '2026-06-01T12:00:00Z' },
@@ -125,6 +130,8 @@ function seed(): Snapshot {
       { id: 'p20', itemId: 'f1', userId: 'u2', tier: 'B', position: 1 },
       // The shared board's ranking has no owner.
       { id: 'p21', itemId: 'g1', userId: null, tier: 'S', position: 1 },
+      { id: 'p22', itemId: 'vg1', userId: 'u1', tier: 'S', position: 1 },
+      { id: 'p23', itemId: 'vg2', userId: 'u2', tier: 'A', position: 1 },
     ],
     // Book completions: b1 read by both, b2/b4 only by u1, b3 only by u2, b5
     // by neither — so each seed board shows a different Unread shelf.
@@ -134,6 +141,11 @@ function seed(): Snapshot {
       { id: 'r3', itemId: 'b2', userId: 'u1', doneOn: '2026-06-18' },
       { id: 'r4', itemId: 'b3', userId: 'u2', doneOn: '2026-06-20' },
       { id: 'r5', itemId: 'b4', userId: 'u1', doneOn: '2026-06-25' },
+      // Game completions: Hades + Outer Wilds played by u1, Stardew by u2,
+      // Celeste by neither.
+      { id: 'r6', itemId: 'vg1', userId: 'u1', doneOn: '2026-06-06' },
+      { id: 'r7', itemId: 'vg3', userId: 'u1', doneOn: '2026-06-16' },
+      { id: 'r8', itemId: 'vg2', userId: 'u2', doneOn: '2026-06-09' },
     ],
     // Personal tags for both members, so the "Mine" row differs by viewer
     // (and the partner's never shows up on yours).

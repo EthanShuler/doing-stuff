@@ -64,9 +64,10 @@ export function ItemModal({
   const canSave = Boolean(draft.title.trim())
 
   // Title suggestions — TMDB for movies/TV (needs a key), Open Library for
-  // books (keyless, so always on). No provider covers a space-defined list —
-  // hand entry only (see TitleSearchInput).
-  const searchKind: SearchKind = kind === 'movie' || kind === 'tv' || kind === 'book' ? kind : null
+  // books (keyless, so always on), IGDB for games (through the backend's
+  // `igdb` Edge Function). No provider covers a space-defined list — hand
+  // entry only (see TitleSearchInput).
+  const searchKind: SearchKind = kind === 'movie' || kind === 'tv' || kind === 'book' || kind === 'game' ? kind : null
 
   const heading = isEditing ? `Edit ${noun}` : `Add a ${noun}`
   const saveLabel = isEditing ? 'Save changes' : `Add ${noun}`
