@@ -5,7 +5,7 @@ test('header feature nav and the list picker navigate; browser back works', asyn
   await page.goto('/')
   const header = page.locator('header')
 
-  // One header item covers all four boards; it lands on Movies.
+  // One header item covers every board; it lands on Movies.
   await header.getByText('Tier Lists', { exact: true }).click()
   await expect(page).toHaveURL('/movies')
   await expect(page.getByText('Spirited Away')).toBeVisible()

@@ -67,6 +67,29 @@ describe('posterSrc — Open Library', () => {
   })
 })
 
+describe('posterSrc — IGDB', () => {
+  const IGDB = 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1r7f.jpg'
+
+  it('picks the smallest cover size that covers the box', () => {
+    // A 38px list thumb at 2× = 76 device px → cover_small (90 wide).
+    expect(posterSrc(IGDB, 38, 2)).toBe('https://images.igdb.com/igdb/image/upload/t_cover_small/co1r7f.jpg')
+    // A 76px board card at 2× = 152 → cover_big (264).
+    expect(posterSrc(IGDB, 76, 2)).toBe(IGDB)
+    // Bigger than 264 → cover_big_2x.
+    expect(posterSrc(IGDB, 200, 2)).toBe('https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co1r7f.jpg')
+  })
+
+  it('rewrites a stored small or 2x cover too', () => {
+    expect(posterSrc('https://images.igdb.com/igdb/image/upload/t_cover_small/co1r7f.jpg', 76, 2)).toBe(IGDB)
+    expect(posterSrc('https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co1r7f.jpg', 76, 2)).toBe(IGDB)
+  })
+
+  it('leaves non-cover IGDB images alone', () => {
+    const shot = 'https://images.igdb.com/igdb/image/upload/t_screenshot_big/sc6l9f.jpg'
+    expect(posterSrc(shot, 76, 2)).toBe(shot)
+  })
+})
+
 describe('posterSrc — passthroughs', () => {
   it('leaves everything it does not recognise alone', () => {
     const untouched = [

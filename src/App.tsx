@@ -89,7 +89,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
   const doingStuff = (screen: Screen) =>
     gate('doing-stuff', <DoingStuffPage screen={screen} spaceId={spaceId} userId={userId} configured={configured} />)
 
-  // Same trick for the tier lists: /movies, /tv, /books and
+  // Same trick for the tier lists: /movies, /tv, /books, /games and
   // /tiers/:id render one component, so its store survives switching boards —
   // the board just re-derives. No kind = the custom-list route, which reads
   // the list id out of the URL.
@@ -133,8 +133,9 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             <Route path="/movies" element={tierList('movie')} />
             <Route path="/tv" element={tierList('tv')} />
             <Route path="/books" element={tierList('book')} />
+            <Route path="/games" element={tierList('game')} />
             {/* Space-defined boards (ice cream lives here too). Same element
-                type in the same slot as the three above, so switching between
+                type in the same slot as the four above, so switching between
                 them keeps the store alive; an unknown id redirects from inside
                 the page (after its load). */}
             <Route path="/tiers/:id" element={tierList()} />
@@ -144,7 +145,7 @@ function AuthedApp({ session, configured }: { session: Session | null; configure
             <Route path="/lists/tv" element={lists('tv')} />
             <Route path="/lists/books" element={lists('book')} />
             {/* Space-defined lists. Same element type in the same slot as the
-                three above; an unknown id redirects from inside the page. */}
+                four above; an unknown id redirects from inside the page. */}
             <Route path="/lists/:id" element={lists()} />
             <Route
               path="/french-toast"

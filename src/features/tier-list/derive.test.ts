@@ -213,6 +213,14 @@ describe('deriveBoard for books', () => {
     expect(board.unwatched).toEqual([])
   })
 
+  it('games split by each viewer’s own played record, like books', () => {
+    const a = item({ kind: 'game', doneOn: '2026-06-01' })
+    const comps = [completion({ itemId: a.id, userId: 'u2' })]
+    // The shared date is ignored; only u2 has played it.
+    expect(deriveBoard([a], [], comps, 'u2', 'game').unranked).toEqual([a])
+    expect(deriveBoard([a], [], comps, 'u1', 'game').unwatched).toEqual([a])
+  })
+
   it('movies ignore read records — the shared watched date still rules', () => {
     const a = item({ kind: 'movie', doneOn: null })
     const board = deriveBoard([a], [], [completion({ itemId: a.id, userId: 'u1' })], 'u1', 'movie')
@@ -221,8 +229,9 @@ describe('deriveBoard for books', () => {
 })
 
 describe('datesArePersonal', () => {
-  it('is true only for books', () => {
+  it('is true only for books and games', () => {
     expect(datesArePersonal('book')).toBe(true)
+    expect(datesArePersonal('game')).toBe(true)
     expect(datesArePersonal('movie')).toBe(false)
     expect(datesArePersonal('tv')).toBe(false)
   })
@@ -1044,6 +1053,7 @@ describe('tierPullSource / tierPullChoices / defaultPullKeys', () => {
       ['movie', 2, 1],
       ['tv', 0, 0],
       ['book', 0, 0],
+      ['game', 0, 0],
       ['list:sl2', 1, 1],
       ['list:sl1', 1, 0],
     ])

@@ -4,8 +4,8 @@ import { listIdOf } from './derive'
 /**
  * Per-kind wording + iconography, so the components stay kind-agnostic.
  * Movies and TV are "watched" (one shared date on the pool item — we watch
- * together); books are "read", and read state is per person (a
- * `tier_item_completions` row). A space-defined list ("Ice Cream") tracks no
+ * together); books are "read" and games "played", and that state is per
+ * person (a `tier_item_completions` row). A space-defined list ("Ice Cream") tracks no
  * done date at all — no date field, no second shelf — so its `dates` is null.
  * `datesArePersonal()` / `hasUndatedShelf()` in derive.ts are the behavior
  * switches; this file is just the words.
@@ -79,14 +79,26 @@ export const KIND_COPY: Record<TierKind, KindCopy> = {
       'New books land on your unranked shelf — or Unread with no date. Read dates are per person; everyone marks their own.',
     attribution: 'Book search by Open Library.',
   },
+  game: {
+    pageTitle: 'Video Games',
+    noun: 'game',
+    emoji: '🎮',
+    example: 'Hades',
+    imageLabel: 'Cover image URL',
+    creatorLabel: 'Developer',
+    dates: { shelfLabel: 'Unplayed', past: 'played', fieldLabel: 'Played on' },
+    boardHint:
+      'New games land on your unranked shelf — or Unplayed with no date. Played dates are per person; everyone marks their own.',
+    attribution: 'Game search by IGDB.',
+  },
 }
 
 // --- Space-defined lists ------------------------------------------------------
 // A custom list has no entry above: its behavior is fixed to one template
 // (shared pool, no dates and so one shelf, hand-pasted image URLs, no search
 // provider) and its WORDS come from the `tier_lists` row. So the copy is
-// templated here rather than stored. Only movies/TV/books stay built in, for
-// their search providers and want-to lists.
+// templated here rather than stored. Only movies/TV/books/games stay built in,
+// for their search providers (and, but for games, their want-to lists).
 
 /** Fallback emoji for a list whose row left it blank. */
 const LIST_EMOJI = '🏷️'

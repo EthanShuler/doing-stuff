@@ -189,8 +189,9 @@ create index if not exists entry_repeats_entry_idx on public.entry_repeats (entr
 -- other's but WRITE only their own — the partner's board is read-only at the
 -- security boundary.
 --
--- Besides the three built-in boards (kind 'movie'/'tv'/'book' — built in for
--- their title-search providers and want-to lists), a space can define its own
+-- Besides the four built-in boards (kind 'movie'/'tv'/'book'/'game' — built
+-- in for their title-search providers, and all but games for their want-to
+-- lists), a space can define its own
 -- lists ("Ice Cream", "Bugs", "Fruits") in `tier_lists`. Those
 -- rows are shared space data with the uniform policy; their items carry
 -- kind = 'custom' plus a `list_id`, so deleting a list is ONE statement and
@@ -243,8 +244,9 @@ create table if not exists public.tier_items (
   -- On an existing DB, admit a new kind with:
   --   alter table public.tier_items drop constraint tier_items_kind_check;
   --   alter table public.tier_items add constraint tier_items_kind_check
-  --     check (kind in ('movie', 'tv', 'book', 'custom'));
-  kind        text not null check (kind in ('movie', 'tv', 'book', 'custom')),
+  --     check (kind in ('movie', 'tv', 'book', 'game', 'custom'));
+  -- ('game' arrived 2026-11-20: migrations/20261120_video_games_board.sql.)
+  kind        text not null check (kind in ('movie', 'tv', 'book', 'game', 'custom')),
   -- Set exactly when kind = 'custom' (the CHECK below enforces the pairing):
   -- which space-defined list this item is on. ON DELETE CASCADE is what makes
   -- deleting a list one statement.
@@ -254,7 +256,7 @@ create table if not exists public.tier_items (
   image_url   text not null default '',
   -- The day we finished it (SHARED, like the item itself). Null = unknown;
   -- the client defaults it to today on add / a Lists check-off. Movies/TV
-  -- only — books are read separately, so their dates are per person in
+  -- only — books and games are read / played separately, so their dates are per person in
   -- `tier_item_completions.done_on` (same column name on purpose) and this
   -- stays null. Custom lists track no date at all and ignore this column
   -- (their boards have one unranked shelf). Renamed from `watched_on` on 2026-09-11 —
@@ -300,11 +302,11 @@ create table if not exists public.tier_placements (
   unique nulls not distinct (item_id, user_id)
 );
 
--- PER-PERSON completion state — today only BOOK items use it. Movies/TV are
--- watched together, so their date is the shared `done_on` above; books are
--- read separately, so each member records their own finish date here. Absence
--- of a row = that member hasn't finished it (the book sits on their Unread
--- shelf). Opinion data like placements → same split RLS below (members read
+-- PER-PERSON completion state — today BOOK and GAME items use it. Movies/TV
+-- are watched together, so their date is the shared `done_on` above; books
+-- and games are read / played separately, so each member records their own
+-- finish date here. Absence of a row = that member hasn't finished it (it
+-- sits on their Unread / Unplayed shelf). Opinion data like placements → same split RLS below (members read
 -- all, write only their own rows).
 create table if not exists public.tier_item_completions (
   id          uuid primary key default gen_random_uuid(),

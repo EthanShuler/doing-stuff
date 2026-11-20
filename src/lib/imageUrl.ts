@@ -1,7 +1,7 @@
 /**
- * Render-time image sizing for the two poster/cover CDNs we link to.
+ * Render-time image sizing for the poster/cover CDNs we link to.
  *
- * Both TMDB and Open Library encode the size in the URL path, so the right
+ * TMDB, Open Library and IGDB all encode the size in the URL path, so the right
  * size for a given box is a pure string rewrite — no API call, no new stored
  * data. We do it **at render time only**: the URL saved on the row stays
  * exactly what the provider (or a hand-paste) gave us. That matters because
@@ -17,6 +17,7 @@
 const TMDB_WIDTHS = [92, 154, 185, 342, 500, 780]
 
 const TMDB_RE = /^(https?:\/\/image\.tmdb\.org\/t\/p\/)(w\d+|original)(\/.+)$/
+const IGDB_RE = /^(https?:\/\/images\.igdb\.com\/igdb\/image\/upload\/)t_cover_(?:small|big)(?:_2x)?(\/[^/]+)$/
 const OPEN_LIBRARY_RE = /^(https?:\/\/covers\.openlibrary\.org\/b\/(?:id|isbn|olid)\/[^/-]+)-(?:S|M|L)(\.jpg)$/
 
 /** Cap the DPR multiplier: past 2× the extra bytes buy nothing visible. */
@@ -53,6 +54,15 @@ export function posterSrc(url: string, targetWidth: number, dpr?: number): strin
     // Open Library's three sizes are roughly 45 / 180 / 500 px wide.
     const size = devicePx <= 45 ? 'S' : devicePx <= 180 ? 'M' : 'L'
     return `${prefix}-${size}${suffix}`
+  }
+
+  const igdb = IGDB_RE.exec(url)
+  if (igdb) {
+    const [, prefix, path] = igdb
+    // IGDB's portrait covers: cover_small is 90 wide, cover_big 264, and
+    // cover_big_2x 528.
+    const size = devicePx <= 90 ? 'cover_small' : devicePx <= 264 ? 'cover_big' : 'cover_big_2x'
+    return `${prefix}t_${size}${path}`
   }
 
   return url
