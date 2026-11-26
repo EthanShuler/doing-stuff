@@ -801,16 +801,19 @@ export type Database = {
       space_members: {
         Row: {
           created_at: string
+          display_name: string | null
           space_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           space_id: string
           user_id: string
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           space_id?: string
           user_id?: string
         }
@@ -1196,6 +1199,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_space_names: {
+        Args: never
+        Returns: {
+          display_name: string
+          space_id: string
+          user_id: string
+        }[]
+      }
       admin_list_spaces: {
         Args: never
         Returns: {
@@ -1225,6 +1236,10 @@ export type Database = {
       }
       admin_set_display_name: {
         Args: { new_name: string; target_user: string }
+        Returns: undefined
+      }
+      admin_set_space_display_name: {
+        Args: { new_name: string; target_space: string; target_user: string }
         Returns: undefined
       }
       admin_set_user_spaces: {

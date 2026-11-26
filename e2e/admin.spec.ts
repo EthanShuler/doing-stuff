@@ -70,6 +70,32 @@ test('a person’s row edits their name and spaces, and hands out a fresh link',
   await expect(page.getByRole('button', { name: /^Samantha/ })).toContainText('Our city, together')
 })
 
+test('a name set for one space shows in that space only', async ({ page }) => {
+  await page.goto('/admin')
+  await page.getByRole('button', { name: /^Riley/ }).click()
+  const dialog = page.getByRole('dialog')
+  // Riley is only in Friends, so that's the only per-space field.
+  await expect(dialog.getByLabel('Name in Our city, together')).toHaveCount(0)
+  await dialog.getByLabel('Name in Friends').fill('Ri')
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+
+  // People keeps the display name; the Friends row uses the space's name.
+  await expect(page.getByRole('button', { name: /^Riley/ })).toBeVisible()
+  await pickSegment(page, 'Spaces')
+  await expect(page.getByRole('button', { name: /^Friends/ })).toContainText('Avery, Jordan, Ri')
+
+  // The form reopens with it, and Friends' own pages use it.
+  await pickSegment(page, 'People')
+  await page.getByRole('button', { name: /^Riley/ }).click()
+  await expect(dialog.getByLabel('Name in Friends')).toHaveValue('Ri')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await accountMenu(page).click()
+  await page.getByRole('menuitem', { name: 'Friends' }).click()
+  await page.getByRole('link', { name: /Parks/ }).first().click()
+  await expect(page.getByRole('radiogroup', { name: 'Whose map' }).getByText('Ri', { exact: true })).toBeVisible()
+})
+
 test('a new space with two features is switchable, and editing it updates the nav live', async ({ page }) => {
   await page.goto('/')
   await openAdmin(page)

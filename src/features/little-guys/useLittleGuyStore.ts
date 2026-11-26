@@ -2,9 +2,8 @@ import { useCallback, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { LittleGuy, Profile } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { PROFILE_COLUMNS, SEED_PROFILES, syncTable, toProfile, useSpaceSync } from '../../data/spaceSync'
+import { SEED_PROFILES, syncTable, fetchSpacePeople, useSpaceSync } from '../../data/spaceSync'
 import { usePhotoRows } from '../../data/usePhotoRows'
-import type { ProfileRow } from '../../data/spaceSync'
 import { removeLittleGuyPhoto, uploadLittleGuyPhoto } from './photos'
 
 // Data seam for the little guy collection, mirroring the other stores' two modes:
@@ -133,17 +132,15 @@ export function useLittleGuyStore(spaceId: string | null): LittleGuyStore {
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [guyRes, profileRes, memberRes] = await Promise.all([
+    const [guyRes, people] = await Promise.all([
       supabase.from('little_guys').select(LITTLE_GUY_COLUMNS).eq('space_id', spaceId).order('created_at'),
-      supabase.from('profiles').select(PROFILE_COLUMNS),
-      supabase.from('space_members').select('user_id,created_at').eq('space_id', spaceId).order('created_at'),
+      fetchSpacePeople(spaceId),
     ])
-    const err = guyRes.error ?? profileRes.error ?? memberRes.error
-    if (err) throw err
+    if (guyRes.error) throw guyRes.error
     return {
       guys: (guyRes.data as LittleGuyRow[]).map(toLittleGuy),
-      profiles: (profileRes.data as ProfileRow[]).map(toProfile),
-      memberIds: (memberRes.data as { user_id: string }[]).map((m) => m.user_id),
+      profiles: people.profiles,
+      memberIds: people.memberIds,
     }
   }, [spaceId])
 

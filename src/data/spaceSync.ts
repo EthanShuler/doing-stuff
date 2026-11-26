@@ -31,6 +31,43 @@ export type ProfileRow = { id: string; email: string | null; display_name: strin
 export const toProfile = (r: ProfileRow): Profile => ({ id: r.id, email: r.email, displayName: r.display_name })
 export const PROFILE_COLUMNS = 'id,email,display_name'
 
+/** One membership row's name: what that person goes by in ONE space
+ *  (`space_members.display_name`; null/blank = their profile name). */
+export type SpaceNameRow = { user_id: string; display_name: string | null }
+
+/** Profiles as one space shows them: a member with a name of their own in
+ *  that space gets it in place of their profile name. Everyone else — and
+ *  anyone not in `members` — is returned untouched. */
+export function withSpaceNames(profiles: readonly Profile[], members: readonly SpaceNameRow[]): Profile[] {
+  const names = new Map<string, string>()
+  for (const m of members) {
+    const name = m.display_name?.trim()
+    if (name) names.set(m.user_id, name)
+  }
+  return profiles.map((p) => {
+    const name = names.get(p.id)
+    return name ? { ...p, displayName: name } : p
+  })
+}
+
+/** The people of one space: every profile the viewer can read (RLS: self +
+ *  co-members of ANY space), named as THIS space names them, plus this
+ *  space's member ids in join order. Throws on a failed query. */
+export async function fetchSpacePeople(spaceId: string): Promise<{ profiles: Profile[]; memberIds: string[] }> {
+  if (!supabase) throw new Error('fetchSpacePeople needs Supabase')
+  const [profs, members] = await Promise.all([
+    supabase.from('profiles').select(PROFILE_COLUMNS),
+    supabase.from('space_members').select('user_id,display_name,created_at').eq('space_id', spaceId).order('created_at'),
+  ])
+  if (profs.error) throw profs.error
+  if (members.error) throw members.error
+  const rows = members.data as SpaceNameRow[]
+  return {
+    profiles: withSpaceNames((profs.data as ProfileRow[]).map(toProfile), rows),
+    memberIds: rows.map((m) => m.user_id),
+  }
+}
+
 // --- List-state helpers keyed by row id. Used both by realtime handlers
 //     (which makes echoes of this client's own writes idempotent) and by
 //     optimistic local updates. ---
