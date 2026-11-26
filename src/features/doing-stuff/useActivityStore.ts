@@ -5,8 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { today } from '../../lib/format'
 import { firstGrapheme } from '../../lib/text'
 import { resolveCoordsWithNotice } from '../../lib/geocode'
-import { PROFILE_COLUMNS, SEED_PROFILES, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
-import type { ProfileRow } from '../../data/spaceSync'
+import { SEED_PROFILES, idFactory, syncTable, fetchSpacePeople, upsertById, useSpaceSync } from '../../data/spaceSync'
 
 // The app's single source of domain data (categories / activities / entries).
 //
@@ -258,13 +257,12 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
   // first failed query; callers decide how to surface it.
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [cats, acts, ents, reps, profs, wishes, space] = await Promise.all([
+    const [cats, acts, ents, reps, people, wishes, space] = await Promise.all([
       supabase.from('categories').select('id,name,color_index').eq('space_id', spaceId).order('created_at'),
       supabase.from('activities').select(ACTIVITY_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('entries').select(ENTRY_COLUMNS).eq('space_id', spaceId).order('entry_date', { ascending: false }),
       supabase.from('entry_repeats').select(REPEAT_COLUMNS).eq('space_id', spaceId).order('repeat_date'),
-      // RLS scopes this to the current user + anyone they share a space with.
-      supabase.from('profiles').select(PROFILE_COLUMNS),
+      fetchSpacePeople(spaceId),
       supabase.from('wishlist_items').select(WISHLIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
       supabase.from('spaces').select(SPACE_HOME_COLUMNS).eq('id', spaceId).single(),
     ])
@@ -272,7 +270,6 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
     if (acts.error) throw acts.error
     if (ents.error) throw ents.error
     if (reps.error) throw reps.error
-    if (profs.error) throw profs.error
     if (wishes.error) throw wishes.error
     if (space.error) throw space.error
     return {
@@ -280,7 +277,7 @@ export function useActivityStore(spaceId: string | null, userId: string | null =
       activities: (acts.data as ActivityRow[]).map(toActivity),
       entries: (ents.data as EntryRow[]).map(toEntry),
       repeats: (reps.data as RepeatRow[]).map(toRepeat),
-      profiles: (profs.data as ProfileRow[]).map(toProfile),
+      profiles: people.profiles,
       wishlist: (wishes.data as WishlistRow[]).map(toWishlistItem),
       home: toHome(space.data as SpaceHomeRow),
     }

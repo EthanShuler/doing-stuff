@@ -18,6 +18,9 @@ export interface AdminUser {
   isAdmin: boolean
   /** Their memberships, in join order. */
   spaceIds: string[]
+  /** What they go by in a space where that differs from `displayName`
+   *  (space id → name). A space with no entry uses the display name. */
+  spaceNames: Record<string, string>
 }
 
 /** One space, as `admin_list_spaces()` returns it. */
@@ -37,6 +40,26 @@ export function userLabel(user: Pick<AdminUser, 'displayName' | 'email'>): strin
   return user.email.split('@')[0] || user.email || 'Unnamed'
 }
 
+/** What a person is called inside one space: their name there, else their
+ *  usual label. */
+export function userLabelIn(user: Pick<AdminUser, 'displayName' | 'email' | 'spaceNames'>, spaceId: string): string {
+  return user.spaceNames[spaceId]?.trim() || userLabel(user)
+}
+
+/** The per-space names a form changed: one entry per space in `spaceIds`
+ *  whose trimmed name differs from the baseline ('' = back to the display
+ *  name). Spaces outside `spaceIds` are skipped — no membership, no name. */
+export function spaceNameChanges(
+  baseline: Readonly<Record<string, string>>,
+  draft: Readonly<Record<string, string>>,
+  spaceIds: readonly string[],
+): { spaceId: string; name: string }[] {
+  return spaceIds.flatMap((spaceId) => {
+    const name = (draft[spaceId] ?? '').trim()
+    return name === (baseline[spaceId] ?? '').trim() ? [] : [{ spaceId, name }]
+  })
+}
+
 /** The spaces a person belongs to, in their join order, for the row chips.
  *  An id with no matching space (a race with another tab) is skipped. */
 export function spacesOfUser(user: AdminUser, spaces: readonly AdminSpace[]): AdminSpace[] {
@@ -47,12 +70,12 @@ export function spacesOfUser(user: AdminUser, spaces: readonly AdminSpace[]): Ad
   })
 }
 
-/** A space's member labels, in join order. */
+/** A space's member labels — as that space names them — in join order. */
 export function memberNames(space: AdminSpace, users: readonly AdminUser[]): string[] {
   const byId = new Map(users.map((u) => [u.id, u]))
   return space.memberIds.flatMap((id) => {
     const user = byId.get(id)
-    return user ? [userLabel(user)] : []
+    return user ? [userLabelIn(user, space.id)] : []
   })
 }
 

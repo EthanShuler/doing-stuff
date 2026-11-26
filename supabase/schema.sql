@@ -38,9 +38,14 @@ create table if not exists public.spaces (
 create table if not exists public.space_members (
   space_id    uuid not null references public.spaces (id) on delete cascade,
   user_id     uuid not null references auth.users (id) on delete cascade,
+  -- What this person goes by IN THIS SPACE. Null = their profiles.display_name.
+  -- Written only by admin_set_space_display_name.
+  display_name text,
   created_at  timestamptz not null default now(),
   primary key (space_id, user_id)
 );
+-- For a DB created before per-space names:
+alter table public.space_members add column if not exists display_name text;
 
 create table if not exists public.categories (
   id          uuid primary key default gen_random_uuid(),
@@ -1054,6 +1059,46 @@ begin
 end;
 $$;
 
+-- Per-space display names: a member's `space_members.display_name` overrides
+-- their profile name inside that one space (null = no override).
+create or replace function public.admin_list_space_names()
+returns table (space_id uuid, user_id uuid, display_name text)
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  return query
+    select m.space_id, m.user_id, m.display_name
+      from public.space_members m
+     where m.display_name is not null;
+end;
+$$;
+
+create or replace function public.admin_set_space_display_name(
+  target_space uuid, target_user uuid, new_name text
+) returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Admins only.' using errcode = '42501';
+  end if;
+  update public.space_members m
+     set display_name = nullif(btrim(new_name), '')
+   where m.space_id = target_space and m.user_id = target_user;
+  if not found then
+    raise exception 'They are not in that space.' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
@@ -1386,6 +1431,8 @@ revoke execute on function public.admin_list_spaces()                          f
 revoke execute on function public.admin_save_space(uuid, text, text[], uuid[]) from public, anon;
 revoke execute on function public.admin_set_user_spaces(uuid, uuid[])          from public, anon;
 revoke execute on function public.admin_set_display_name(uuid, text)           from public, anon;
+revoke execute on function public.admin_list_space_names()                     from public, anon;
+revoke execute on function public.admin_set_space_display_name(uuid, uuid, text) from public, anon;
 grant execute on function public.is_space_member(uuid) to authenticated;
 grant execute on function public.shares_space_with(uuid) to authenticated;
 grant execute on function public.is_shared_board_item(uuid) to authenticated;
@@ -1396,6 +1443,8 @@ grant execute on function public.admin_list_spaces()                           t
 grant execute on function public.admin_save_space(uuid, text, text[], uuid[])  to authenticated;
 grant execute on function public.admin_set_user_spaces(uuid, uuid[])           to authenticated;
 grant execute on function public.admin_set_display_name(uuid, text)            to authenticated;
+grant execute on function public.admin_list_space_names()                      to authenticated;
+grant execute on function public.admin_set_space_display_name(uuid, uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime: add the space-scoped tables to the `supabase_realtime` publication

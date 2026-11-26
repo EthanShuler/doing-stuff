@@ -2,9 +2,8 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Profile, Recipe } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { PROFILE_COLUMNS, SEED_PROFILES, errorMessage, removeById, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
+import { SEED_PROFILES, errorMessage, removeById, fetchSpacePeople, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { usePhotoRows } from '../../data/usePhotoRows'
-import type { ProfileRow } from '../../data/spaceSync'
 import { seedPullFetch } from '../../data/seedPullSource'
 import { originOf } from '../../lib/lineage'
 import { copyRecipePhoto, removeRecipePhoto, uploadRecipePhoto } from './photos'
@@ -411,15 +410,14 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [rows, profs] = await Promise.all([
+    const [rows, people] = await Promise.all([
       supabase.from('recipes').select(RECIPE_COLUMNS).eq('space_id', spaceId).order('created_at'),
-      supabase.from('profiles').select(PROFILE_COLUMNS),
+      fetchSpacePeople(spaceId),
     ])
     if (rows.error) throw rows.error
-    if (profs.error) throw profs.error
     return {
       recipes: (rows.data as RecipeRow[]).map(toRecipe),
-      profiles: (profs.data as ProfileRow[]).map(toProfile),
+      profiles: people.profiles,
     }
   }, [spaceId])
 

@@ -730,7 +730,8 @@ flips false once that first load settles either way.
 This load/realtime plumbing is shared: `src/data/spaceSync.ts` owns
 `useSpaceSync` (subscribe → snapshot on join → reconnect-refetch), `syncTable`
 (one table's INSERT/UPDATE/DELETE handlers), `upsertById`/`removeById`, the
-profile row mapper, and `idFactory` for seed-mode ids. A new feature's store
+profile row mapper, `fetchSpacePeople` (profiles named as the current space
+names them + its member ids), and `idFactory` for seed-mode ids. A new feature's store
 supplies only its row mappers, `fetchAll`, a `wire` callback, actions, and
 seed data — follow `useTierListStore` as the template. A collection whose
 rows carry one uploaded photo (spoons, recipes, little guys) gets its
@@ -753,9 +754,26 @@ raises for anyone else: `admin_list_users` (every login + email, last sign-in,
 member ids), `admin_save_space(target_space, name, features, member_ids)`
 (create when the id is null, else rename / re-feature — and set membership to
 **exactly** `member_ids`), `admin_set_user_spaces(user, space_ids)` (one
-person's memberships, exactly), and `admin_set_display_name`. RPCs rather
+person's memberships, exactly), and `admin_set_display_name` — plus the two
+per-space-name RPCs below. RPCs rather
 than `or is_admin()` in RLS, so the admin's own feature pages still see only
 their current space's data and people.
+
+**Per-space display names.** A person can go by a different name in each
+space: nullable **`space_members.display_name`** (null = their one
+`profiles.display_name`, which stays the default everywhere). Only the admin
+writes it — `admin_set_space_display_name(space, user, name)` ('' clears it;
+raises if they aren't in that space), with `admin_list_space_names()` feeding
+the admin page — from the "Name in <space>" fields of `PersonModal` (one per
+ticked space, saved after the memberships; `spaceNameChanges` /
+`userLabelIn` in the admin `derive.ts`). The name sits on the membership row:
+the "set exactly" RPCs keep the rows of people who stay, but removing someone
+from a space drops their name there. Feature stores never read `profiles`
+on their own: **`fetchSpacePeople(spaceId)`** in `src/data/spaceSync.ts`
+returns the readable profiles with this space's names already applied
+(`withSpaceNames`) plus the member ids in join order, so `displayNameFor`
+needs no space argument — a new store that shows people uses it too. Seed:
+`SEED_SPACE_NAMES` in `seedSpaces.ts` (only the Parks seed reads it).
 
 **Per-space features.** `spaces.enabled_features text[]`: **null = every
 feature, including ones added later** (the home space); an array is an

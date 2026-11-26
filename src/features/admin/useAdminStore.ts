@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { SEED_MEMBERS, SEED_SPACES } from '../../data/seedSpaces'
 import { useSpaceContext } from '../../data/useSpace'
 import { type AdminSpace, type AdminUser, mergeMembership } from './derive'
-import { SEED_ACCOUNTS, seedSetUserSpaces, seedSnapshot } from './seed'
+import { SEED_ACCOUNTS, seedPruneSpaceNames, seedSetSpaceName, seedSetUserSpaces, seedSnapshot } from './seed'
 
 /** What creating an account hands back: the new id, and the one-time
  *  set-password token — null when the account was made but the link wasn't
@@ -43,6 +43,9 @@ export interface AdminStore {
   /** Set one person's spaces; `baseline` as for saveSpace. */
   setUserSpaces: (userId: string, spaceIds: string[], baseline: string[]) => Promise<void>
   setDisplayName: (userId: string, name: string) => Promise<void>
+  /** What one person goes by in each given space ('' = their display name
+   *  again). They must already be in those spaces. */
+  setSpaceNames: (userId: string, changes: { spaceId: string; name: string }[]) => Promise<void>
 }
 
 type Snapshot = { users: AdminUser[]; spaces: AdminSpace[] }
@@ -56,9 +59,18 @@ const messageOf = (err: unknown): string =>
 async function fetchSnapshot(): Promise<Snapshot> {
   const client = supabase
   if (!client) throw new Error('Supabase not configured.')
-  const [users, spaces] = await Promise.all([client.rpc('admin_list_users'), client.rpc('admin_list_spaces')])
+  const [users, spaces, names] = await Promise.all([
+    client.rpc('admin_list_users'),
+    client.rpc('admin_list_spaces'),
+    client.rpc('admin_list_space_names'),
+  ])
   if (users.error) throw users.error
   if (spaces.error) throw spaces.error
+  if (names.error) throw names.error
+  const namesByUser = new Map<string, Record<string, string>>()
+  for (const n of names.data ?? []) {
+    namesByUser.set(n.user_id, { ...namesByUser.get(n.user_id), [n.space_id]: n.display_name })
+  }
   return {
     users: (users.data ?? []).map((r) => ({
       id: r.id,
@@ -68,6 +80,7 @@ async function fetchSnapshot(): Promise<Snapshot> {
       hasPassword: r.has_password,
       isAdmin: r.is_admin_user,
       spaceIds: r.space_ids ?? [],
+      spaceNames: namesByUser.get(r.id) ?? {},
     })),
     spaces: (spaces.data ?? []).map((r) => ({
       id: r.id,
@@ -99,7 +112,7 @@ async function invokeAdmin<T>(body: Record<string, unknown>): Promise<T> {
 
 /**
  * The admin page's data seam: every login and every space, plus the admin
- * actions. Live mode calls the five `admin_*` RPCs and the `admin` Edge
+ * actions. Live mode calls the `admin_*` RPCs and the `admin` Edge
  * Function; keyless seed mode edits in-memory accounts and SEED_SPACES /
  * SEED_MEMBERS in place.
  *
@@ -208,6 +221,23 @@ export function useAdminStore(): AdminStore {
       await settle()
     })
 
+  const setSpaceNames: AdminStore['setSpaceNames'] = (userId, changes) =>
+    write(async () => {
+      for (const { spaceId, name } of changes) {
+        if (!live) {
+          seedSetSpaceName(spaceId, userId, name)
+        } else {
+          const { error: rpcError } = await supabase!.rpc('admin_set_space_display_name', {
+            target_space: spaceId,
+            target_user: userId,
+            new_name: name,
+          })
+          if (rpcError) throw rpcError
+        }
+      }
+      await settle()
+    })
+
   const saveSpace: AdminStore['saveSpace'] = ({ spaceId, name, features, memberIds, baselineMemberIds }) =>
     write(async () => {
       const fresh = await read()
@@ -233,6 +263,7 @@ export function useAdminStore(): AdminStore {
           SEED_SPACES.push({ id, name: name.trim(), enabledFeatures: features && [...features] })
         }
         SEED_MEMBERS[id] = [...members]
+        seedPruneSpaceNames()
       } else {
         const { data, error: rpcError } = await supabase!.rpc('admin_save_space', {
           target_space: spaceId,
@@ -307,5 +338,6 @@ export function useAdminStore(): AdminStore {
     saveSpace,
     setUserSpaces,
     setDisplayName,
+    setSpaceNames,
   }
 }

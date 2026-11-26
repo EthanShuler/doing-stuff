@@ -14,10 +14,12 @@ import {
   mergeMembership,
   sameIds,
   setPasswordLink,
+  spaceNameChanges,
   spaceNameError,
   spacesOfUser,
   toggleId,
   userLabel,
+  userLabelIn,
 } from './derive'
 
 const user = (over: Partial<AdminUser> & { id: string }): AdminUser => ({
@@ -27,6 +29,7 @@ const user = (over: Partial<AdminUser> & { id: string }): AdminUser => ({
   hasPassword: true,
   isAdmin: false,
   spaceIds: [],
+  spaceNames: {},
   ...over,
 })
 
@@ -65,8 +68,35 @@ describe('users ↔ spaces', () => {
     expect(membersLine(s, users)).toBe('jordan, Avery')
   })
 
+  it('uses a person’s name in that space, and only there', () => {
+    const riley = user({ id: 'u3', displayName: 'Riley', spaceNames: { s2: ' Ri ', s1: '  ' } })
+    expect(userLabelIn(riley, 's2')).toBe('Ri')
+    expect(userLabelIn(riley, 's1')).toBe('Riley')
+    expect(userLabelIn(riley, 'elsewhere')).toBe('Riley')
+    const everyone = [...users, riley]
+    expect(memberNames(space({ id: 's2', memberIds: ['u1', 'u3'] }), everyone)).toEqual(['Avery', 'Ri'])
+    expect(memberNames(space({ id: 's1', memberIds: ['u1', 'u3'] }), everyone)).toEqual(['Avery', 'Riley'])
+  })
+
   it('says so when a space has nobody', () => {
     expect(membersLine(space({ id: 's1' }), users)).toBe('No members')
+  })
+})
+
+describe('spaceNameChanges', () => {
+  it('returns only the names that changed, trimmed', () => {
+    expect(spaceNameChanges({ s1: 'Ri' }, { s1: 'Ri ', s2: ' Riles ' }, ['s1', 's2'])).toEqual([
+      { spaceId: 's2', name: 'Riles' },
+    ])
+  })
+
+  it('reads a cleared field as back to the display name', () => {
+    expect(spaceNameChanges({ s1: 'Ri' }, { s1: '' }, ['s1'])).toEqual([{ spaceId: 's1', name: '' }])
+  })
+
+  it('skips spaces the person isn’t in', () => {
+    expect(spaceNameChanges({}, { s1: 'Ri', s2: 'Ri' }, ['s2'])).toEqual([{ spaceId: 's2', name: 'Ri' }])
+    expect(spaceNameChanges({ s1: 'Ri' }, { s1: 'Ri' }, [])).toEqual([])
   })
 })
 

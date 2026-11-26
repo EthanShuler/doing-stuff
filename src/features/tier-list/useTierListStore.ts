@@ -8,8 +8,7 @@ import { renormalizedPositions } from '../../lib/order'
 import { datesArePersonal, dropItemRows, itemIdsOnList, keyOf, kindColumn, listIdOf, listKeyFor, normalizeTags, placementOwner, planTierPulls, sumTierPullSummaries, tierPullSummaryLine } from './derive'
 import type { TierPullData, TierPullOptions, TierPullSummary } from './derive'
 import type { ListDraft } from './ListModal'
-import { PROFILE_COLUMNS, SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, toProfile, upsertById, useSpaceSync } from '../../data/spaceSync'
-import type { ProfileRow } from '../../data/spaceSync'
+import { SEED_PROFILES, SEED_SELF_ID, errorMessage, idFactory, syncTable, fetchSpacePeople, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { seedPullFetch } from '../../data/seedPullSource'
 
 // Data seam for the tier lists, mirroring useActivityStore's two modes:
@@ -318,32 +317,29 @@ const nextId = idFactory('tx', 500)
  *  resync use it for its own space. Throws on the first failed query. */
 export async function fetchTierSnapshot(spaceId: string): Promise<Snapshot> {
   if (!supabase) throw new Error('fetchTierSnapshot needs Supabase')
-  const [ls, its, places, comps_, utags, profs, members] = await Promise.all([
+  const [ls, its, places, comps_, utags, people] = await Promise.all([
     supabase.from('tier_lists').select(TIER_LIST_COLUMNS).eq('space_id', spaceId).order('created_at'),
     supabase.from('tier_items').select(TIER_ITEM_COLUMNS).eq('space_id', spaceId).order('created_at'),
     supabase.from('tier_placements').select(TIER_PLACEMENT_COLUMNS).eq('space_id', spaceId).order('position'),
     supabase.from('tier_item_completions').select(TIER_COMPLETION_COLUMNS).eq('space_id', spaceId).order('created_at'),
     supabase.from('tier_item_user_tags').select(TIER_USER_TAGS_COLUMNS).eq('space_id', spaceId),
-    // RLS scopes this to the current user + anyone they share a space with.
-    supabase.from('profiles').select(PROFILE_COLUMNS),
-    // ...so the boards to pick from come from THIS space's membership.
-    supabase.from('space_members').select('user_id,created_at').eq('space_id', spaceId).order('created_at'),
+    // Every readable profile, named as this space names them — and THIS
+    // space's membership, which is what the boards to pick from come from.
+    fetchSpacePeople(spaceId),
   ])
   if (ls.error) throw ls.error
   if (its.error) throw its.error
   if (places.error) throw places.error
   if (comps_.error) throw comps_.error
   if (utags.error) throw utags.error
-  if (profs.error) throw profs.error
-  if (members.error) throw members.error
   return {
     lists: (ls.data as TierListRow[]).map(toTierList),
     items: (its.data as TierItemRow[]).map(toTierItem),
     placements: (places.data as TierPlacementRow[]).map(toTierPlacement),
     completions: (comps_.data as TierCompletionRow[]).map(toTierCompletion),
     userTags: (utags.data as TierUserTagsRow[]).map(toTierUserTags),
-    profiles: (profs.data as ProfileRow[]).map(toProfile),
-    memberIds: (members.data as { user_id: string }[]).map((m) => m.user_id),
+    profiles: people.profiles,
+    memberIds: people.memberIds,
   }
 }
 

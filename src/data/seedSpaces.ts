@@ -38,3 +38,16 @@ export const SEED_MEMBERS: Record<string, string[]> = {
   'seed-home': ['u1', 'u2'],
   'seed-friends': ['u1', 'u2', SEED_FRIEND_PROFILE.id],
 }
+
+/** What a member goes by in one seed space (space id → user id → name), where
+ *  that differs from their profile name — the seed's
+ *  `space_members.display_name`. Starts empty; the admin seed edits it in
+ *  place. Of the feature seeds only Parks reads it (it's the one seed that
+ *  follows the current space). */
+export const SEED_SPACE_NAMES: Record<string, Record<string, string>> = {}
+
+/** A seed space's names, shaped like the membership rows `withSpaceNames` takes. */
+export function seedSpaceNameRows(spaceId: string | null): { user_id: string; display_name: string }[] {
+  const names = (spaceId && SEED_SPACE_NAMES[spaceId]) || {}
+  return Object.entries(names).map(([user_id, display_name]) => ({ user_id, display_name }))
+}

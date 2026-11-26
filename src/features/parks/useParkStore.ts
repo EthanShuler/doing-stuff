@@ -3,17 +3,16 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { ParkVisit, Profile } from '../../types'
 import { supabase } from '../../lib/supabase'
 import {
-  PROFILE_COLUMNS,
   SEED_PROFILES,
   SEED_SELF_ID,
   idFactory,
   syncTable,
-  toProfile,
+  fetchSpacePeople,
   upsertById,
   useSpaceSync,
+  withSpaceNames,
 } from '../../data/spaceSync'
-import type { ProfileRow } from '../../data/spaceSync'
-import { SEED_FRIEND_PROFILE, SEED_MEMBERS } from '../../data/seedSpaces'
+import { SEED_FRIEND_PROFILE, SEED_MEMBERS, seedSpaceNameRows } from '../../data/seedSpaces'
 import { useSpaceContext } from '../../data/useSpace'
 import { isGroupSpace } from './derive'
 
@@ -40,7 +39,7 @@ function seed(seedSpaceId: string | null): Snapshot {
   const memberIds = (seedSpaceId && SEED_MEMBERS[seedSpaceId]) || ['u1', 'u2']
   const third = SEED_FRIEND_PROFILE.id
   return {
-    profiles: [...SEED_PROFILES, SEED_FRIEND_PROFILE],
+    profiles: withSpaceNames([...SEED_PROFILES, SEED_FRIEND_PROFILE], seedSpaceNameRows(seedSpaceId)),
     memberIds,
     // Exercises every status the UI derives: a repeat park (Yosemite twice,
     // once together), solo parks for each member, an undated childhood visit,
@@ -143,21 +142,15 @@ export function useParkStore(spaceId: string | null, userId: string | null): Par
 
   const fetchAll = useCallback(async (): Promise<Snapshot | null> => {
     if (!supabase || !spaceId) return null
-    const [visitRes, profileRes, memberRes] = await Promise.all([
+    const [visitRes, people] = await Promise.all([
       supabase.from('park_visits').select(VISIT_COLUMNS).eq('space_id', spaceId).order('created_at'),
-      supabase.from('profiles').select(PROFILE_COLUMNS),
-      supabase
-        .from('space_members')
-        .select('user_id,created_at')
-        .eq('space_id', spaceId)
-        .order('created_at'),
+      fetchSpacePeople(spaceId),
     ])
-    const err = visitRes.error ?? profileRes.error ?? memberRes.error
-    if (err) throw err
+    if (visitRes.error) throw visitRes.error
     return {
       visits: (visitRes.data as VisitRow[]).map(toVisit),
-      profiles: (profileRes.data as ProfileRow[]).map(toProfile),
-      memberIds: (memberRes.data as { user_id: string }[]).map((m) => m.user_id),
+      profiles: people.profiles,
+      memberIds: people.memberIds,
     }
   }, [spaceId])
 
