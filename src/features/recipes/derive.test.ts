@@ -15,6 +15,7 @@ import {
   stepBlocks,
   toggleStapleItem,
   withMark,
+  shelveRecipes,
 } from './derive'
 
 const recipe = (overrides: Partial<Recipe>): Recipe => ({
@@ -33,6 +34,7 @@ const recipe = (overrides: Partial<Recipe>): Recipe => ({
   doneSteps: [],
   groceryList: '',
   stapleItems: [],
+  shelf: '',
   copiedFrom: null,
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
@@ -311,5 +313,27 @@ describe('cloneRecipe', () => {
     const clone = cloneRecipe(source, '')
     expect(clone.tags).not.toBe(source.tags)
     expect(clone.stapleItems).not.toBe(source.stapleItems)
+  })
+})
+
+describe('shelveRecipes', () => {
+  const all = [
+    recipe({ id: 'a', title: 'Apple kugel', shelf: 'hidden' }),
+    recipe({ id: 'b', title: 'Bread' }),
+    recipe({ id: 'c', title: 'Cacio e pepe', shelf: 'pinned' }),
+    recipe({ id: 'd', title: 'Dal', shelf: 'pinned' }),
+    recipe({ id: 'e', title: 'Eggs' }),
+  ]
+
+  it('splits into pinned / main / hidden, keeping the given order', () => {
+    const shelves = shelveRecipes(all)
+    expect(shelves.pinned.map((r) => r.id)).toEqual(['c', 'd'])
+    expect(shelves.main.map((r) => r.id)).toEqual(['b', 'e'])
+    expect(shelves.hidden.map((r) => r.id)).toEqual(['a'])
+  })
+
+  it('a pulled copy lands on the normal shelf', () => {
+    expect(cloneRecipe(all[0], '').shelf).toBe('')
+    expect(cloneRecipe(all[2], '').shelf).toBe('')
   })
 })

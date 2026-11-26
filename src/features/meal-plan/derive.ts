@@ -1,6 +1,6 @@
 import type { GroceryStaple, Meal, MealPlanDay, Recipe } from '../../types'
 import { formatDate, isoDate } from '../../lib/format'
-import { groceryLines, ingredientLines, isStapleItem } from '../recipes/derive'
+import { groceryLines, ingredientLines, isStapleItem, shelveRecipes } from '../recipes/derive'
 
 // Pure data-shaping for the meal plan: week math, day labels, the leftovers
 // picker, and the grocery step's per-recipe ingredient checklist. No React in
@@ -77,6 +77,28 @@ export function plannedCount(days: MealPlanDay[], week: string[], meal: Meal): n
 /** "Sun dinner" — names an earlier cook in the leftovers labels. */
 export function slotName(day: MealPlanDay): string {
   return `${dayName(day.day)} ${day.meal}`
+}
+
+
+/** One recipe in the picker. */
+export interface RecipeOption {
+  value: string
+  label: string
+}
+
+/** The recipe picker's options, ranked by shelf: pinned first, shelved (stored
+ *  as 'hidden') last,
+ *  each group in the order given (A–Z). Grouped under headings when any
+ *  recipe is pinned or hidden; a plain list otherwise. */
+export function recipePickerOptions(recipes: Recipe[]): RecipeOption[] | { group: string; items: RecipeOption[] }[] {
+  const option = (recipe: Recipe): RecipeOption => ({ value: recipe.id, label: recipe.title })
+  const { pinned, main, hidden } = shelveRecipes(recipes)
+  if (pinned.length === 0 && hidden.length === 0) return main.map(option)
+  return [
+    { group: '📌 Pinned', items: pinned.map(option) },
+    { group: 'All', items: main.map(option) },
+    { group: 'Shelved', items: hidden.map(option) },
+  ].filter((group) => group.items.length > 0)
 }
 
 /** The recipe a recipe day cooks, or null (not a recipe day, or the recipe

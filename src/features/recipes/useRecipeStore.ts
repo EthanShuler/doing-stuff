@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import type { Profile, Recipe } from '../../types'
+import type { Profile, Recipe, RecipeShelf } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { SEED_PROFILES, errorMessage, removeById, fetchSpacePeople, upsertById, useSpaceSync } from '../../data/spaceSync'
 import { usePhotoRows } from '../../data/usePhotoRows'
@@ -51,6 +51,7 @@ function seed(): Snapshot {
         // No grocery list: the meal plan falls back to the ingredient lines.
         groceryList: '',
         stapleItems: [],
+        shelf: '',
         copiedFrom: null,
         createdBy: 'u1',
         createdAt: '2026-05-10T09:00:00Z',
@@ -72,6 +73,7 @@ function seed(): Snapshot {
         doneSteps: [],
         groceryList: '',
         stapleItems: [],
+        shelf: 'pinned',
         copiedFrom: null,
         createdBy: 'u2',
         createdAt: '2026-04-02T09:00:00Z',
@@ -93,6 +95,7 @@ function seed(): Snapshot {
         doneSteps: [],
         groceryList: 'onion\nred pepper\ngarlic\ncumin\npaprika\ncrushed tomatoes (28 oz can)\neggs\nfeta\ncilantro',
         stapleItems: ['cumin', 'paprika'],
+        shelf: '',
         copiedFrom: null,
         createdBy: 'u1',
         createdAt: '2026-06-18T09:00:00Z',
@@ -114,6 +117,7 @@ function seed(): Snapshot {
         doneSteps: [],
         groceryList: '',
         stapleItems: [],
+        shelf: '',
         copiedFrom: null,
         createdBy: 'u2',
         createdAt: '2026-03-22T09:00:00Z',
@@ -132,6 +136,7 @@ export function seedRecipePullSource(): Recipe[] {
   const base = {
     crossedIngredients: [],
     doneSteps: [],
+    shelf: '' as const,
     copiedFrom: null,
     createdBy: 'u2',
   }
@@ -225,10 +230,14 @@ type RecipeRow = {
   done_steps: number[] | null
   grocery_list: string | null
   staple_items: string[] | null
+  shelf: string | null
   copied_from: string | null
   created_by: string | null
   created_at: string
 }
+
+/** Anything but the two named shelves reads as normal. */
+const toShelf = (value: string | null): RecipeShelf => (value === 'pinned' || value === 'hidden' ? value : '')
 
 const toRecipe = (r: RecipeRow): Recipe => ({
   id: r.id,
@@ -246,6 +255,7 @@ const toRecipe = (r: RecipeRow): Recipe => ({
   doneSteps: r.done_steps ?? [],
   groceryList: r.grocery_list ?? '',
   stapleItems: r.staple_items ?? [],
+  shelf: toShelf(r.shelf),
   copiedFrom: r.copied_from,
   createdBy: r.created_by,
   createdAt: r.created_at,
@@ -268,6 +278,7 @@ const FIELD_OF_COLUMN: Record<Exclude<keyof RecipeRow, 'id'>, Exclude<keyof Reci
   done_steps: 'doneSteps',
   grocery_list: 'groceryList',
   staple_items: 'stapleItems',
+  shelf: 'shelf',
   copied_from: 'copiedFrom',
   created_by: 'createdBy',
   created_at: 'createdAt',
@@ -283,7 +294,7 @@ function omittedKept(row: Partial<RecipeRow>, mapped: Recipe, held: Recipe): Rec
 }
 
 const RECIPE_COLUMNS =
-  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,grocery_list,staple_items,copied_from,created_by,created_at'
+  'id,title,image_url,ingredients,steps,source,source_url,tags,servings,total_time,notes,crossed_ingredients,done_steps,grocery_list,staple_items,shelf,copied_from,created_by,created_at'
 
 /** The fields the add/edit modal writes. All plain strings except tags. */
 export interface RecipeDraft {
@@ -324,6 +335,9 @@ export interface RecipeStore {
   setMark: (id: string, list: MarkList, index: number, marked: boolean) => Promise<void>
   /** Uncheck every ingredient and step — "starting a fresh batch". */
   clearMarks: (id: string) => Promise<void>
+  /** Pin, hide, or put back one recipe — a one-column write, so it can't
+   *  clobber someone else's edit. Optimistic; a failed write reverts it. */
+  setShelf: (id: string, shelf: RecipeShelf) => Promise<void>
 
   /** Non-fatal warning (a pulled recipe came over without its photo). */
   notice: string | null
@@ -348,6 +362,9 @@ type MarkFields = Partial<Pick<Recipe, 'crossedIngredients' | 'doneSteps'>>
 /** Lineage rides along only on a create: null for a recipe made here, the
  *  root origin's id for one pulled from another space. Edits never send it. */
 type LineageField = Partial<Pick<Recipe, 'copiedFrom'>>
+/** Carried on a create so the seed row is complete; never sent as a column —
+ *  a new recipe takes the DB default (''), and only setShelf changes it. */
+type ShelfField = Partial<Pick<Recipe, 'shelf'>>
 
 const draftFields = (draft: RecipeDraft) => ({
   title: draft.title.trim(),
@@ -371,7 +388,7 @@ const draftFields = (draft: RecipeDraft) => ({
 // and an edit sends them only when the text they index into changed — so an
 // edit can't stomp on a partner's taps on an untouched list. `copied_from`
 // is written only when set (a pull); seed mode keeps the null on the row.
-const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields & LineageField) => ({
+const recipeColumns = (fields: ReturnType<typeof draftFields> & MarkFields & LineageField & ShelfField) => ({
   title: fields.title,
   image_url: fields.imageUrl,
   ingredients: fields.ingredients,
@@ -481,7 +498,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
   const addRecipe = useCallback(
     async (draft: RecipeDraft) => {
       const fields = draftFields(draft)
-      if (fields.title) await insert({ ...fields, crossedIngredients: [], doneSteps: [], copiedFrom: null })
+      if (fields.title) await insert({ ...fields, crossedIngredients: [], doneSteps: [], shelf: '', copiedFrom: null })
     },
     [insert],
   )
@@ -553,6 +570,24 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     [spaceId, find],
   )
 
+  const setShelf = useCallback(
+    async (id: string, shelf: RecipeShelf) => {
+      setError(null)
+      const prior = find(id)
+      if (!prior || prior.shelf === shelf) return
+      const apply = (value: RecipeShelf) =>
+        setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, shelf: value } : r)))
+      apply(shelf)
+      if (!supabase || !spaceId) return
+      const { error } = await supabase.from('recipes').update({ shelf }).eq('id', id)
+      if (error) {
+        apply(prior.shelf)
+        setError(error.message)
+      }
+    },
+    [spaceId, find],
+  )
+
   const fetchPullSource = useCallback(async (sourceSpaceId: string): Promise<Recipe[]> => {
     if (!supabase) return seedPullFetch(seedRecipePullSource)
     const { data, error } = await supabase
@@ -615,6 +650,7 @@ export function useRecipeStore(spaceId: string | null): RecipeStore {
     deleteRecipe: rows.remove,
     setMark,
     clearMarks,
+    setShelf,
     notice,
     clearNotice,
     fetchPullSource,

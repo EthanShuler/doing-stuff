@@ -310,6 +310,12 @@ export interface Spoon {
  *  light structure parsed client-side: `ingredients` is one per line,
  *  `steps` splits into numbered steps on blank lines (see the recipes
  *  feature's derive.ts). */
+/** A recipe's place on the cookbook index, labeled Pinned / All / Shelved:
+ *  'pinned' = first, '' = the main list, 'hidden' (Shelved) = in the
+ *  collapsed drawer at the bottom (still searchable, still
+ *  offered by the meal plan). */
+export type RecipeShelf = 'pinned' | '' | 'hidden'
+
 export interface Recipe {
   id: string
   title: string
@@ -344,6 +350,8 @@ export interface Recipe {
   /** groceryList lines (by text) flagged as pantry staples — the grocery step
    *  starts them unticked. */
   stapleItems: string[]
+  /** Where it sits on the cookbook index (shared). Set from the recipe page. */
+  shelf: RecipeShelf
   /** Lineage: the ROOT row this was pulled from in another space
    *  (\`source.copiedFrom ?? source.id\` — see originOf in lib/lineage.ts),
    *  or null for a row made here. A matching hint for re-pulls, never

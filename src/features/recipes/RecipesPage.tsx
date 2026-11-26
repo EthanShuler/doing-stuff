@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Button, Group, SegmentedControl, TextInput, UnstyledButton } from '@mantine/core'
+import { Box, Button, Group, SegmentedControl, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import type { Recipe } from '../../types'
-import { colors } from '../../theme'
+import { colors, fonts, text } from '../../theme'
 import { useBusy } from '../../lib/useBusy'
 import { usePhotoSession } from '../../lib/photoSession'
 import { keysIn, useTriFilter } from '../../lib/triFilter'
@@ -16,7 +16,7 @@ import { PullButton } from '../../components/PullModal'
 import { Splash } from '../../components/Splash'
 import { useRecipeStore } from './useRecipeStore'
 import type { RecipeDraft } from './useRecipeStore'
-import { distinctRecipeTags, filterRecipes, sortRecipes } from './derive'
+import { distinctRecipeTags, filterRecipes, shelveRecipes, sortRecipes } from './derive'
 import { RecipeGrid } from './RecipeGrid'
 import { RecipeList } from './RecipeList'
 import { RecipeDetail } from './RecipeDetail'
@@ -42,6 +42,16 @@ const emptyDraft = (): RecipeDraft => ({
   groceryList: '',
   stapleItems: [],
 })
+
+/** A shelf's heading on the index ("📌 Pinned", "All"). The grid
+ *  and list below bring their own top margin, so this pulls them in. */
+function ShelfHeading({ children }: { children: string }) {
+  return (
+    <Text component="h2" fz={20} c={colors.ink} mt={26} mb={-12} style={{ fontFamily: fonts.serif, fontWeight: 400 }}>
+      {children}
+    </Text>
+  )
+}
 
 /** The shared cookbook. /recipes (the index: grid/list toggle, search, tag
  *  pills), /recipes/plan (the meal plan) and /recipes/:id (the full recipe
@@ -82,6 +92,13 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
     () => sortRecipes(filterRecipes(store.recipes, search, includedTags, excludedTags)),
     [store.recipes, search, tagFilter.state],
   )
+  // Pinned first, then All, then the Shelved drawer (stored as shelf
+  // 'hidden') — closed until opened, except while a search or tag filter is
+  // on (a match in the drawer has to be visible).
+  const shelves = shelveRecipes(shown)
+  const filtering = filterActive || search.trim().length > 0
+  const [hiddenOpen, setHiddenOpen] = useState(false)
+  const showHidden = hiddenOpen || filtering
 
   const [modalOpen, setModalOpen] = useState(false)
   // "Pull from…": a fresh modal (new key) per opening, so it starts clean.
@@ -174,6 +191,13 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
   // "Recipe not found" for as long as the first load takes.
   const loadingData = configured && (store.loading || (planning && mealPlan.loading))
 
+  const shelf = (recipes: Recipe[]) =>
+    view === 'list' ? (
+      <RecipeList recipes={recipes} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
+    ) : (
+      <RecipeGrid recipes={recipes} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
+    )
+
   const openRecipe = openId ? store.recipes.find((r) => r.id === openId) ?? null : null
 
   return (
@@ -213,6 +237,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
               onEdit={() => openEdit(openRecipe)}
               onMark={(list, index, marked) => void store.setMark(openRecipe.id, list, index, marked)}
               onClearMarks={() => void store.clearMarks(openRecipe.id)}
+              onShelf={(value) => void store.setShelf(openRecipe.id, value)}
             />
           ) : (
             <EmptyCard title="Recipe not found" blurb="It may have been deleted.">
@@ -273,7 +298,7 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
             />
 
             {shown.length === 0 ? (
-              filterActive || search.trim().length > 0 ? (
+              filtering ? (
                 <EmptyCard title="Nothing matches" blurb="No recipe fits that search and those tags." />
               ) : (
                 <EmptyCard
@@ -281,10 +306,36 @@ export function RecipesPage({ spaceId, configured }: { spaceId: string | null; c
                   blurb="Only a title is required."
                 />
               )
-            ) : view === 'list' ? (
-              <RecipeList recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
             ) : (
-              <RecipeGrid recipes={shown} onOpen={(recipe) => navigate(`/recipes/${recipe.id}`)} />
+              <>
+                {shelves.pinned.length > 0 && (
+                  <>
+                    <ShelfHeading>📌 Pinned</ShelfHeading>
+                    {shelf(shelves.pinned)}
+                  </>
+                )}
+                {shelves.main.length > 0 && (
+                  <>
+                    {shelves.pinned.length > 0 && <ShelfHeading>All</ShelfHeading>}
+                    {shelf(shelves.main)}
+                  </>
+                )}
+                {shelves.hidden.length > 0 && (
+                  <Box mt={28} style={{ borderTop: `1px dotted ${colors.dotted}` }}>
+                    <UnstyledButton
+                      onClick={() => setHiddenOpen((open) => !open)}
+                      aria-expanded={showHidden}
+                      // A filter holds the drawer open, so the toggle would do nothing.
+                      disabled={filtering}
+                      py={10}
+                      style={{ fontFamily: fonts.sans, fontSize: text.small, fontWeight: 600, color: colors.muted }}
+                    >
+                      {showHidden ? '▾' : '▸'} Shelved · {shelves.hidden.length}
+                    </UnstyledButton>
+                    {showHidden && <Box mt={-14}>{shelf(shelves.hidden)}</Box>}
+                  </Box>
+                )}
+              </>
             )}
           </>
         )}

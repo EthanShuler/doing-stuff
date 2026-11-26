@@ -4,7 +4,7 @@ import { Box, Button, Group, Popover, Select, Text, TextInput, UnstyledButton } 
 import type { Meal, MealPlanDay, Recipe } from '../../types'
 import { ACCENT, colors, fieldLabelStyle, fonts, radii, shadows, text } from '../../theme'
 import { formatDate } from '../../lib/format'
-import { dayName, mealName, recipeOf, slotName } from './derive'
+import { dayName, mealName, recipeOf, recipePickerOptions, slotName } from './derive'
 import type { MealChoice } from './useMealPlanStore'
 
 /**
@@ -105,7 +105,7 @@ export function DayPopover({
           placeholder="Search recipes…"
           searchable
           nothingFoundMessage="No recipe by that name"
-          data={recipes.map((r) => ({ value: r.id, label: r.title }))}
+          data={recipePickerOptions(recipes)}
           value={current?.kind === 'recipe' ? current.recipeId : null}
           onChange={(id) => id && pick({ kind: 'recipe', recipeId: id })}
           comboboxProps={{ withinPortal: false }}
