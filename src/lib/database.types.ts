@@ -617,6 +617,7 @@ export type Database = {
           ingredients: string
           notes: string
           servings: string
+          shelf: string
           source: string
           source_url: string
           space_id: string
@@ -638,6 +639,7 @@ export type Database = {
           ingredients?: string
           notes?: string
           servings?: string
+          shelf?: string
           source?: string
           source_url?: string
           space_id: string
@@ -659,6 +661,7 @@ export type Database = {
           ingredients?: string
           notes?: string
           servings?: string
+          shelf?: string
           source?: string
           source_url?: string
           space_id?: string

@@ -1,5 +1,5 @@
-import { Anchor, Box, Button, Group, Text, Title, UnstyledButton } from '@mantine/core'
-import type { Profile, Recipe } from '../../types'
+import { Anchor, Box, Button, Group, SegmentedControl, Text, Title, UnstyledButton } from '@mantine/core'
+import type { Profile, Recipe, RecipeShelf } from '../../types'
 import { colors, fieldLabelStyle, fonts, text } from '../../theme'
 import { formatDateWithYear, localDateOf } from '../../lib/format'
 import { displayNameFor } from '../../lib/profile'
@@ -21,6 +21,7 @@ export function RecipeDetail({
   onEdit,
   onMark,
   onClearMarks,
+  onShelf,
 }: {
   recipe: Recipe
   profiles: Profile[]
@@ -28,6 +29,8 @@ export function RecipeDetail({
   onEdit: () => void
   onMark: (list: MarkList, index: number, marked: boolean) => void
   onClearMarks: () => void
+  /** Pin, hide, or put back (saved on tap, for everyone in the space). */
+  onShelf: (shelf: RecipeShelf) => void
 }) {
   const ingredients = ingredientLines(recipe.ingredients)
   const steps = stepBlocks(recipe.steps)
@@ -210,7 +213,28 @@ export function RecipeDetail({
         </Box>
       )}
 
-      <Text fz={12} c={colors.faint} mt={30} style={{ fontFamily: fonts.sans }}>
+      {/* Where it sits on the index. '' can't be a radio value, hence 'normal'. */}
+      <Box mt={30}>
+        <Text component="span" style={fieldLabelStyle}>
+          In the cookbook
+        </Text>
+        <SegmentedControl
+          aria-label="In the cookbook"
+          size="xs"
+          value={recipe.shelf || 'normal'}
+          onChange={(value) => onShelf(value === 'normal' ? '' : (value as RecipeShelf))}
+          data={[
+            { label: '📌 Pinned', value: 'pinned' },
+            { label: 'All', value: 'normal' },
+            { label: 'Shelved', value: 'hidden' },
+          ]}
+        />
+        <Text fz={text.caption} c={colors.faint} mt={6} style={{ fontFamily: fonts.sans }}>
+          Pinned recipes come first. Shelved ones sit in a drawer at the bottom and stay in the meal plan.
+        </Text>
+      </Box>
+
+      <Text fz={12} c={colors.faint} mt={18} style={{ fontFamily: fonts.sans }}>
         {byline}
       </Text>
     </Box>

@@ -579,6 +579,11 @@ create table if not exists public.recipes (
   -- Which grocery_list lines (by text) are pantry staples: the grocery step
   -- starts them unticked.
   staple_items text[] not null default '{}',
+  -- Where it sits on the cookbook index: 'pinned' (first), '' (normal), or
+  -- 'hidden' (a collapsed drawer at the bottom; still searchable and still
+  -- offered by the meal plan). Shared; set from the recipe page.
+  shelf text not null default ''
+    constraint recipes_shelf_check check (shelf in ('', 'pinned', 'hidden')),
   -- Pull lineage (see tier_lists.copied_from): the root recipe this was
   -- copied from, null = an original. No FK on purpose.
   copied_from uuid,

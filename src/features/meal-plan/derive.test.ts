@@ -17,6 +17,7 @@ import {
   weekLabel,
   weekStart,
   withSent,
+  recipePickerOptions,
 } from './derive'
 
 const recipe = (id: string, title: string, ingredients = ''): Recipe => ({
@@ -35,6 +36,7 @@ const recipe = (id: string, title: string, ingredients = ''): Recipe => ({
   doneSteps: [],
   groceryList: '',
   stapleItems: [],
+  shelf: '',
   copiedFrom: null,
   createdBy: null,
   createdAt: '2026-01-01T00:00:00Z',
@@ -223,5 +225,34 @@ describe('recipe grocery lines', () => {
       { text: '1 onion, diced', staple: false },
       { text: '2 tbsp olive oil', staple: true },
     ])
+  })
+})
+
+describe('recipePickerOptions', () => {
+  const plain = [recipe('r1', 'Bread'), recipe('r2', 'Dal')]
+
+  it('is a plain list when nothing is pinned or hidden', () => {
+    expect(recipePickerOptions(plain)).toEqual([
+      { value: 'r1', label: 'Bread' },
+      { value: 'r2', label: 'Dal' },
+    ])
+  })
+
+  it('ranks pinned first and hidden last, under headings', () => {
+    const recipes = [
+      { ...recipe('r0', 'Apple kugel'), shelf: 'hidden' as const },
+      ...plain,
+      { ...recipe('r3', 'Eggs'), shelf: 'pinned' as const },
+    ]
+    expect(recipePickerOptions(recipes)).toEqual([
+      { group: '📌 Pinned', items: [{ value: 'r3', label: 'Eggs' }] },
+      { group: 'All', items: [{ value: 'r1', label: 'Bread' }, { value: 'r2', label: 'Dal' }] },
+      { group: 'Shelved', items: [{ value: 'r0', label: 'Apple kugel' }] },
+    ])
+  })
+
+  it('drops an empty group', () => {
+    const recipes = [{ ...recipe('r0', 'Apple kugel'), shelf: 'hidden' as const }, ...plain]
+    expect(recipePickerOptions(recipes)).toHaveLength(2)
   })
 })

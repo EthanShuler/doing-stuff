@@ -64,6 +64,22 @@ export function filterRecipes(
   return result.filter((recipe) => matches(recipe.tags))
 }
 
+/** The index's three groups, each keeping the order it was given: pinned
+ *  first, then everything else, then the hidden drawer. */
+export interface RecipeShelves {
+  pinned: Recipe[]
+  main: Recipe[]
+  hidden: Recipe[]
+}
+
+export function shelveRecipes(recipes: Recipe[]): RecipeShelves {
+  return {
+    pinned: recipes.filter((recipe) => recipe.shelf === 'pinned'),
+    main: recipes.filter((recipe) => recipe.shelf === ''),
+    hidden: recipes.filter((recipe) => recipe.shelf === 'hidden'),
+  }
+}
+
 /** The card/list metadata line: "Serves 4 · 45 min" (whichever parts exist). */
 export function servingsTimeLine(recipe: Pick<Recipe, 'servings' | 'totalTime'>): string {
   const parts: string[] = []
@@ -163,7 +179,8 @@ export function recipePullChoices(source: Recipe[], target: Recipe[]): RecipePul
 /** What a pull inserts for one source recipe: everything written on it
  *  (title, ingredients, steps, source + link, tags, servings, time, notes,
  *  grocery list + staple flags) with the copied photo's URL, the cooking
- *  marks cleared (they're this batch's state, not the recipe's), and
+ *  marks cleared (they're this batch's state, not the recipe's), the shelf
+ *  reset to normal, and
  *  `copiedFrom` = the source's ROOT origin (lib/lineage.ts). */
 export function cloneRecipe(source: Recipe, imageUrl: string): Omit<Recipe, 'id' | 'createdBy' | 'createdAt'> {
   return {
@@ -181,6 +198,8 @@ export function cloneRecipe(source: Recipe, imageUrl: string): Omit<Recipe, 'id'
     stapleItems: [...source.stapleItems],
     crossedIngredients: [],
     doneSteps: [],
+    // How often it gets made is this space's call, not the source's.
+    shelf: '',
     copiedFrom: originOf(source),
   }
 }

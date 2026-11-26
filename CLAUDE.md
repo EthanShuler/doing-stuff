@@ -446,7 +446,19 @@ ingredients as they go on a shopping list, one per line with no prep, plus
 **shown only in the edit modal**, never on the recipe page — its staples are
 tap-to-flag ★/☆ chips, shape + words; helpers in the recipes `derive.ts`), and ONE hero **photo** uploaded to the
 public `recipes` Storage bucket (same design as spoons; shared helpers in
-`src/lib/photos.ts`). The index (`/recipes`) is A–Z (no sort control) with
+`src/lib/photos.ts`), and a shared **`shelf`** (`'pinned' | '' | 'hidden'`,
+check-constrained; the UI calls them **Pinned / All / Shelved** — `'hidden'`
+is the stored value for Shelved) saying where it sits on the index. The index (`/recipes`)
+is three shelves, each A–Z (`shelveRecipes` in the recipes `derive.ts`): a
+**📌 Pinned** section first, then the rest (headed "All" only when
+something is pinned), then a collapsed **"Shelved · n"** drawer at
+the bottom — page state, closed on mount, and **held open while a search or
+tag filter is on**, so a shelved match is never unfindable. Shelved is for
+rarely-made recipes and ones added only for the grocery step; it tucks a recipe
+away on the index and nothing else. The shelf is set **only on the recipe page** (an
+"In the cookbook" Pinned / All / Shelved SegmentedControl above the
+byline) through `setShelf` — an optimistic one-column UPDATE, never part of
+the edit modal's draft, so an edit can't clobber it. The index has
 fuzzy title search (`src/lib/fuzzy.ts`, shared with the Log dashboard) and a
 **Grid / List** toggle (photo cards vs dense rows). Opening a recipe navigates
 to **`/recipes/:id` — the app's first full-page sub-route detail** (both
@@ -492,7 +504,10 @@ further browsing), "n of 7 dinners · n of 7 lunches", and seven dense day
 rows (past days faded, today labeled "today"), each with a Lunch and a Dinner
 line. Tapping a meal opens `DayPopover`: a searchable recipe Select, a
 "Something else" text field, leftovers chips ("Shakshuka (Sun dinner)"),
-Clear. A recipe meal gets a ↗ to `/recipes/:id`. **🛒 Plan groceries** (shown
+Clear. The recipe Select is **ranked by shelf** — pinned, then All, then
+Shelved, under group headings when any recipe is pinned or shelved
+(`recipePickerOptions`); a shelved recipe plans like any other. A recipe meal
+gets a ↗ to `/recipes/:id`. **🛒 Plan groceries** (shown
 only when the space has Lists on, since it writes into Lists) opens
 `GroceryModal`: each recipe meal's lines as checkboxes — its **grocery list** when
 written, else its ingredient lines (`recipeGroceryLines`) — **ticked by default except
@@ -660,7 +675,8 @@ mobile drawer, and that no route scrolls sideways at 390px
 (`mobile-overflow.spec.ts` — its name must keep matching the mobile project's
 `testMatch`), plus the multi-space flows: switching spaces and feature gating
 (`spaces`), the admin page (`admin`), set-password and change password
-(`password`), and both pulls (`tier-pull`, `recipe-pull`).
+(`password`), both pulls (`tier-pull`, `recipe-pull`), and pinning / shelving
+recipes (`recipe-shelf`).
 It boots its own Vite server on a dedicated port (5199, `strictPort`, so it
 can never attach to a dev server with real keys; **`E2E_PORT`** overrides it
 so two suites — e.g. parallel agents in separate worktrees — can run side by
@@ -1038,7 +1054,8 @@ title only → **"Same title here"**, still tickable (a different recipe that
 shares a name), unticked by default. A pulled recipe brings everything written
 on it (ingredients, steps, source, tags, servings, time, notes, grocery list +
 staple flags) with its **photo duplicated** and its **cross-off marks
-cleared**; meal-plan links stay behind. Recipes go one at a time, skipping any
+cleared** and its **shelf reset to normal** (how often it's made is each
+space's call); meal-plan links stay behind. Recipes go one at a time, skipping any
 whose origin is already here (including ones this pull just added). A photo
 that won't copy → the recipe comes over without it and `store.notice` says
 how many; a failed insert → its copied photo is removed and the pull stops
@@ -1248,7 +1265,7 @@ e2e/
   helpers.ts               Mantine interaction helpers (Select, SegmentedControl…)
   *.spec.ts                Playwright specs (routes, navigation, doing-stuff,
                            tier-list, lists, spoons, little-guys, parks,
-                           recipes, meal-plan, music-practice, seasons, alignment, mobile,
+                           recipes, recipe-shelf, meal-plan, music-practice, seasons, alignment, mobile,
                            mobile-overflow, spaces, admin, password, tier-pull, recipe-pull)
                            — see playwright.config.ts
 supabase/
